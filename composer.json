@@ -1,0 +1,22 @@
+{
+    "name": "Xero/xero",
+    "type": "project",
+    "description": "Xero is a digital currency that allows instant payments to anyone, anywhere. Xero has been written completely in PHP and follows the same technical design as Bitcoin. Xero uses P2P technology to operate with no central server.",
+    "keywords": ["crypto", "cryptocurrency", "bitcoin"],
+    "license": "MIT",
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Xero\\Xero\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Mike Curry",
+            "email": "mikecurry74@gmail.com"
+        }
+    ],
+    "require": {}
+}
