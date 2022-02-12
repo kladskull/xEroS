@@ -1,7 +1,7 @@
 {
-    "name": "Xero/xero",
+    "name": "mcurry/xeros",
     "type": "project",
-    "description": "Xero is a digital currency that allows instant payments to anyone, anywhere. Xero has been written completely in PHP and follows the same technical design as Bitcoin. Xero uses P2P technology to operate with no central server.",
+    "description": "Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP and follows the same technical design as Bitcoin. Xeros uses P2P technology to operate with no central server.",
     "keywords": ["crypto", "cryptocurrency", "bitcoin"],
     "license": "MIT",
     "require-dev": {
@@ -9,7 +9,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Xero\\Xero\\": "src/"
+            "Xeros\\": "src/"
         }
     },
     "authors": [
