@@ -8,7 +8,6 @@ use RuntimeException;
 
 class Database
 {
-
     private ?Medoo $dbConn = null;
     private static ?Database $instance = null;
 
@@ -45,7 +44,7 @@ class Database
         try {
             return self::initConnection()->dbConn;
         } catch (Exception $ex) {
-            Log::console("Unable to connect to the database " . $ex->getMessage());
+            Console::console("Unable to connect to the database " . $ex->getMessage());
             return null;
         }
     }

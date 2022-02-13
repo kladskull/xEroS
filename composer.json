@@ -29,6 +29,7 @@
     ],
     "require": {
         "catfan/medoo": "^2.1",
-        "robmorgan/phinx": "^0.12.10"
+        "robmorgan/phinx": "^0.12.10",
+        "stephenhill/base58": "^1.1"
     }
 }

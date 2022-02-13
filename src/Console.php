@@ -2,7 +2,7 @@
 
 namespace Xeros;
 
-class Log
+class Console
 {
     public static function console(string $message): void
     {

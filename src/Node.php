@@ -53,7 +53,7 @@ class Node
     {
         $server = stream_socket_server($this->getConnectUri($this->ip, $this->port), $errNumber, $errorMessage, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
         if (!$server) {
-            Log::console("$errorMessage ($errNumber)");
+            Console::console("$errorMessage ($errNumber)");
             exit(1);
         }
 
@@ -77,7 +77,7 @@ class Node
                     }
                     $this->clients[] = $client;
                     $ip = stream_socket_get_name($client, true);
-                    Log::console("New Client connected from $ip");
+                    Console::console("New Client connected from $ip");
 
                     $found_socket = array_search($server, $changed, true);
                     unset($changed[$found_socket]);
@@ -89,17 +89,17 @@ class Node
                     // todo: make sure we get all of it! (while !== false?)
                     $buffer = fread($changed_socket, 8192);
                     if (empty($buffer)) {
-                        Log::console("Client Disconnected from $ip");
+                        Console::console("Client Disconnected from $ip");
                         @fclose($changed_socket);
                         $found_socket = array_search($changed_socket, $this->clients, true);
                         unset($this->clients[$found_socket]);
                     }
                     //$unmasked = $this->unmask($buffer);
                     if ($buffer !== '') {
-                        Log::console("data from $ip");
+                        Console::console("data from $ip");
                         if ($buffer === 'time') {
-                            Log::console("Received a time request from $ip");
-                            Log::console("Sending a time response to $ip");
+                            Console::console("Received a time request from $ip");
+                            Console::console("Sending a time response to $ip");
                             @fwrite($changed_socket, time() . '');
                         }
 
@@ -113,8 +113,27 @@ class Node
         }
 
         // close the socket
-        Log::console('Closing server port');
+        Console::console('Closing server port');
         fclose($server);
+    }
+
+    public static function isAccessible(): bool
+    {
+        $accessible = false;
+
+        $peer = new Peer();
+        $http = new Http();
+        foreach ($peer->getAll(5) as $p) {
+            Console::console('Asking ' . $p['address'] . ' if we are accessible');
+            $value = Api::decodeResponse((string)$http->get($p['address'] . '/accessible.php'));
+            if (!empty($value)) {
+                if ($value['data'] === true) {
+                    $accessible = true;
+                }
+            }
+        }
+
+        return $accessible;
     }
 
     private function getSocketName($client): string
@@ -137,7 +156,7 @@ class Node
     public function send($client, $message, bool $compress = true): bool
     {
         if (fwrite($client, $message) === false) {
-            Log::console('Error sending packet to a client');
+            Console::console('Error sending packet to a client');
             return false;
         }
         return true;
@@ -158,7 +177,7 @@ class Node
         $recipientClients = array_diff($clients, $ignore);
         foreach ($recipientClients as $client) {
             if (fwrite($client, gzcompress($message, 9)) === false) {
-                Log::console('Error sending packet to client: `' . $this->getSocketName($client) . '`');
+                Console::console('Error sending packet to client: `' . $this->getSocketName($client) . '`');
             }
         }
     }

@@ -36,7 +36,7 @@ pcntl_signal(SIGINT, 'shutdown');
 // get the interpreter version
 $phpVersion = ((PHP_MAJOR_VERSION * 10000) + (PHP_MINOR_VERSION * 1000) + PHP_RELEASE_VERSION);
 if ($phpVersion < 81001) {
-    Log::console('The minimum version of PHP must be 8.1');
+    Console::console('The minimum version of PHP must be 8.1');
     exit(1);
 }
 

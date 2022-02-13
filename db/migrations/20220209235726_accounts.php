@@ -1,8 +1,6 @@
-<?php
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 use Phinx\Migration\AbstractMigration;
-use Phinx\Util\Literal;
 
 final class Accounts extends AbstractMigration
 {
@@ -25,7 +23,7 @@ final class Accounts extends AbstractMigration
             ->addColumn('date_created', 'integer', ['signed' => false])
             ->addColumn('public_key', 'text')
             ->addColumn('private_key', 'text')
-            ->addColumn('public_key_raw', 'text')
+            ->addColumn('public_hash', 'text')
             ->addColumn('address', 'text', ['limit' => 64])
             ->addIndex(['address'], ['unique' => true, 'order' => ['address' => 'ASC']])
             ->addIndex(['public_key_raw'], ['unique' => true, 'order' => ['public_key_raw' => 'ASC']])
