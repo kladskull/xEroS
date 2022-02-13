@@ -2,7 +2,7 @@
 
 namespace Xeros;
 
-class Queue extends Database
+class Queue
 {
     public function get(int $id): ?array
     {

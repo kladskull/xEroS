@@ -49,8 +49,9 @@ class Account
             $this->db->action(function () {
                 $keys = $this->openSsl->createRsaKeyPair();
 
-                $this->db->insert('accounts',
-                    [
+                $this->db->insert(
+                    table: 'accounts',
+                    values: [
                         'public_key' => $keys['public_key'],
                         'public_key_raw' => $keys['public_key_raw'],
                         'private_key' => $keys['private_key'],

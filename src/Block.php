@@ -2,19 +2,39 @@
 
 namespace Xeros;
 
+use PDO;
 use Exception;
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Pure;
 
-class Block extends Database
+class Block
 {
+    public const maxLifeTimeBlocks = 9999999999999;
+
+    private PDO $db;
+    private Pow $pow;
+
+    public function __construct()
+    {
+        $this->db = Database::getInstance();
+        $this->pow = new Pow();
+    }
+
+    public static function filterBlockHeight(int $height): int
+    {
+        if ($height <= 0 || $height > self::maxLifeTimeBlocks) {
+            $height = 1;
+        }
+        return $height;
+    }
+
     /**
      * @throws Exception
      */
     public function genesis(): array
     {
         $transaction = new Transaction();
-        $ossl = new OpenSsl();
+        $openSsl = new OpenSsl();
 
         // block details
         $height = 1;
@@ -23,8 +43,8 @@ class Block extends Database
 
         $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2rurp8hen6Wepcz0X+4kWqtqEk7e+46Mx4hjDDlYw2j7XXiEpSHAz0ZWwKfDlBSBV8yYVBSGI+URjoBn7+ZH/cuHaSNCxg5JTxSG5DyWgeG1OHUnILnfLdJpo0H/mGscVdf/Nws21j/XbG9eXICFIVfojKKqZWLax8XLyuf/Gl4Oj7RAuRVseN7CRiq73x8kcMSzUgLyitefWaH1GxmATTm3ygey5itn8ddf4iow78lM56hPHXl5id0JV+WsRL6QbuFvrC5Eo42iAyN0dsHrpqkK1+2fKVrfedJy3aa6LqjQZdfebJtw4PCdKBpn1ZVIeDJILy2lQUuBXu52Qc93QQIDAQAB';
 
-        //$publicKeyRaw = $ossl->stripPem(file_get_contents(__DIR__ . '/../../public.key'));
-        //$privateKeyRaw = $ossl->stripPem(file_get_contents(__DIR__ . '/../../private.key'));
+        //$publicKeyRaw = $openSsl->stripPem(file_get_contents(__DIR__ . '/../../public.key'));
+        //$privateKeyRaw = $openSsl->stripPem(file_get_contents(__DIR__ . '/../../private.key'));
 
         $hash = '0000000ddc4bae812455272176cdf3c8b7ed8d6a1e0eb7ba2709c14741fbb732';
         $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
@@ -41,11 +61,11 @@ class Block extends Database
         $address = new Address();
         $transferEncoding = new TransferEncoding();
         $script = new Script([]);
-        $partialAddress = $transferEncoding->binToHex($address->createPartial($ossl->formatPem($publicKeyRaw, false)));
+        $partialAddress = $transferEncoding->binToHex($address->createPartial($openSsl->formatPem($publicKeyRaw, false)));
         $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E656420696E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
         $txId = 0;
         $lockHeight = $height + Config::getLockHeight();
-        $toAddress = $address->create($ossl->formatPem($publicKeyRaw, false));
+        $toAddress = $address->create($openSsl->formatPem($publicKeyRaw, false));
 
         $transactionId = $transaction->generateId($date, $blockId, $publicKeyRaw);
         $transactionRecord = [
@@ -55,7 +75,7 @@ class Block extends Database
             'date_created' => $date,
             'public_key' => $publicKeyRaw,
             'peer' => 'genesis',
-            'version' => Version::Coinbase,
+            'version' => TransactionVersion::Coinbase,
             'height' => 1,
             Transaction::Inputs => [],
             Transaction::Outputs => [
@@ -65,7 +85,7 @@ class Block extends Database
                     'value' => $amount,
                     'script' => $script->encodeScript($scriptText),
                     'lock_height' => $lockHeight,
-                    'hash' => Hash::doubleSha256ToBase58($transactionId . $txId . $toAddress . $amount . $lockHeight),
+                    'hash' => $this->pow->doubleSha256ToBase58($transactionId . $txId . $toAddress . $amount . $lockHeight),
                 ]
             ],
         ];
@@ -94,53 +114,100 @@ class Block extends Database
 
     public function generateId(string $previousBlockId, int $date, int $height): string
     {
-        return Hash::doubleSha256ToBase58(
+        return $this->pow->doubleSha256ToBase58(
             $previousBlockId . $date . $height
         );
     }
 
-    public function getCurrentHeight(): int
-    {
-        $current = (int)$this->db->queryFirstField("SELECT height FROM blocks ORDER by height DESC LIMIT 1");
-        if ($current < 1) {
-            return 0;
-        }
-        return $current;
-    }
-
     public function get(int $id): ?array
     {
-        return $this->db->queryFirstRow("SELECT * FROM blocks WHERE id=%i", $id);
+        // prepare the statement
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+
+        // filter and bind parameters
+        $id = self::filterBlockHeight(filter_var($id, FILTER_SANITIZE_NUMBER_INT));
+        $stmt->bindParam(param: ':id', var: $id, type: PDO::PARAM_INT);
+
+        // execute the query
+        $stmt->execute();
+
+        return $stmt->fetch() ?: null;
     }
 
-    public function getByPrevBlockId(string $blockId): array
+    public function getCurrentHeight(): int
     {
-        return $this->db->queryFirstRow("SELECT * FROM blocks WHERE previous_block_id=%s", $blockId) ?: [];
+        // prepare the statement
+        $query = 'SELECT `height` FROM blocks ORDER BY `height` DESC LIMIT 1';
+        $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
+
+        // execute the query
+        return max(1, $stmt->fetchColumn());
     }
 
-    public function getByBlockId(string $blockId): array
+    public function getByBlockId(string $blockId): ?array
     {
-        return $this->db->queryFirstRow("SELECT * FROM blocks WHERE block_id=%s", $blockId) ?: [];
+        // prepare the statement
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `block_id` = :block_id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+
+        // filter and bind parameters
+        $blockId = preg_replace("/[^a-zA-Z0-9]/", '', $blockId);
+        $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
+
+        // execute the query
+        $stmt->execute();
+
+        return $stmt->fetch() ?: null;
     }
 
-    public function getByHeight(int $height): array
+    public function getByPreviousBlockId(string $previousBlockId): ?array
     {
-        return $this->db->queryFirstRow("SELECT * FROM blocks WHERE height=%i AND orphan=0;", $height) ?: [];
+        // prepare the statement
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `previous_block_id` = :previous_block_id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+
+        // filter and bind parameters
+        $previousBlockId = preg_replace("/[^a-zA-Z0-9]/", '', $previousBlockId);
+        $stmt->bindParam(param: ':previous_block_id', var: $previousBlockId, maxLength: 64);
+
+        // execute the query
+        $stmt->execute();
+
+        return $stmt->fetch() ?: null;
     }
 
-    public function getFullBlockByHeight(int $height): array
+    public function getByHeight(int $height): ?array
     {
-        $blockId = $this->db->queryFirstField("SELECT block_id FROM blocks WHERE height=%i AND orphan=0;", $height) ?: [];
-        return $this->returnFullBlock($blockId);
+        // prepare the statement
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan` = 0 AND `height` = :height LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+
+        // filter and bind parameters
+        $height = self::filterBlockHeight(filter_var($height, FILTER_SANITIZE_NUMBER_INT));
+        $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
+
+        // execute the query
+        $stmt->execute();
+
+        return $stmt->fetch() ?: null;
     }
 
-    public function getCurrent(): array|null
+    public function getCurrent(): ?array
     {
-        return $this->db->queryFirstRow("SELECT * FROM blocks WHERE orphan=0 ORDER by height DESC LIMIT 1");
+        // prepare the statement
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan`=0 ORDER BY height DESC LIMIT 1';
+        $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
+
+        // execute the query
+        return max(1, $stmt->fetchColumn());
     }
 
     private function injectConfirmationsAndClean(array &$blockData): void
     {
+        /**
+         * You were looking why we define a new block, and then wondering if we need to return the FULL block array
+         */
         $block = new Block();
         $currentHeight = $block->getCurrentHeight();
 
@@ -281,7 +348,7 @@ class Block extends Database
         $coinbaseRecords = 0;
 
         foreach ($transactions as $transaction) {
-            if ($transaction['version'] === Version::Coinbase) {
+            if ($transaction['version'] === TransactionVersion::Coinbase) {
                 $coinbaseRecords++;
             }
             $reason = $t->validate($transaction);
@@ -387,13 +454,6 @@ class Block extends Database
         }
 
         return $nSubsidy;
-    }
-
-    // eventually calculate the maximum block size and increase if required
-    #[Pure]
-    public function getMaxTransactions(): float|int
-    {
-        return Config::getMaxTransactionSize();
     }
 
     public function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float

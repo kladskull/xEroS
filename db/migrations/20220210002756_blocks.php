@@ -28,7 +28,7 @@ final class Blocks extends AbstractMigration
             ->addColumn('nonce', 'text', ['limit' => '128'])
             ->addColumn('difficulty', 'integer', ['signed' => false])
             ->addColumn('merkle_root', 'text', ['limit' => 64])
-            ->addColumn('transaction_count', 'integer', ['signed' => false])
+            ->addColumn('transactions', 'integer', ['signed' => false])
             ->addColumn('previous_hash', 'text', ['limit' => 64])
             ->addColumn('hash', 'text', ['limit' => 64])
             ->addColumn('orphan', 'integer', ['signed' => false, 'default' => '0'])

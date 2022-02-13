@@ -2,7 +2,7 @@
 
 namespace Xeros;
 
-class Mempool extends Database
+class Mempool
 {
     protected Peer $peers;
     protected TransferEncoding $transferEncoding;

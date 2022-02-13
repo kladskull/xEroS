@@ -20,9 +20,7 @@ class Address
 
     public function create(string $publicKey): string
     {
-        if (!str_starts_with(
-                $publicKey, OpenSsl::BEGIN_PUBLIC_KEY) && !str_ends_with(rtrim($publicKey), OpenSsl::END_PUBLIC_KEY)
-        ) {
+        if (!str_starts_with($publicKey, OpenSsl::BEGIN_PUBLIC_KEY) && !str_ends_with(rtrim($publicKey), OpenSsl::END_PUBLIC_KEY)) {
             $publicKey = $this->openssl->formatPem($publicKey, false);
         }
 

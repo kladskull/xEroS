@@ -4,7 +4,7 @@ namespace Xeros;
 
 class Console
 {
-    public static function console(string $message): void
+    public static function log(string $message): void
     {
         echo '[ ', date('Y-m-d H:i:s'), ' ] -> ', $message, PHP_EOL;
     }

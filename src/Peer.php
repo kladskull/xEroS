@@ -2,15 +2,13 @@
 
 namespace Xeros;
 
-class Peer extends Database
+class Peer
 {
     private Http $http;
     private DataStore $store;
 
     public function __construct()
     {
-        parent::__construct();
-
         $this->http = new Http();
         $this->store = new DataStore();
     }

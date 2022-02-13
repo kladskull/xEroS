@@ -2,7 +2,7 @@
 
 namespace Xeros;
 
-class DataStore extends Database
+class DataStore
 {
     public function get(int $id): ?array
     {

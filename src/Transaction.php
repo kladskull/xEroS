@@ -3,7 +3,7 @@
 namespace Xeros;
 
 // todo: reduce the size of the signature (dehex, and base58?)
-class Transaction extends Database
+class Transaction
 {
     protected Peer $peers;
     protected TransferEncoding $transferEncoding;

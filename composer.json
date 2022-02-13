@@ -27,7 +27,6 @@
     "ext-xml": "*",
     "ext-xmlrpc": "*",
     "ext-zip": "*",
-    "catfan/medoo": "^2.1",
     "robmorgan/phinx": "^0.12.10",
     "stephenhill/base58": "^1.1",
     "symfony/console": "^6.0"
@@ -43,7 +42,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Xeros\\": "tests/"
+      "Xeros\\Tests\\": "tests/"
     }
   },
   "scripts": {

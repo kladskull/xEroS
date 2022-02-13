@@ -2,55 +2,32 @@
 
 namespace Xeros;
 
-use Exception;
-use Medoo\Medoo;
-use RuntimeException;
+use PDO;
+use PDOException;
 
 class Database
 {
-    private ?Medoo $dbConn = null;
-    private static ?Database $instance = null;
+    protected static PDO $instance;
 
-    private function __construct()
+    protected function __construct()
     {
     }
 
-    private static function getInstance()
+    public static function getInstance(): PDO
     {
-        if (self::$instance === null) {
-            $className = __CLASS__;
-            self::$instance = new $className;
+        if (empty(self::$instance)) {
+            try {
+                self::$instance = new PDO(
+                    dsn: 'sqlite:' . APP_DIR . strtolower(Config::getProductName()) . '.db',
+                    options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+                );
+                self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            } catch (PDOException $error) {
+                Console::log($error->getMessage());
+            }
+
         }
 
         return self::$instance;
-    }
-
-    private static function initConnection()
-    {
-        $db = self::getInstance();
-
-        // Connect the database.
-        $db->dbConn = new Medoo([
-            'type' => 'sqlite',
-            // todo: add development, testing and production based on config
-            'database' => APP_DIR . strtolower(Config::getProductName()) . '.db'
-        ]);
-
-        return $db;
-    }
-
-    public static function getDbConn(): ?Medoo
-    {
-        try {
-            return self::initConnection()->dbConn;
-        } catch (Exception $ex) {
-            Console::console("Unable to connect to the database " . $ex->getMessage());
-            return null;
-        }
-    }
-
-    public function __clone()
-    {
-        throw new RuntimeException("Can't clone a singleton");
     }
 }
