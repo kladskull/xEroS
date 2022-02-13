@@ -1,35 +1,63 @@
 {
-    "name": "mcurry/xeros",
-    "type": "project",
-    "description": "Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP and follows the same technical design as Bitcoin. Xeros uses P2P technology to operate with no central server.",
-    "keywords": ["crypto", "cryptocurrency", "bitcoin"],
-    "license": "MIT",
-    "require-dev": {
-        "roave/security-advisories": "dev-latest"
-        ,
-        "phpunit/phpunit": "^9.5"
-    },
-
-    "autoload": {
-        "psr-4": {
-            "Xeros\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Xeros\\": "tests/"
-        }
-    },
-    "bin": ["bin/xero"],
-    "authors": [
-        {
-            "name": "Mike Curry",
-            "email": "mikecurry74@gmail.com"
-        }
-    ],
-    "require": {
-        "catfan/medoo": "^2.1",
-        "robmorgan/phinx": "^0.12.10",
-        "stephenhill/base58": "^1.1"
+  "name": "mcurry/xeros",
+  "type": "project",
+  "description": "Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP and follows the same technical design as Bitcoin. Xeros uses P2P technology to operate with no central server.",
+  "keywords": [
+    "coin",
+    "blockchain",
+    "cryptocurrency"
+  ],
+  "homepage": "https://solutionxero.io",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Mike Curry",
+      "email": "mikecurry74@gmail.com",
+      "homepage": "https://currazy.com",
+      "role": "Lead Developer"
     }
+  ],
+  "require": {
+    "php": ">=8.1",
+    "ext-bcmath": "*",
+    "ext-curl": "*",
+    "ext-mbstring": "*",
+    "ext-pdo": "*",
+    "ext-sqlite3": "*",
+    "ext-xml": "*",
+    "ext-xmlrpc": "*",
+    "ext-zip": "*",
+    "catfan/medoo": "^2.1",
+    "robmorgan/phinx": "^0.12.10",
+    "stephenhill/base58": "^1.1",
+    "symfony/console": "^6.0"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "phpunit/phpunit": "^9.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Xeros\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Xeros\\": "tests/"
+    }
+  },
+  "scripts": {
+    "check": [
+      "@test",
+      "@cs-check"
+    ],
+    "cs-check": "phpcs -np app/ src/ tests/",
+    "cs-fix": "phpcbf -np app/ src/ tests/",
+    "stan": "phpstan analyse src/",
+    "stan-setup": "cp composer.json composer.backup && composer require --dev phpstan/phpstan:^0.12 && mv composer.backup composer.json",
+    "test": "phpunit --colors=always"
+  },
+  "bin": [
+    "bin/xero"
+  ]
 }
