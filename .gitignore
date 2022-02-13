@@ -1,10 +1,11 @@
+# Local files
+*.db
+*.key
+
 ### Composer ###
 composer.phar
 /vendor/
 # composer.lock
-
-# keys
-*.key
 
 # vendor
 /vendor/*

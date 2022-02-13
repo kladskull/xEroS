@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Xeros;
 
@@ -61,7 +61,7 @@ class Node
         stream_set_blocking($server, false);
 
         while (true) {
-            if (!defined('QUIT')) {
+            if (!defined('APP_QUIT')) {
 
                 // connect to other peers, if we can
                 if ($this->peers < $this->maxPeers) {

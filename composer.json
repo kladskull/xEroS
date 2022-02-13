@@ -5,18 +5,30 @@
     "keywords": ["crypto", "cryptocurrency", "bitcoin"],
     "license": "MIT",
     "require-dev": {
+        "roave/security-advisories": "dev-latest"
+        ,
         "phpunit/phpunit": "^9.5"
     },
+
     "autoload": {
         "psr-4": {
             "Xeros\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Xeros\\": "tests/"
+        }
+    },
+    "bin": ["bin/xero"],
     "authors": [
         {
             "name": "Mike Curry",
             "email": "mikecurry74@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "catfan/medoo": "^2.1",
+        "robmorgan/phinx": "^0.12.10"
+    }
 }
