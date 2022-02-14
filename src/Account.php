@@ -92,7 +92,7 @@ class Account
         }
         return $result;
     }
-    
+
     public function getBalance(string $address): string
     {
         $query = 'SELECT `value` FROM transaction_outputs WHERE `address` = :address';
