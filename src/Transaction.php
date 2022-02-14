@@ -177,7 +177,7 @@ class Transaction
         }
 
         // report the fee
-        return bcabs(bcsub($totalInputs, $totalOutputs));
+        return BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
     }
 
     /**
@@ -320,7 +320,7 @@ class Transaction
         }
 
         // check for an appropriate fee
-        $fee = bcabs(bcsub($totalInputs, $totalOutputs));
+        $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
         if (bccomp($fee, Config::getMinimumTransactionFee()) < 0) {
             return $this->returnValidateError('fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . ').');
         }

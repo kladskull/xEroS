@@ -63,8 +63,6 @@ class Peer
 
     public function getAll(int $limit = 100, bool $oldest = false): array
     {
-        $limit = filterLimit($limit, 1, 100);
-
         $timeSql = 'AND (UNIX_TIMESTAMP(NOW())-last_ping < 86400 OR UNIX_TIMESTAMP(NOW())-date_created < 86400) ORDER BY RAND()';
         if ($oldest) {
             // do not disturb recently pinged servers...

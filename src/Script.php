@@ -216,7 +216,7 @@ class Script
 
         $result = $value;
         if (ctype_xdigit($value)) {
-            $result = bchexdec($value);
+            $result = BcmathExtensions::bchexdec($value);
         }
 
         return $result;

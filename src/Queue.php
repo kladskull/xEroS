@@ -11,8 +11,6 @@ class Queue
 
     public function getItems(string $command, int $limit = 100): array
     {
-        $limit = filterLimit($limit, 1, 100);
-
         return toArray(
             $this->db->query("SELECT id,date_created,command,data,trys FROM queue WHERE command=%s AND trys<5 ORDER BY id LIMIT %i;", $command, $limit)
         );
