@@ -2,65 +2,67 @@
 
 namespace Xeros;
 
-// todo: reduce the size of the signature (dehex, and base58?)
+use Exception;
+use JetBrains\PhpStorm\ArrayShape;
+use JetBrains\PhpStorm\Pure;
+use PDO;
+
 class Transaction
 {
-    protected Peer $peers;
-    protected TransferEncoding $transferEncoding;
-    protected Address $address;
-    protected OpenSsl $openSsl;
+    private PDO $db;
+    protected Pow $pow;
 
     public const Inputs = 'txIn';
     public const Outputs = 'txOut';
 
     public function __construct()
     {
-        parent::__construct();
-        $this->peers = new Peer();
-        $this->address = new Address();
-        $this->openSsl = new OpenSsl();
-        $this->transferEncoding = new TransferEncoding();
+        $this->db = Database::getInstance();
+        $this->pow = new Pow();
     }
 
+    #[Pure]
     public function generateId($date, $blockId, $publicKeyRaw): string
     {
-        return Hash::doubleSha256ToBase58(
-            $date . $blockId . $publicKeyRaw
+        return bin2hex(
+            $this->pow->doubleSha256(
+                $date . $blockId . $publicKeyRaw
+            )
         );
     }
 
     public function exists(string $transactionId): bool
     {
-        $result = false;
-        $id = (int)$this->db->queryFirstField("SELECT count(1) FROM transactions WHERE transaction_id=%s", $transactionId);
-        if ($id > 0) {
-            $result = true;
-        }
-        return $result;
+        $query = 'SELECT `id` FROM transactions WHERE `id` = :transaction_id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt->execute();
+
+        $id = $stmt->fetchColumn() ?: null;
+        return ($id !== null && $id > 0);
     }
 
-    /**
-     * @throws Exception
-     */
     public function get(int $id): array|null
     {
-        $transaction = null;
-        $transaction_id = $this->db->queryFirstField('SELECT transaction_id FROM transactions WHERE id=%i', $id);
-        if ($transaction_id !== null) {
-            $transaction = $this->getByTransactionId($transaction_id);
-        }
-        return $transaction;
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT, 0);
+        $stmt->execute();
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    /**
-     * @throws Exception
-     */
     public function getByTransactionId(string $transactionId): array|null
     {
-        $transaction = $this->db->queryFirstRow('SELECT * FROM transactions WHERE transaction_id=%s', $transactionId);
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'transaction_id', $transactionId, DatabaseHelpers::ALPHA_NUMERIC, 64);
+        $stmt->execute();
+        $transaction = $stmt->fetch() ?: null;
+
         if ($transaction !== null) {
-            $txIns = $this->db->query("SELECT * FROM transaction_inputs WHERE transaction_id=%s", $transactionId);
-            $txOuts = $this->db->query("SELECT * FROM transaction_outputs WHERE transaction_id=%s", $transactionId);
+            $txIns = $this->getTransactionInputs($transactionId);
+            $txOuts = $this->getTransactionOutputs($transactionId);
 
             // attach the details
             $transaction[self::Inputs] = $txIns;
@@ -70,45 +72,60 @@ class Transaction
         return $transaction;
     }
 
-    public function getTransactionsByBlockId(string $blockId): array|null
+    public function getTransactionInputs(string $transactionId): array
+    {
+        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script` FROM transaction_inputs WHERE transaction_id=:transaction_id;';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt->execute();
+
+        return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
+    }
+
+    public function getTransactionOutputs(string $transactionId): bool|array|null
+    {
+        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` FROM transaction_outputs WHERE transaction_id=:transaction_id;';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt->execute();
+
+        return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
+    }
+
+    public function getTransactionsByBlockId(string $blockId): array
     {
         $returnTransactions = [];
-        $transactions = $this->db->query('SELECT block_id,transaction_id,date_created,signature,public_key,peer,height,version FROM transactions WHERE block_id=%s', $blockId);
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `block_id` = :block_id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
+        $stmt->execute();
+
+        $transactions = $stmt->fetch() ?: null;
         foreach ($transactions as $transaction) {
-
-            $txIns = $this->db->query("SELECT tx_id,previous_transaction_id,previous_tx_out_id,script FROM transaction_inputs WHERE transaction_id=%s", $transaction['transaction_id']);
-            $txOuts = $this->db->query("SELECT tx_id,address,script,value,lock_height,hash FROM transaction_outputs WHERE transaction_id=%s", $transaction['transaction_id']);
-
             // attach the details
-            $transaction[self::Inputs] = $txIns;
-            $transaction[self::Outputs] = $txOuts;
-
+            $transaction[self::Inputs] = $this->getTransactionInputs($transaction['transaction_id']);
+            $transaction[self::Outputs] = $this->getTransactionOutputs($transaction['transaction_id']);
             $returnTransactions[] = $transaction;
         }
 
         return $returnTransactions;
     }
 
-    public function stripInternals(array $transaction): array
-    {
-        unset($transaction['id'], $transaction['block_id']);
-        return $transaction;
-    }
-
     private function attachTxs(array $transaction): array
     {
+
         $transaction[self::Inputs] = $this->db->query("SELECT * FROM transaction_inputs WHERE transaction_id=%s", $transaction['transaction_id']);
         $transaction[self::Outputs] = $this->db->query("SELECT * FROM transaction_outputs WHERE transaction_id=%s", $transaction['transaction_id']);
 
         return $transaction;
     }
 
-    private function assembleFullTransaction(array $transaction): array
+    private function stripInternalFields(array $transaction): array
     {
-        // attach tx's
-        $transaction = $this->attachTxs($transaction);
+        // remove internal columns
+        unset($transaction['id'], $transaction['block_id']);
 
-        // remove internals
+        // remove internal columns
         $inputs = [];
         foreach ($transaction[self::Inputs] as $in) {
             unset($in['id'], $in['transaction_id']);
@@ -123,7 +140,7 @@ class Transaction
         }
         $transaction[self::Outputs] = $outputs;
 
-        return $this->stripInternals($transaction);
+        return $transaction;
     }
 
     #[ArrayShape(['validated' => "", 'reason' => ""])]
@@ -169,6 +186,9 @@ class Transaction
     #[ArrayShape(['validated' => "false", 'reason' => "string"])]
     public function validate(array $transaction): array
     {
+        $address = new Address();
+        $openSsl = new OpenSsl();
+
         if (!isset($transaction['date_created'])) {
             return $this->returnValidateError('"date_created" is a missing');
         }
@@ -217,7 +237,7 @@ class Transaction
 
         // validate signature
         $signatureText = $this->generateSignatureText($transaction);
-        if (!$this->openSsl->verifySignature($signatureText, $transaction['signature'], $this->openSsl->formatPem($transaction['public_key'], false))) {
+        if (!$openSsl->verifySignature($signatureText, $transaction['signature'], $openSsl->formatPem($transaction['public_key'], false))) {
             return $this->returnValidateError('Invalid signature');
         }
 
@@ -261,7 +281,7 @@ class Transaction
 
         $totalOutputs = "0";
         foreach ($transaction[self::Outputs] as $txOut) {
-            if (!$this->address->validateAddress($txOut['address'])) {
+            if (!$address->validateAddress($txOut['address'])) {
                 return $this->returnValidateError('invalid address in unspent: ' . $txOut['address']);
             }
 
@@ -290,12 +310,12 @@ class Transaction
         }
 
         // non-coinbase - the inputs must be greater or equal to the outputs
-        if (($transaction['version'] !== Version::Coinbase) && bccomp($totalInputs, $totalOutputs) < 0) {
+        if (($transaction['version'] !== TransactionVersion::Coinbase) && bccomp($totalInputs, $totalOutputs) < 0) {
             return $this->returnValidateError('the inputs are less than the outputs).');
         }
 
         // coinbase - the inputs must be zero, and the outputs must be > 0
-        if (($transaction['version'] === Version::Coinbase) && bccomp($totalInputs, "0") === 0 && bccomp($totalInputs, "0") > 0) {
+        if (($transaction['version'] === TransactionVersion::Coinbase) && bccomp($totalInputs, "0") === 0) {
             return $this->returnValidateError('the coinbase inputs must be zero.');
         }
 
@@ -331,23 +351,25 @@ class Transaction
         return $sortedTransactions;
     }
 
-    public static function sortTx(array $txIns): array
+    public static function sortTx(?array $txs): array
     {
         $sorted = [];
-        foreach ($txIns as $txIn) {
-            $sorted[str_pad((string)(int)$txIn['tx_id'], 6, '0', STR_PAD_LEFT)] = $txIn;
+        $sortedTx = [];
+        if ($txs !== null) {
+            foreach ($txs as $tx) {
+                $sorted[str_pad((string)(int)$tx['tx_id'], 6, '0', STR_PAD_LEFT)] = $tx;
+            }
+
+            // sort by the new key
+            ksort($sorted);
+
+            // reassemble the array from the sorted data
+            foreach ($sorted as $txIn) {
+                $sortedTx[] = $txIn;
+            }
         }
-
-        // sort by the new key
-        ksort($sorted);
-
-        // reassemble the array from the sorted data
-        $sortedTxIns = [];
-        foreach ($sorted as $txIn) {
-            $sortedTxIns[] = $txIn;
-        }
-
-        return $sortedTxIns;
+        
+        return $sortedTx;
     }
 
     public function generateSignatureText(array $transaction): string
@@ -373,7 +395,7 @@ class Transaction
      */
     public function generateSignature($signatureText, $publicKey, $privateKey): string
     {
-        return $this->openSsl->signAndVerifyData($signatureText, $publicKey, $privateKey);
+        return (new OpenSsl())->signAndVerifyData($signatureText, $publicKey, $privateKey);
     }
 
     /**
@@ -382,26 +404,6 @@ class Transaction
     public function signTransaction(array $transaction, $publicKey, $privateKey): string
     {
         return $this->generateSignature($this->generateSignatureText($transaction), $publicKey, $privateKey);
-    }
-
-    public function delete(int $id): bool
-    {
-        $result = false;
-        try {
-            $this->db->startTransaction();
-
-            // grab the record for the tx id
-            $transaction = $this->get($id);
-
-            $this->db->delete('transactions', "id=%s", $id);
-            $this->db->delete('transaction_inputs', "transaction_id=%s", $transaction['transaction_id']);
-            $this->db->delete('transaction_outputs', "transaction_id=%s", $transaction['transaction_id']);
-            $this->db->commit();
-            $result = true;
-        } catch (MeekroDBException|Exception $ex) {
-            $this->db->rollback();
-        }
-        return $result;
     }
 
     public function unlockTransaction(array $input, array $output): bool

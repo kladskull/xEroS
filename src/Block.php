@@ -13,7 +13,7 @@ class Block
     public const maxLifeTimeBlocks = 9999999999999;
 
     private PDO $db;
-    private Transaction $transaction;
+    public Transaction $transaction;
     private Pow $pow;
 
     public function __construct()
@@ -88,7 +88,7 @@ class Block
                     'value' => $amount,
                     'script' => $script->encodeScript($scriptText),
                     'lock_height' => $lockHeight,
-                    'hash' => $this->pow->doubleSha256ToBase58($transactionId . $txId . $toAddress . $amount . $lockHeight),
+                    'hash' => $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight),
                 ]
             ],
         ];
@@ -117,7 +117,7 @@ class Block
 
     public function generateId(string $previousBlockId, int $date, int $height): string
     {
-        return $this->pow->doubleSha256ToBase58(
+        return $this->pow->doubleSha256(
             $previousBlockId . $date . $height
         );
     }
@@ -130,13 +130,6 @@ class Block
         $stmt->execute();
 
         return $stmt->fetch() ?: null;
-    }
-
-    public function getCurrentHeight(): int
-    {
-        $query = 'SELECT `height` FROM blocks ORDER BY `height` DESC LIMIT 1';
-        $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
-        return max(1, $stmt->fetchColumn());
     }
 
     public function getByBlockId(string $blockId): ?array
@@ -157,6 +150,13 @@ class Block
         return $stmt->fetch() ?: null;
     }
 
+    public function getCurrentHeight(): int
+    {
+        $query = 'SELECT `height` FROM blocks ORDER BY `height` DESC LIMIT 1';
+        $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
+        return max(1, $stmt->fetchColumn());
+    }
+
     public function getByHeight(int $height): ?array
     {
         // prepare the statement
@@ -171,39 +171,32 @@ class Block
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan`=0 ORDER BY height DESC LIMIT 1';
         $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
-        return max(1, $stmt->fetchColumn());
+        return $stmt->fetch() ?: null;
     }
 
-    /*
-    private function injectConfirmationsAndClean(array &$blockData): array
-    {
-        $currentHeight = $this->getCurrentHeight();
-        unset($blockData['id'], $blockData['orphan']);
-
-        // add confirmations
-        $blockData['confirmations'] = $currentHeight - $blockData['height'];
-
-        return $blockData;
-    }
-    */
-    /*
-    public function 1`ullBlock(string $blockId, bool $previousBlockId = false): array
+    public function assembleFullBlock(string $blockId, bool $previousBlockId = false): array
     {
         $transaction = new Transaction();
         if (!$previousBlockId) {
             $currBlock = $this->getByBlockId($blockId);
         } else {
-            $currBlock = $this->getByPrevBlockId($blockId);
+            $currBlock = $this->getByPreviousBlockId($blockId);
         }
-        if (count($currBlock)) {
+
+        if ($currBlock !== null) {
+            // remove internal fields
+            unset($currBlock['id'], $currBlock['orphan']);
+
+            // get the current height to calculate confirmations
+            $currentHeight = $this->getCurrentHeight();
+            $currBlock['confirmations'] = $currentHeight - $currBlock['height'];
             $currBlock['transactions'] = $transaction->getTransactionsByBlockId($blockId);
-            $this->injectConfirmationsAndClean($currBlock);
         } else {
             $currBlock = [];
         }
         return $currBlock;
     }
-    */
+
 
     /**
      * @throws Exception
@@ -223,43 +216,6 @@ class Block
         ];
     }
 
-    /**
-     * Validate a remote block against x peers
-     *
-     * @param array $blk
-     * @param Peer $peer
-     * @param Block $block
-     * @return bool
-     */
-    function verifyRemoteBlock(array $blk, Peer $peer, Block $block): bool
-    {
-        // we need to check the block other peers...
-        $result = false;
-
-        $count = 0;
-        $correct = 0;
-
-        // check the block against all of our peers
-        foreach ($peer->getAll(Config::getMaxRebroadcastPeers()) as $p) {
-            $checkBlk = $block->getRemoteBlockById($p['address'], $blk['block_id']);
-            if ($checkBlk['hash'] === $blk['hash'] && $checkBlk['previous_hash'] === $blk['previous_hash']) {
-                $correct++;
-            }
-            $count++;
-        }
-
-        // check the score and add the block
-        $score = $correct / $count * 100;
-        if ($score >= 51) {
-            $result = true;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @throws Exception
-     */
     public function validate(array $block, array $transactions, int $transactionCount): array
     {
         if ($block['network_id'] !== Config::getNetworkIdentifier()) {
@@ -335,9 +291,11 @@ class Block
      */
     public function addFullBlock(array $block, bool $validate = true): bool
     {
+        $result = false;
+
         if ($validate) {
             try {
-                $result = $this->validateFullBlock();
+                $result = $this->validateFullBlock($block);
             } catch (Exception|RuntimeException $ex) {
                 Console::log('Exception thrown validating block: ' . $ex->getMessage());
                 exit(0);
@@ -358,12 +316,14 @@ class Block
         unset($transactions);
 
         try {
+            // start a transaction
+            $this->db->beginTransaction();
+
             // lock tables
             $this->db->exec('LOCK TABLES accounts WRITE, blocks WRITE, transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,peers WRITE;');
 
             // prepare the statement and execute
-            $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan`) ' .
-                'VALUES (:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,:transactions,:previous_hash,:hash,:orphan)';
+            $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan`) VALUES (:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,:transactions,:previous_hash,:hash,:orphan)';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'network_id', value: $block['network_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 4);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $block['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
@@ -497,15 +457,15 @@ class Block
             $this->db->exec('UNLOCK TABLES');
             $this->db->commit();
 
+            $result = true;
         } catch (Exception $ex) {
             Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->exec('UNLOCK TABLES');
             $this->db->rollback();
         }
 
-        return $id;
+        return $result;
     }
-
 
     // add a new block to the db
     public function identifyOrphans(int $height, string $blockId): void
@@ -554,8 +514,7 @@ class Block
         return $nSubsidy;
     }
 
-    public
-    function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
+    public function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
     {
         return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
     }
@@ -634,78 +593,106 @@ class Block
 
     public function generateBlockHeader(array $block): string
     {
-        return $block['network_id'] . $block['block_id'] . $block['previous_block_id'] . $block['date_created'] .
-            $block['height'] . $block['difficulty'] . $block['merkle_root'] . $block['transaction_count'] . $block['previous_hash'];
+        return
+            $block['network_id'] .
+            $block['block_id'] .
+            $block['previous_block_id'] .
+            $block['date_created'] .
+            $block['height'] .
+            $block['difficulty'] .
+            $block['merkle_root'] .
+            $block['transaction_count'] .
+            $block['previous_hash'];
     }
 
     public function delete(string $blockId): bool
     {
-        // delete the block
-        $query = 'DELETE FROM blocks WHERE `block_id` = :block_id;';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-        $blockId = preg_replace("/[^a-zA-Z0-9]/", '', $blockId);
-        $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
-        $stmt->execute();
+        $result = false;
+        try {
+            // delete the block
+            $query = 'DELETE FROM blocks WHERE `block_id` = :block_id;';
+            $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt->execute();
 
-        // get all transactions associated with this block
-        $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-        $stmt->bindParam(param: ':id', var: $blockId, type: PDO::PARAM_INT);
-        $stmt->execute();
-        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // get all transactions associated with this block
+            $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt->execute();
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        /******** DELEGATE THIS TO TRANSACTIONS ********/
-        foreach ($transactions as $transaction) {
-            $this->db->delete('transactions', "transaction_id=%s", $transaction['transaction_id']);
-
-            // REVERSE ANY SPENT TRANSACTIONS!!
-            $spentItems = $this->db->query('SELECT previous_transaction_id, previous_tx_out_id from transaction_inputs WHERE transaction_id=%s;', $transaction['transaction_id']);
-            foreach ($spentItems as $spentItem) {
-                // mark the transaction as unspent
-                $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
-                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $spentItem['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $spentItem['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
-                $stmt->execute();
-                $transactionTxId = $this->db->lastInsertId();
-                if ($transactionTxId <= 0) {
-                    throw new RuntimeException('failed to update transaction tx as unspent in the database: ' . $txIn['transaction_id'] . ' - ' . $txIn['transaction_id']);
+            foreach ($transactions as $transaction) {
+                // REVERSE ANY SPENT TRANSACTIONS!!
+                $spentItems = $this->db->query('SELECT previous_transaction_id, previous_tx_out_id from transaction_inputs WHERE transaction_id=%s;', $transaction['transaction_id']);
+                foreach ($spentItems as $spentItem) {
+                    // mark the transaction as unspent
+                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $spentItem['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $spentItem['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                    $transactionTxId = $this->db->lastInsertId();
+                    if ($transactionTxId <= 0) {
+                        throw new RuntimeException('failed to update transaction tx as unspent in the database: ' . $spentItem['transaction_id'] . ' - ' . $spentItem['transaction_id']);
+                    }
                 }
+
+                // clear the transaction inputs
+                $query = 'DELETE FROM transaction_inputs WHERE `transaction_id` = :transaction_id;';
+                $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt->execute();
+
+                // clear the transaction outputs
+                $query = 'DELETE FROM transaction_outputs WHERE `transaction_id` = :transaction_id;';
+                $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt->execute();
             }
 
-            // clear the transactions
-            $this->db->delete('transaction_inputs', "transaction_id=%s", $transaction['transaction_id']);
-            $this->db->delete('transaction_outputs', "transaction_id=%s", $transaction['transaction_id']);
+            $this->db->commit();
+            $result = true;
+        } catch (Exception|RuntimeException $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            $this->db->exec('UNLOCK TABLES');
+            $this->db->rollback();
         }
-        /******** DELEGATE THIS TO TRANSACTIONS ********/
-
+        return $result;
     }
 
-    /*
-    public function getRemoteBlockByHeight(string $peer, int $height)
+
+    /**
+     * Validate a remote block against x peers
+     *
+     * TODO: Needs to be refactored
+     *
+     * @param array $blk
+     * @param Peer $peer
+     * @param Block $block
+     * @return bool
+     */
+    function verifyRemoteBlock(array $blk, Peer $peer, Block $block): bool
     {
-        $http = new Http();
+        // we need to check the block other peers...
+        $result = false;
 
-        $response = $http->get($peer . 'block.php?height=' . $height);
-        $data = Api::decodeResponse($response);
+        $count = 0;
+        $correct = 0;
 
-        return $data['data'] ?? [];
-    }
-    */
-
-    /*
-    public function getRemoteBlockById(string $peer, string $blockId = '')
-    {
-        $http = new Http();
-
-        $query = '';
-        if (!empty($blockId)) {
-            $query = '?block_id=' . $blockId;
+        // check the block against all of our peers
+        foreach ($peer->getAll(Config::getMaxRebroadcastPeers()) as $p) {
+            $checkBlk = null;// $block->getRemoteBlockById($p['address'], $blk['block_id']);
+            if ($checkBlk['hash'] === $blk['hash'] && $checkBlk['previous_hash'] === $blk['previous_hash']) {
+                $correct++;
+            }
+            $count++;
         }
 
-        $response = $http->get($peer . 'block.php' . $query);
-        $data = Api::decodeResponse($response);
+        // check the score and add the block
+        $score = $correct / $count * 100;
+        if ($score >= 51) {
+            $result = true;
+        }
 
-        return $data['data'] ?? [];
+        return $result;
     }
-    */
 }
