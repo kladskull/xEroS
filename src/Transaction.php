@@ -368,7 +368,7 @@ class Transaction
                 $sortedTx[] = $txIn;
             }
         }
-        
+
         return $sortedTx;
     }
 

@@ -2,66 +2,71 @@
 
 namespace Xeros;
 
+use PDO;
 use Exception;
-use Medoo\Medoo;
-use PDOException;
+use RuntimeException;
+
 
 class Account
 {
+    private PDO $db;
     private OpenSsl $openSsl;
     private Address $address;
-    private Medoo $db;
 
     public function __construct()
     {
-        $this->db = Database::getDbConn();
+        $this->db = Database::getInstance();
         $this->openSsl = new OpenSsl();
         $this->address = new Address();
     }
 
-    public function get(int $id): array
+    public function get(int $id): ?array
     {
-        return $this->db->get(
-            table: 'accounts',
-            columns: ['address', 'public_hash', 'public_key', 'private_key', 'date_created'],
-            where: ['id' => $id]
-        );
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+        $stmt->execute();
+        return $stmt->fetch() ?: null;
     }
 
-    public function getBy(string $fieldName, string $value): ?array
+    public function getByPublicKeyRaw(string $publicKeyRaw): ?array
     {
-        if (in_array($fieldName, ['address', 'public_hash'])) {
-            return null;
-        }
-
-        $record = $this->db->get(
-            table: 'accounts',
-            columns: ['id'],
-            where: [$fieldName => $value]
-        );
-        return $this->get((int)$record['id']);
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `public_key_raw` = :public_key_raw LIMIT 1';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'public_key_raw', $publicKeyRaw, DatabaseHelpers::TEXT);
+        $stmt->execute();
+        return $stmt->fetch() ?: null;
     }
 
     public function create(): int
     {
-        $id = 0;
         try {
-            $this->db->action(function () {
-                $keys = $this->openSsl->createRsaKeyPair();
+            $this->db->beginTransaction();
 
-                $this->db->insert(
-                    table: 'accounts',
-                    values: [
-                        'public_key' => $keys['public_key'],
-                        'public_key_raw' => $keys['public_key_raw'],
-                        'private_key' => $keys['private_key'],
-                        'address' => $this->address->create($keys['public_key']),
-                    ]);
-            });
-            $id = $this->db->id();
+            $keys = $this->openSsl->createRsaKeyPair();
+            $address = $this->address->create($keys['public_key']);
+            $dateCreated = time();
 
-        } catch (PDOException|Exception $ex) {
-            Console::console($ex->getMessage());
+            // prepare the statement and execute
+            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) VALUES (:public_key,:public_key_raw,:private_key,:address,`data_created`';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key', value: $keys['public_key'], pdoType: DatabaseHelpers::TEXT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key_raw', value: $keys['public_key_raw'], pdoType: DatabaseHelpers::TEXT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'private_key', value: $keys['private_key'], pdoType: DatabaseHelpers::TEXT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $address, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 40);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: $dateCreated, pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
+            // ensure the block was stored
+            $id = $this->db->lastInsertId();
+            if ($id <= 0) {
+                throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
+            }
+            $this->db->commit();
+        } catch (Exception $ex) {
+            $id = 0;
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            $this->db->rollback();
         }
 
         return $id;
@@ -70,29 +75,33 @@ class Account
     public function delete(int $id): bool
     {
         $result = false;
-
         try {
-            $this->db->action(function (int $id) {
-                $this->db->delete('accounts', ['AND' => ['age' => $id]]);
-            });
-            $result = true;
-        } catch (PDOException|Exception $ex) {
-            Console::console($ex->getMessage());
-        }
+            $this->db->beginTransaction();
 
+            // delete the block
+            $query = 'DELETE FROM accounts WHERE `id` = :id;';
+            $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
+            $this->db->commit();
+            $result = true;
+        } catch (Exception|RuntimeException $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            $this->db->rollback();
+        }
         return $result;
     }
-
+    
     public function getBalance(string $address): string
     {
-        $balance = "0";
-        $unspentTransactions = $this->db->select(
-            table: 'transaction_outputs',
-            join: null,
-            columns: 'value',
-            where: ['address' => $address]
-        );
+        $query = 'SELECT `value` FROM transaction_outputs WHERE `address` = :address';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
+        $stmt->execute();
+        $unspentTransactions = $stmt->fetch() ?: [];
 
+        $balance = "0";
         foreach ($unspentTransactions as $unspentTransaction) {
             $balance = bcadd($balance, $unspentTransaction['value'], 0);
         }
@@ -106,33 +115,31 @@ class Account
         $balance = $this->getBalance($address);
 
         // get all the mempool transactions for the address
-        $transactions = [];
-        $mempoolTransactions = $this->db->select(
-            table: 'mempool_outputs',
-            join: null,
-            columns: ['transaction_id', 'tx_id', 'value'],
-            where: ['address' => $address]
-        );
+        $query = 'SELECT `transaction_id`,`tx_id`,`value` FROM mempool_outputs WHERE `address` = :address';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
+        $stmt->execute();
+        $transactions = $stmt->fetch() ?: [];
 
-        foreach ($mempoolTransactions as $mempoolTransaction) {
-            $key = $mempoolTransaction['transaction_id'] . '-' . $mempoolTransaction['tx_id'];
-            $transactions[$key] = $mempoolTransaction['value'];
+        foreach ($transactions as $transaction) {
+            $key = $transaction['transaction_id'] . '-' . $transaction['tx_id'];
+            $transactions[$key] = $transaction['value'];
         }
 
-        // remove any spent transactions from the array
-        $mempoolSpends = $this->db->select(
-            table: 'mempool_inputs',
-            join: null,
-            columns: ['previous_transaction_id', 'previous_tx_out_id'],
-            where: ['address' => $address]
-        );
-        foreach ($mempoolSpends as $mempoolSpend) {
-            $key = $mempoolSpend['previous_transaction_id'] . '-' . $mempoolSpend['previous_tx_out_id'];
+        // get all the mempool transactions for the address
+        $query = 'SELECT `previous_transaction_id`,`previous_tx_out_id` FROM mempool_inputs WHERE `address` = :address';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
+        $stmt->execute();
+        $spentTxs = $stmt->fetch() ?: [];
+
+        foreach ($spentTxs as $spent) {
+            $key = $spent['previous_transaction_id'] . '-' . $spent['previous_tx_out_id'];
             unset($transactions[$key]);
         }
 
         // add the pending to the balance
-        foreach ($transactions as $key => $value) {
+        foreach ($transactions as $value) {
             $balance = bcadd($balance, $value, 0);
         }
 

@@ -126,7 +126,7 @@ class Block
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT, 0);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT);
         $stmt->execute();
 
         return $stmt->fetch() ?: null;
@@ -315,6 +315,11 @@ class Block
         $transactions = $block['transactions'];
         unset($transactions);
 
+        // defaults
+        if ((int)$block['date_created'] <= 0) {
+            $block['date_created'] = time();
+        }
+
         try {
             // start a transaction
             $this->db->beginTransaction();
@@ -341,13 +346,18 @@ class Block
 
             // ensure the block was stored
             $blockInsertId = $this->db->lastInsertId();
-            if ($block <= 0) {
+            if ($blockInsertId <= 0) {
                 throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
             }
 
             // add the transactions
             foreach ($block['transactions'] as $transaction) {
                 $transaction['block_id'] = $block['block_id'];
+
+                // defaults
+                if ((int)$transaction['date_created'] <= 0) {
+                    $transaction['date_created'] = time();
+                }
 
                 // delete mempool transactions with same transaction id's
                 $stmt = $this->db->prepare('DELETE from mempool_transactions WHERE transaction_id=:transaction_id;');
@@ -609,6 +619,8 @@ class Block
     {
         $result = false;
         try {
+            $this->db->beginTransaction();
+
             // delete the block
             $query = 'DELETE FROM blocks WHERE `block_id` = :block_id;';
             $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
@@ -617,6 +629,7 @@ class Block
 
             // get all transactions associated with this block
             $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
+            $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt->execute();
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -670,7 +683,7 @@ class Block
      * @param Block $block
      * @return bool
      */
-    function verifyRemoteBlock(array $blk, Peer $peer, Block $block): bool
+    public function verifyRemoteBlock(array $blk, Peer $peer, Block $block): bool
     {
         // we need to check the block other peers...
         $result = false;
