@@ -6,17 +6,20 @@ use PDO;
 use Exception;
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Pure;
+use RuntimeException;
 
 class Block
 {
     public const maxLifeTimeBlocks = 9999999999999;
 
     private PDO $db;
+    private Transaction $transaction;
     private Pow $pow;
 
     public function __construct()
     {
         $this->db = Database::getInstance();
+        $this->transaction = new Transaction();
         $this->pow = new Pow();
     }
 
@@ -121,15 +124,9 @@ class Block
 
     public function get(int $id): ?array
     {
-        // prepare the statement
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-
-        // filter and bind parameters
-        $id = self::filterBlockHeight(filter_var($id, FILTER_SANITIZE_NUMBER_INT));
-        $stmt->bindParam(param: ':id', var: $id, type: PDO::PARAM_INT);
-
-        // execute the query
+        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT, 0);
         $stmt->execute();
 
         return $stmt->fetch() ?: null;
@@ -137,43 +134,26 @@ class Block
 
     public function getCurrentHeight(): int
     {
-        // prepare the statement
         $query = 'SELECT `height` FROM blocks ORDER BY `height` DESC LIMIT 1';
         $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
-
-        // execute the query
         return max(1, $stmt->fetchColumn());
     }
 
     public function getByBlockId(string $blockId): ?array
     {
-        // prepare the statement
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `block_id` = :block_id LIMIT 1';
         $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-
-        // filter and bind parameters
-        $blockId = preg_replace("/[^a-zA-Z0-9]/", '', $blockId);
-        $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
-
-        // execute the query
+        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
-
         return $stmt->fetch() ?: null;
     }
 
     public function getByPreviousBlockId(string $previousBlockId): ?array
     {
-        // prepare the statement
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `previous_block_id` = :previous_block_id LIMIT 1';
         $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-
-        // filter and bind parameters
-        $previousBlockId = preg_replace("/[^a-zA-Z0-9]/", '', $previousBlockId);
-        $stmt->bindParam(param: ':previous_block_id', var: $previousBlockId, maxLength: 64);
-
-        // execute the query
+        $stmt = DatabaseHelpers::filterBind($stmt, 'previous_block_id', $previousBlockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
-
         return $stmt->fetch() ?: null;
     }
 
@@ -182,42 +162,32 @@ class Block
         // prepare the statement
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan` = 0 AND `height` = :height LIMIT 1';
         $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
-
-        // filter and bind parameters
-        $height = self::filterBlockHeight(filter_var($height, FILTER_SANITIZE_NUMBER_INT));
-        $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
-
-        // execute the query
+        $stmt = DatabaseHelpers::filterBind($stmt, 'height', $height, DatabaseHelpers::INT, 0);
         $stmt->execute();
-
         return $stmt->fetch() ?: null;
     }
 
     public function getCurrent(): ?array
     {
-        // prepare the statement
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan`=0 ORDER BY height DESC LIMIT 1';
         $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
-
-        // execute the query
         return max(1, $stmt->fetchColumn());
     }
 
-    private function injectConfirmationsAndClean(array &$blockData): void
+    /*
+    private function injectConfirmationsAndClean(array &$blockData): array
     {
-        /**
-         * You were looking why we define a new block, and then wondering if we need to return the FULL block array
-         */
-        $block = new Block();
-        $currentHeight = $block->getCurrentHeight();
-
+        $currentHeight = $this->getCurrentHeight();
         unset($blockData['id'], $blockData['orphan']);
 
         // add confirmations
         $blockData['confirmations'] = $currentHeight - $blockData['height'];
-    }
 
-    public function returnFullBlock(string $blockId, bool $previousBlockId = false): array
+        return $blockData;
+    }
+    */
+    /*
+    public function 1`ullBlock(string $blockId, bool $previousBlockId = false): array
     {
         $transaction = new Transaction();
         if (!$previousBlockId) {
@@ -233,6 +203,7 @@ class Block
         }
         return $currBlock;
     }
+    */
 
     /**
      * @throws Exception
@@ -240,12 +211,11 @@ class Block
     public function validateFullBlock(array $block): array
     {
         $transactions = $block['transactions'];
-        unset($block['transactions']);
         return $this->validate($block, $transactions, count($transactions));
     }
 
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
-    private function returnValidateError(string $reason, bool $result): array
+    private function returnValidateResult(string $reason, bool $result): array
     {
         return [
             'validated' => $result,
@@ -253,11 +223,19 @@ class Block
         ];
     }
 
+    /**
+     * Validate a remote block against x peers
+     *
+     * @param array $blk
+     * @param Peer $peer
+     * @param Block $block
+     * @return bool
+     */
     function verifyRemoteBlock(array $blk, Peer $peer, Block $block): bool
     {
+        // we need to check the block other peers...
         $result = false;
 
-        // we need to check the block other peers...
         $count = 0;
         $correct = 0;
 
@@ -279,68 +257,45 @@ class Block
         return $result;
     }
 
-    public function computeMerkleHash(array $transactions): ?string
-    {
-        // sort it
-        $transactions = Transaction::sort($transactions); // sort the array
-
-        // calculate the merkle root
-        $tree = new drupol\phpmerkle\Merkle();
-        foreach ($transactions as $tx) {
-            $tree[] = $tx['transaction_id'];
-        }
-
-        // compute the merkle root
-        return $tree->hash();
-    }
-
     /**
      * @throws Exception
      */
     public function validate(array $block, array $transactions, int $transactionCount): array
     {
         if ($block['network_id'] !== Config::getNetworkIdentifier()) {
-            return $this->returnValidateError('networkId mismatch', false);
+            return $this->returnValidateResult('networkId mismatch', false);
         }
 
         // ensure a sane time
         if ($block['date_created'] > time() + 60) {
-            return $this->returnValidateError('block from the future', false);
+            return $this->returnValidateResult('block from the future', false);
         }
 
         // no transactions before the genesis
         if ($block['date_created'] < Config::getGenesisDate()) {
-            return $this->returnValidateError('block precedes genesis block', false);
+            return $this->returnValidateResult('block precedes genesis block', false);
         }
 
         // check difficulty
         if ($this->getDifficulty((int)$block['height']) !== (int)$block['difficulty']) {
-            return $this->returnValidateError('difficulty difference', false);
+            return $this->returnValidateResult('difficulty difference', false);
         }
-
-        // check if the previous block values match (if not we have an orphan)
-        /*if ($block['height'] > 1) {
-            $prevBlock = $this->getByHeight($block['height'] - 1);
-            if ($block['previous_block_id'] !== $prevBlock['block_id'] || $block['previous_hash'] !== $prevBlock['hash']) {
-                return $this->returnValidateError('previous hash mismatch', false);
-            }
-        }*/
 
         // check the proof of work
         $pow = new Pow();
         if (!$pow->verifyPow($block['hash'], $this->generateBlockHeader($block), $block['nonce'])) {
-            return $this->returnValidateError("Proof of work fail", false);
+            return $this->returnValidateResult("Proof of work fail", false);
         }
 
         // we must have all the transactions
         $transactions = Transaction::sort($transactions);
         if ($transactionCount !== count($transactions)) {
-            return $this->returnValidateError("transaction count mismatch", false);
+            return $this->returnValidateResult("transaction count mismatch", false);
         }
 
         // check for a valid height
         if ($block['height'] < 1) {
-            return $this->returnValidateError("invalid height", false);
+            return $this->returnValidateResult("invalid height", false);
         }
 
         // check the transactions
@@ -358,56 +313,194 @@ class Block
         }
 
         if ($coinbaseRecords !== 1) {
-            return $this->returnValidateError("blocks must have exactly 1 coinbase record.", false);
+            return $this->returnValidateResult("blocks must have exactly 1 coinbase record.", false);
         }
 
         // test the merkle root
-        if ($block['merkle_root'] !== $this->computeMerkleHash($transactions)) {
-            return $this->returnValidateError("merkle root issue", false);
+        $merkle = new Merkle();
+        if ($block['merkle_root'] !== $merkle->computeMerkleHash($transactions)) {
+            return $this->returnValidateResult("merkle root issue", false);
         }
 
-        return $this->returnValidateError("ok", true);
+        return $this->returnValidateResult("ok", true);
     }
 
-    // add a new block to the db
-    public function add(array $block): int
+    /**
+     * Add a block, and its transactions. It's all done in here to avoid PDO transactions being done
+     * over several external calls, etc. We're going to lock the tables, and do it in one go.
+     *
+     * @param array $block
+     * @param bool $validate
+     * @return bool
+     */
+    public function addFullBlock(array $block, bool $validate = true): bool
     {
-        $transaction = new Transaction();
+        if ($validate) {
+            try {
+                $result = $this->validateFullBlock();
+            } catch (Exception|RuntimeException $ex) {
+                Console::log('Exception thrown validating block: ' . $ex->getMessage());
+                exit(0);
+            }
+            if (!$result['validated']) {
+                Console::log('Invalid block: ' . $result['reason']);
+                exit(0);
+            }
+        }
 
-        // remove whatever is there...
-        //$this->delete($block['block_id']);
+        // ensure we have transactions
+        if (!isset($block['transactions'])) {
+            throw new RuntimeException('Missing transactions');
+        }
 
-        $id = 0;
+        // clip transactions
+        $transactions = $block['transactions'];
+        unset($transactions);
+
         try {
-            $this->db->startTransaction();
+            // lock tables
+            $this->db->exec('LOCK TABLES accounts WRITE, blocks WRITE, transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,peers WRITE;');
 
-            // lock table to avoid race conditions on blocks?
-            $this->db->query("LOCK TABLES accounts WRITE, blocks WRITE, transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,peers WRITE;");
+            // prepare the statement and execute
+            $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan`) ' .
+                'VALUES (:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,:transactions,:previous_hash,:hash,:orphan)';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'network_id', value: $block['network_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 4);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $block['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_block_id', value: $block['previous_block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: $block['date_created'], pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'height', value: $block['height'], pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'nonce', value: $block['nonce'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 16);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'difficulty', value: $block['difficulty'], pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'merkle_root', value: $block['merkle_root'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transactions', value: $block['transactions'], pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'hash', value: $block['hash'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_hash', value: $block['previous_hash'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'orphan', value: $block['orphan'], pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
+            // ensure the block was stored
+            $blockInsertId = $this->db->lastInsertId();
+            if ($block <= 0) {
+                throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
+            }
 
             // add the transactions
-            foreach ($block['transactions'] as $t) {
-                $t['block_id'] = $block['block_id'];
-                $id = $transaction->add($t);
-                if ($id <= 0) {
-                    throw new MeekroDBException("failed to add transaction");
+            foreach ($block['transactions'] as $transaction) {
+                $transaction['block_id'] = $block['block_id'];
+
+                // delete mempool transactions with same transaction id's
+                $stmt = $this->db->prepare('DELETE from mempool_transactions WHERE transaction_id=:transaction_id;');
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt->execute();
+
+                // prepare the statement and execute
+                $query = 'INSERT INTO transactions (`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key`) VALUES (:block_id,:transaction_id,:date_created,:peer,:height,:version,:signature,:public_key)';
+                $stmt = $this->db->prepare($query);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $transaction['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: $transaction['date_created'], pdoType: DatabaseHelpers::INT);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'peer', value: $transaction['peer'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'height', value: $transaction['height'], pdoType: DatabaseHelpers::INT);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'version', value: $transaction['version'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 2);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'signature', value: $transaction['signature'], pdoType: DatabaseHelpers::TEXT);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key', value: $transaction['signature'], pdoType: DatabaseHelpers::TEXT);
+                $stmt->execute();
+
+                $transactionId = $this->db->lastInsertId();
+                if ($transactionId <= 0) {
+                    throw new RuntimeException('failed to add transaction to the database: ' . $transaction['block_id'] . ' - ' . $transaction['transaction_id']);
+                }
+
+                // add txIn
+                foreach ($transaction[Transaction::Inputs] as $txIn) {
+                    $txIn['transaction_id'] = $transaction['transaction_id'];
+
+                    // make sure there is a previous unspent transaction
+                    $query = 'SELECT `transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`hash` FROM transaction_outputs WHERE spent=0 AND transaction_id=:transaction_id AND tx_id=:tx_id';
+                    $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_transaction_id', value: $txIn['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                    $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    if (count($txOut) <= 0) {
+                        throw new RuntimeException('failed to get unspent transaction for: ' . $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']);
+                    }
+
+                    // run script
+                    $result = $this->transaction->unlockTransaction($txIn, $txOut);
+                    if (!$result) {
+                        throw new RuntimeException("Cannot unlock script for: " . $txIn['transaction_id']);
+                    }
+
+                    // mark the transaction as spent
+                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=1 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                    $transactionTxId = $this->db->lastInsertId();
+                    if ($transactionTxId <= 0) {
+                        throw new RuntimeException('failed to update transaction tx as spent in the database: ' . $txIn['transaction_id'] . ' - ' . $txIn['transaction_id']);
+                    }
+
+                    // add the txIn record to the db
+                    $query = 'INSERT INTO transaction_inputs (`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script`) VALUES (:transaction_id,:tx_id,:previous_transaction_id,:previous_tx_out_id,:script)';
+                    $stmt = $this->db->prepare($query);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['tx_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_transaction_id', value: $txIn['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'script', value: $txIn['script'], pdoType: DatabaseHelpers::TEXT);
+                    $stmt->execute();
+                    $transactionTxId = $this->db->lastInsertId();
+                    if ($transactionTxId <= 0) {
+                        throw new RuntimeException('failed to add a new transaction tx: ' . $txIn['transaction_id'] . ' - ' . $txIn['$txIn']);
+                    }
+
+                    // delete mempool transactions
+                    $stmt = $this->db->prepare('DELETE from mempool_inputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['tx_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                }
+
+                // add txOut
+                foreach ($transaction[Transaction::Outputs] as $txOut) {
+                    $txOut['transaction_id'] = $transaction['transaction_id'];
+
+                    // add the txIn record to the db
+                    $query = 'INSERT INTO transaction_outputs (`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash`) VALUES (:transaction_id,:tx_id,:address,:value,:script,:lock_height,:spent,:hash)';
+                    $stmt = $this->db->prepare($query);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['tx_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $txOut['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 40);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'value', value: $txOut['value'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'script', value: $txOut['script'], pdoType: DatabaseHelpers::TEXT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'lock_height', value: $txOut['lock_height'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'spent', value: $txOut['spent'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'script', value: $txOut['hash'], pdoType: DatabaseHelpers::TEXT);
+                    $stmt->execute();
+                    $transactionTxId = $this->db->lastInsertId();
+                    if ($transactionTxId <= 0) {
+                        throw new RuntimeException('failed to add a new transaction tx as unspent in the database: ' . $txOut['transaction_id'] . ' - ' . $txOut['$txIn']);
+                    }
+
+                    // delete mempool transactions
+                    $stmt = $this->db->prepare('DELETE from mempool_outputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['tx_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
                 }
             }
 
-            // remove transactions & confirmations
-            unset($block['transactions'], $block['confirmations']);
-
-            // add the block
-            $this->db->replace('blocks', $block);
-            $id = $this->db->insertId();
-
-            // release the locking as everything is finished
-            $this->db->query("UNLOCK TABLES");
+            // unlock tables and commit
+            $this->db->exec('UNLOCK TABLES');
             $this->db->commit();
 
-        } catch (MeekroDBException|Exception $ex) {
-            $this->db->query("UNLOCK TABLES");
+        } catch (Exception $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            $this->db->exec('UNLOCK TABLES');
             $this->db->rollback();
-            var_dump($ex->getMessage());
         }
 
         return $id;
@@ -417,20 +510,25 @@ class Block
     // add a new block to the db
     public function identifyOrphans(int $height, string $blockId): void
     {
-        try {
-            $this->db->startTransaction();
-            $this->db->query("UPDATE blocks SET orphan=1 WHERE height=%i AND block_id != %s;", $height, $blockId);
-            $this->db->query("UPDATE blocks SET orphan=0 WHERE height=%i AND block_id = %s;", $height, $blockId);
-            $this->db->commit();
+        // mark all other blocks as orphans
+        $query = 'UPDATE blocks SET `orphan`=1 WHERE `height`= :height AND `block_id` != :block_id';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $height = self::filterBlockHeight(filter_var($height, FILTER_SANITIZE_NUMBER_INT));
+        $blockId = preg_replace("/[^a-zA-Z0-9]/", '', $blockId);
+        $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
+        $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
+        $stmt->execute();
 
-        } catch (MeekroDBException|Exception $ex) {
-            var_dump("Block302: " . $ex->getMessage());
-            $this->db->rollback();
-        }
+        // ensure this block is not an orphan
+        $query = 'UPDATE blocks SET `orphan`=0 WHERE `height`= :height AND `block_id` = :block_id';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
+        $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
+        $stmt->execute();
     }
 
     #[Pure]
-    function getRewardValue(int $nHeight): string
+    public function getRewardValue(int $nHeight): string
     {
         if ($nHeight <= 0) {
             $nHeight = 1;
@@ -456,7 +554,8 @@ class Block
         return $nSubsidy;
     }
 
-    public function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
+    public
+    function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
     {
         return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
     }
@@ -472,7 +571,8 @@ class Block
      * @param array|null $oldestBlock
      * @return int
      */
-    public function getDifficulty(int $height = 0, array $latestBlock = null, array $oldestBlock = null): int
+    public
+    function getDifficulty(int $height = 0, array $latestBlock = null, array $oldestBlock = null): int
     {
         // get the current height, if not given
         if ($height === 0) {
@@ -538,55 +638,49 @@ class Block
             $block['height'] . $block['difficulty'] . $block['merkle_root'] . $block['transaction_count'] . $block['previous_hash'];
     }
 
-    public function deleteSeries(string $blockId): void
-    {
-        while (1) {
-            $this->delete($blockId);
-            $nextBlockId = $this->db->queryFirstField('select block_id from blocks where previous_block_id=%s', $blockId);
-            if ($nextBlockId === null) {
-                break;
-            }
-            $blockId = $nextBlockId;
-        }
-    }
-
     public function delete(string $blockId): bool
     {
-        $result = false;
-        try {
-            $this->db->startTransaction();
+        // delete the block
+        $query = 'DELETE FROM blocks WHERE `block_id` = :block_id;';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $blockId = preg_replace("/[^a-zA-Z0-9]/", '', $blockId);
+        $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
+        $stmt->execute();
 
-            $this->db->delete('blocks', "block_id=%s", $blockId);
+        // get all transactions associated with this block
+        $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
+        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt->bindParam(param: ':id', var: $blockId, type: PDO::PARAM_INT);
+        $stmt->execute();
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $transactions = $this->db->query('SELECT transaction_id FROM transactions WHERE block_id=%s;', $blockId);
-            foreach ($transactions as $transaction) {
-                $this->db->delete('transactions', "transaction_id=%s", $transaction['transaction_id']);
+        /******** DELEGATE THIS TO TRANSACTIONS ********/
+        foreach ($transactions as $transaction) {
+            $this->db->delete('transactions', "transaction_id=%s", $transaction['transaction_id']);
 
-                // REVERSE ANY SPENT TRANSACTIONS!!
-                $spentItems = $this->db->query('SELECT previous_transaction_id, previous_tx_out_id from transaction_inputs WHERE transaction_id=%s;', $transaction['transaction_id']);
-                foreach ($spentItems as $spentItem) {
-                    $this->db->query(
-                        'UPDATE transaction_outputs SET spent=0 WHERE transaction_id=%s AND tx_id=%i',
-                        $spentItem['transaction_id'],
-                        (int)$spentItem['tx_id'],
-                    );
+            // REVERSE ANY SPENT TRANSACTIONS!!
+            $spentItems = $this->db->query('SELECT previous_transaction_id, previous_tx_out_id from transaction_inputs WHERE transaction_id=%s;', $transaction['transaction_id']);
+            foreach ($spentItems as $spentItem) {
+                // mark the transaction as unspent
+                $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $spentItem['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $spentItem['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                $stmt->execute();
+                $transactionTxId = $this->db->lastInsertId();
+                if ($transactionTxId <= 0) {
+                    throw new RuntimeException('failed to update transaction tx as unspent in the database: ' . $txIn['transaction_id'] . ' - ' . $txIn['transaction_id']);
                 }
-
-                // clear the transactions
-                $this->db->delete('transaction_inputs', "transaction_id=%s", $transaction['transaction_id']);
-                $this->db->delete('transaction_outputs', "transaction_id=%s", $transaction['transaction_id']);
             }
-            $this->db->commit();
-            $result = true;
-        } catch (MeekroDBException|Exception $ex) {
-            $this->db->rollback();
+
+            // clear the transactions
+            $this->db->delete('transaction_inputs', "transaction_id=%s", $transaction['transaction_id']);
+            $this->db->delete('transaction_outputs', "transaction_id=%s", $transaction['transaction_id']);
         }
-        return $result;
+        /******** DELEGATE THIS TO TRANSACTIONS ********/
+
     }
 
-    /**
-     * @throws JsonException
-     */
+    /*
     public function getRemoteBlockByHeight(string $peer, int $height)
     {
         $http = new Http();
@@ -596,10 +690,9 @@ class Block
 
         return $data['data'] ?? [];
     }
+    */
 
-    /**
-     * @throws JsonException
-     */
+    /*
     public function getRemoteBlockById(string $peer, string $blockId = '')
     {
         $http = new Http();
@@ -614,4 +707,5 @@ class Block
 
         return $data['data'] ?? [];
     }
+    */
 }
