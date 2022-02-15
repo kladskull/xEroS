@@ -125,35 +125,35 @@ class Block
     public function get(int $id): ?array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `id` = :id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT);
         $stmt->execute();
 
-        return $stmt->fetch() ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getByBlockId(string $blockId): ?array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `block_id` = :block_id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
-        return $stmt->fetch() ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getByPreviousBlockId(string $previousBlockId): ?array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `previous_block_id` = :previous_block_id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'previous_block_id', $previousBlockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
-        return $stmt->fetch() ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getCurrentHeight(): int
     {
         $query = 'SELECT `height` FROM blocks ORDER BY `height` DESC LIMIT 1';
-        $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->query($query);
         return max(1, $stmt->fetchColumn());
     }
 
@@ -161,17 +161,17 @@ class Block
     {
         // prepare the statement
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan` = 0 AND `height` = :height LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'height', $height, DatabaseHelpers::INT, 0);
         $stmt->execute();
-        return $stmt->fetch() ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getCurrent(): ?array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan`=0 ORDER BY height DESC LIMIT 1';
-        $stmt = $this->db->query($query, PDO::FETCH_ASSOC);
-        return $stmt->fetch() ?: null;
+        $stmt = $this->db->query($query);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function assembleFullBlock(string $blockId, bool $previousBlockId = false): array
@@ -388,7 +388,7 @@ class Block
 
                     // make sure there is a previous unspent transaction
                     $query = 'SELECT `transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`hash` FROM transaction_outputs WHERE spent=0 AND transaction_id=:transaction_id AND tx_id=:tx_id';
-                    $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+                    $stmt = $this->db->prepare($query);
                     $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_transaction_id', value: $txIn['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
                     $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
                     $stmt->execute();
@@ -482,7 +482,7 @@ class Block
     {
         // mark all other blocks as orphans
         $query = 'UPDATE blocks SET `orphan`=1 WHERE `height`= :height AND `block_id` != :block_id';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $height = self::filterBlockHeight(filter_var($height, FILTER_SANITIZE_NUMBER_INT));
         $blockId = preg_replace("/[^a-zA-Z0-9]/", '', $blockId);
         $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
@@ -491,7 +491,7 @@ class Block
 
         // ensure this block is not an orphan
         $query = 'UPDATE blocks SET `orphan`=0 WHERE `height`= :height AND `block_id` = :block_id';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
         $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
         $stmt->execute();
@@ -623,13 +623,13 @@ class Block
 
             // delete the block
             $query = 'DELETE FROM blocks WHERE `block_id` = :block_id;';
-            $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+            $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt->execute();
 
             // get all transactions associated with this block
             $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
-            $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+            $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt->execute();
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -651,13 +651,13 @@ class Block
 
                 // clear the transaction inputs
                 $query = 'DELETE FROM transaction_inputs WHERE `transaction_id` = :transaction_id;';
-                $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+                $stmt = $this->db->prepare($query);
                 $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
                 $stmt->execute();
 
                 // clear the transaction outputs
                 $query = 'DELETE FROM transaction_outputs WHERE `transaction_id` = :transaction_id;';
-                $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+                $stmt = $this->db->prepare($query);
                 $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
                 $stmt->execute();
             }

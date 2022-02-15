@@ -32,9 +32,6 @@ class Miner
         return sprintf('%.2f%s', $hashesPerSecond / (1000 ** ((int)$mag)), $magnitudes[(int)$mag]);
     }
 
-    /**
-     * @throws Exception
-     */
     public function mineBlock(string $blockHeader, int $difficulty, int $height, string $miningUrl, int $startingNonce = 0): array|bool
     {
         $start = time();
@@ -99,7 +96,7 @@ class Miner
                 $elapsed = max((time() - $start), 1);
                 $hashesPerSecond = $hashes / $elapsed;
                 $nonceHex = dechex($nonce);
-                Console::console("Height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) . "  difficulty: {$difficulty}  nonce: {$nonceHex}  elapsed: {$elapsed}s");
+                Console::log("Height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) . "  difficulty: {$difficulty}  nonce: {$nonceHex}  elapsed: {$elapsed}s");
             }
 
             // break out?
@@ -109,7 +106,7 @@ class Miner
 
                 // if we're generating for block x, make sure there is nothing greater
                 if ($currentHeight >= $height) {
-                    Console::console('New block found on the network, restarting');
+                    Console::log('New block found on the network, restarting');
                     return [
                         'nonce' => $nonce,
                         'hash' => '',

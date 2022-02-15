@@ -34,7 +34,7 @@ class Transaction
     public function exists(string $transactionId): bool
     {
         $query = 'SELECT `id` FROM transactions WHERE `id` = :transaction_id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt->execute();
 
@@ -45,7 +45,7 @@ class Transaction
     public function get(int $id): array|null
     {
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT, 0);
         $stmt->execute();
 
@@ -55,10 +55,10 @@ class Transaction
     public function getByTransactionId(string $transactionId): array|null
     {
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'transaction_id', $transactionId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
-        $transaction = $stmt->fetch() ?: null;
+        $transaction = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         if ($transaction !== null) {
             $txIns = $this->getTransactionInputs($transactionId);
@@ -75,7 +75,7 @@ class Transaction
     public function getTransactionInputs(string $transactionId): array
     {
         $query = 'SELECT `id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script` FROM transaction_inputs WHERE transaction_id=:transaction_id;';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt->execute();
 
@@ -85,7 +85,7 @@ class Transaction
     public function getTransactionOutputs(string $transactionId): bool|array|null
     {
         $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` FROM transaction_outputs WHERE transaction_id=:transaction_id;';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt->execute();
 
@@ -96,11 +96,11 @@ class Transaction
     {
         $returnTransactions = [];
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `block_id` = :block_id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
 
-        $transactions = $stmt->fetch() ?: null;
+        $transactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         foreach ($transactions as $transaction) {
             // attach the details
             $transaction[self::Inputs] = $this->getTransactionInputs($transaction['transaction_id']);

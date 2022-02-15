@@ -23,19 +23,19 @@ class Account
     public function get(int $id): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `id` = :id LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
-        return $stmt->fetch() ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getByPublicKeyRaw(string $publicKeyRaw): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `public_key_raw` = :public_key_raw LIMIT 1';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'public_key_raw', $publicKeyRaw, DatabaseHelpers::TEXT);
         $stmt->execute();
-        return $stmt->fetch() ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function create(): int
@@ -48,7 +48,7 @@ class Account
             $dateCreated = time();
 
             // prepare the statement and execute
-            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) VALUES (:public_key,:public_key_raw,:private_key,:address,`data_created`';
+            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) VALUES (:public_key,:public_key_raw,:private_key,:address,`date_created`)';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key', value: $keys['public_key'], pdoType: DatabaseHelpers::TEXT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key_raw', value: $keys['public_key_raw'], pdoType: DatabaseHelpers::TEXT);
@@ -80,7 +80,7 @@ class Account
 
             // delete the block
             $query = 'DELETE FROM accounts WHERE `id` = :id;';
-            $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+            $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
             $stmt->execute();
 
@@ -96,10 +96,10 @@ class Account
     public function getBalance(string $address): string
     {
         $query = 'SELECT `value` FROM transaction_outputs WHERE `address` = :address';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
         $stmt->execute();
-        $unspentTransactions = $stmt->fetch() ?: [];
+        $unspentTransactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         $balance = "0";
         foreach ($unspentTransactions as $unspentTransaction) {
@@ -116,10 +116,10 @@ class Account
 
         // get all the mempool transactions for the address
         $query = 'SELECT `transaction_id`,`tx_id`,`value` FROM mempool_outputs WHERE `address` = :address';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
         $stmt->execute();
-        $transactions = $stmt->fetch() ?: [];
+        $transactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($transactions as $transaction) {
             $key = $transaction['transaction_id'] . '-' . $transaction['tx_id'];
@@ -128,10 +128,10 @@ class Account
 
         // get all the mempool transactions for the address
         $query = 'SELECT `previous_transaction_id`,`previous_tx_out_id` FROM mempool_inputs WHERE `address` = :address';
-        $stmt = $this->db->prepare($query, PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
         $stmt->execute();
-        $spentTxs = $stmt->fetch() ?: [];
+        $spentTxs = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($spentTxs as $spent) {
             $key = $spent['previous_transaction_id'] . '-' . $spent['previous_tx_out_id'];

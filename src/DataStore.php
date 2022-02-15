@@ -2,71 +2,112 @@
 
 namespace Xeros;
 
+use Exception;
+use PDO;
+
 class DataStore
 {
+    private PDO $db;
+
+    public function __construct()
+    {
+        $this->db = Database::getInstance();
+    }
+
     public function get(int $id): ?array
     {
-        return $this->db->queryFirstRow("SELECT `key`,`data` FROM key_value_store WHERE id=%i", $id);
+        $query = 'SELECT `key`,`data` FROM key_value_store WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getKey(string $key, $default = ''): string|int
     {
-        $retVal = $default;
-        $values = $this->db->queryFirstRow("SELECT `data`,expires FROM key_value_store WHERE `key`=%s", $key);
-        if ($values !== null) {
-            $expiry = (int)$values['expires'];
+        $query = 'SELECT `data`,`expires` FROM key_value_store WHERE `key` = :key LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'key', $key, DatabaseHelpers::TEXT);
+        $stmt->execute();
+
+        $retVal = null;
+        $record = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        if ($record !== null) {
+            $expiry = $record['expires'];
             if ($expiry === 0) {
-                $retVal = $values['data'];
+                $retVal = $record['data'];
             } elseif (time() < $expiry) {
-                $retVal = $values['data'];
+                $retVal = $record['data'];
             }
+        } else {
+            $retVal = $default;
         }
         return $retVal;
     }
 
-    public
-    function add(string $key, string $value, int $expires = 0): int
+    public function add(string $key, string $value, int $expires = 0): int
     {
         if (strlen($key) > 128) {
             return 0;
         }
 
         try {
-            $this->db->startTransaction();
+            $this->db->beginTransaction();
 
-            $this->db->insertUpdate('key_value_store', [
-                'key' => $key,
-                'data' => $value,
-                'expires' => $expires
-            ], [
-                'data' => $value,
-                'expires' => $expires
-            ]);
-            $id = $this->db->insertId();
+            $query = 'INSERT OR REPLACE INTO key_value_store (`key`,`data`,`expires`) VALUES (:key,:data,:expires);';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'key', $key, DatabaseHelpers::TEXT, 128);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'data', $value, DatabaseHelpers::TEXT);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'expires', $expires, DatabaseHelpers::INT);
+            $stmt->execute();
+            $id = $this->db->lastInsertId();
+
             $this->db->commit();
-        } catch (MeekroDBException|Exception $ex) {
+        } catch (Exception $ex) {
+            Console::log('Error storing key: ' . $ex->getMessage());
             $id = 0;
             $this->db->rollback();
         }
         return $id;
     }
 
-    public
-    function deleteKey(string $key): bool
-    {
-        return $this->delete((int)$this->db->queryFirstField("SELECT id FROM key_value_store WHERE `key`=%s", $key));
-    }
-
-    public
-    function delete(int $id): bool
+    public function delete(int $id): bool
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->delete('peers', 'id=%i', $id);
+            $this->db->beginTransaction();
+
+            // delete the block
+            $query = 'DELETE FROM key_value_store WHERE `id` = :id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            $this->db->rollback();
+        }
+        return $result;
+    }
+
+    public function deleteKey(string $key): bool
+    {
+        $result = false;
+        try {
+            $this->db->beginTransaction();
+
+            // delete the block
+            $query = 'DELETE FROM key_value_store WHERE `key` = :key;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'key', value: $key, pdoType: DatabaseHelpers::TEXT, maxLength: 128);
+            $stmt->execute();
+
+            $this->db->commit();
+            $result = true;
+        } catch (Exception $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->rollback();
         }
         return $result;
