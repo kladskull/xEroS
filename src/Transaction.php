@@ -111,15 +111,6 @@ class Transaction
         return $returnTransactions;
     }
 
-    private function attachTxs(array $transaction): array
-    {
-
-        $transaction[self::Inputs] = $this->db->query("SELECT * FROM transaction_inputs WHERE transaction_id=%s", $transaction['transaction_id']);
-        $transaction[self::Outputs] = $this->db->query("SELECT * FROM transaction_outputs WHERE transaction_id=%s", $transaction['transaction_id']);
-
-        return $transaction;
-    }
-
     private function stripInternalFields(array $transaction): array
     {
         // remove internal columns

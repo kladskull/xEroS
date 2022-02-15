@@ -4,7 +4,7 @@ namespace Xeros;
 
 class BcmathExtensions
 {
-    public static function bcabs($number)
+    public static function bcabs(string $number): string
     {
         if (bccomp($number, '0') === -1) {
             return bcmul($number, '-1');

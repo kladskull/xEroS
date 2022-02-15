@@ -291,6 +291,8 @@ class Block
      */
     public function addFullBlock(array $block, bool $validate = true): bool
     {
+        $mempool = new Mempool();
+
         $result = false;
 
         if ($validate) {
