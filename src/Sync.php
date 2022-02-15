@@ -112,7 +112,7 @@ while (1) {
      * Broadcast us as a peer, only if we are synchronized
      **************************************************************************************************************/
     if ($ticks === 0 || $ticks % $peerBroadcastTimer === 0) {
-        if ($store->getKey('state', '') !== State::Syncing) {
+        if ($store->getKey('state', '') !== DataStore::Syncing) {
             foreach ($peer->getAll(Config::getMaxRebroadcastPeers()) as $p) {
                 $peerRequest = json_encode(['data' => 'peer_request']);
                 $result = $http->post($p['address'] . '/peer.php', $peerRequest);
@@ -147,7 +147,7 @@ while (1) {
      * Force a synchronization if we just started
      **************************************************************************************************************/
     if ($localHeight === 1 && $localHeight !== $blockCount) {
-        $store->add('state', State::Syncing);
+        $store->add('state', Node::Syncing);
     }
 
     // determine the state, and what we need to do

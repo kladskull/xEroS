@@ -14,6 +14,9 @@ class Node
 
     private TcpIp $tcpIp;
 
+    public const Syncing = 'sync';
+    public const Mining = 'mine';
+
     #[Pure]
     public function __construct()
     {

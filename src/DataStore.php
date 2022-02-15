@@ -45,7 +45,7 @@ class DataStore
         return $retVal;
     }
 
-    public function add(string $key, string $value, int $expires = 0): int
+    public function add(string $key, mixed $value, int $expires = 0): int
     {
         if (strlen($key) > 128) {
             return 0;
