@@ -7,7 +7,7 @@ use JetBrains\PhpStorm\Pure;
 class Node
 {
     private string $ip;
-    private string $port;
+    private int $port;
     private array $clients;
     private int $maxPeers = 5;
     private int $peers = 0;
@@ -23,12 +23,12 @@ class Node
         $this->tcpIp = new TcpIp();
     }
 
-    private function getConnectUri(string $ip, string $port): string
+    private function getConnectUri(string $ip, int $port): string
     {
         return 'tcp://' . $ip . ':' . $port;
     }
 
-    private function connect(string $ip, string $port): bool
+    private function connect(string $ip, int $port): bool
     {
         $socket = $this->getConnectUri($ip, $port);
         $connection = stream_socket_client($socket);

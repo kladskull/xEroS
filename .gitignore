@@ -1,6 +1,7 @@
 # Local files
 *.db
 *.key
+.env
 
 ### Composer ###
 composer.phar
