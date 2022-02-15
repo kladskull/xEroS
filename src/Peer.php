@@ -2,15 +2,19 @@
 
 namespace Xeros;
 
+use Exception;
+use PDO;
+use RuntimeException;
+
 class Peer
 {
-    private Http $http;
+    private PDO $db;
     private DataStore $store;
 
     public function __construct()
     {
-        $this->http = new Http();
         $this->store = new DataStore();
+        $this->db = Database::getInstance();
     }
 
     public function getUniquePeerId(): string
@@ -21,7 +25,6 @@ class Peer
             $data = trim(file_get_contents('/etc/machine-id'));
             $data .= trim(file_get_contents('/var/lib/dbus/machine-id'));
             $data .= exec('whoami');
-            $data .= $this->http->get(Config::getHostIdService());
 
             // tie it to an IP address
             $data = hash('ripemd160', hash('ripemd160', $data));
@@ -32,45 +35,20 @@ class Peer
 
     public function get(int $id): ?array
     {
-        return $this->db->queryFirstRow("SELECT * FROM peers WHERE id=%i", $id);
+        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function ping(string $peer): bool|string
+    public function getAll(int $limit = 100): array
     {
-        return $this->http->get($peer . 'ping.php');
-    }
-
-    public function refresh(array $peers): bool
-    {
-        // get a list of peers
-        $success = false;
-
-        // make some connections
-        foreach ($peers as $id => $p) {
-            $success = false;
-            Console::console('Refreshing ' . $p);
-            $data = $this->http->get($p . '/ping.php');
-            $response = json_decode($data, true) ?: null;
-            if ($response !== null) {
-                $this->updatePingTime($p);
-                $success = true;
-            } else {
-                $this->incrementFails($p);
-            }
-        }
-        return $success;
-    }
-
-    public function getAll(int $limit = 100, bool $oldest = false): array
-    {
-        $timeSql = 'AND (UNIX_TIMESTAMP(NOW())-last_ping < 86400 OR UNIX_TIMESTAMP(NOW())-date_created < 86400) ORDER BY RAND()';
-        if ($oldest) {
-            // do not disturb recently pinged servers...
-            $timeSql = 'AND UNIX_TIMESTAMP(NOW())-last_ping > 86400 ORDER BY last_ping DESC';
-        }
-
-        // yea, this is not so good using RAND, but it's not a bottleneck... yet
-        $peers = toArray($this->db->query("SELECT address FROM peers WHERE blacklisted=0 AND fails<5 $timeSql LIMIT %i;", $limit));
+        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE blacklisted=0 and fails <5 LIMIT :limit;';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'limit', $limit, DatabaseHelpers::INT);
+        $stmt->execute();
+        $peers = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $seeds = Config::getInitialPeers();
         foreach ($seeds as $seed) {
@@ -92,9 +70,11 @@ class Peer
 
     public function getByHostAddress(string $address): ?array
     {
-        return $this->get(
-            (int)$this->db->queryFirstField("SELECT id FROM peers WHERE address=%s", $address)
-        );
+        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE `address` = :address LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function addBlackList(string $address): int
@@ -106,11 +86,14 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->query("UPDATE peers SET fails=fails+1 WHERE address=%s", $address);
+            $this->db->beginTransaction();
+            $query = 'UPDATE peers SET fails=fails+1 WHERE address=:address;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
+            $stmt->execute();
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception $e) {
+        } catch (Exception) {
             $this->db->rollback();
         }
         return $result;
@@ -120,15 +103,14 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-
-            if ($this->getByHostAddress($address)) {
-                $this->db->query("UPDATE peers SET fails=0 WHERE address=%s", $address);
-            }
-
+            $this->db->beginTransaction();
+            $query = 'UPDATE peers SET fails=0 WHERE address=:address;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
+            $stmt->execute();
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception) {
             $this->db->rollback();
         }
         return $result;
@@ -138,63 +120,57 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->update('peers', ['last_ping' => time()], "address=%s", $address);
+            $this->db->beginTransaction();
+            $query = 'UPDATE peers SET last_ping=:last_ping WHERE address=:address;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'last_ping', time(), DatabaseHelpers::INT);
+            $stmt->execute();
             $this->db->commit();
             $result = true;
-
-            $this->clearFails($address);
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception) {
             $this->db->rollback();
         }
         return $result;
     }
 
-    public function add(string $url, bool $blacklisted = false): int
+    public function add(string $address, bool $blacklisted = false): int
     {
-        $url = trim($url);
-        if (strlen($url) > 256) {
+        if ($this->getByHostAddress($address) !== null) {
+            Console::log('failed to add peer to the database: ' . $address);
             return 0;
-        }
-
-        $url = filter_var($url, FILTER_VALIDATE_URL);
-        if ($url === false) {
-            return 0;
-        }
-
-        if (!str_ends_with($url, '/')) {
-            $url .= '/';
         }
 
         try {
-            $this->db->startTransaction();
+            $this->db->beginTransaction();
 
-            $activePeers = (int)$this->db->queryFirstField(
-                'SELECT count(1) FROM peers WHERE blacklisted=0 AND reserve=0 AND last_ping > UNIX_TIMESTAMP()-86400 AND reserve=0;'
-            );
-
-            $reserve = 0;
-            if ($activePeers > Config::getMaxPeers()) {
-                $reserve = 1;
-            }
-
+            $blist = 0;
             if ($blacklisted) {
-                $reserve = 0;
+                $blist = 1;
             }
 
-            $this->db->insert('peers', [
-                'address' => $url,
-                'reserve' => $reserve,
-                'last_ping' => 0,
-                'blacklisted' => $blacklisted,
-                'fails' => 0,
-            ]);
-            $id = $this->db->insertId();
+            // prepare the statement and execute
+            $query = 'INSERT INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created`) VALUES (:address,:reserve,:last_ping,:blacklisted,:fails,:date_created)';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $address, pdoType: DatabaseHelpers::TEXT, maxLength: 256);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'last_ping', value: 0, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'blacklisted', value: $blist, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'fails', value: 0, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: time(), pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
+            // ensure the block was stored
+            $id = $this->db->lastInsertId();
+            if ($id <= 0) {
+                throw new RuntimeException('failed to add peer to the database: ' . $address);
+            }
             $this->db->commit();
-        } catch (MeekroDBException|Exception $ex) {
+        } catch (Exception $ex) {
             $id = 0;
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->rollback();
         }
+
         return $id;
     }
 
@@ -202,11 +178,18 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->delete('peers', 'id=%i', $id);
+            $this->db->beginTransaction();
+
+            // delete the block
+            $query = 'DELETE FROM peers WHERE `id` = :id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception|RuntimeException $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->rollback();
         }
         return $result;

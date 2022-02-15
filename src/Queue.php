@@ -2,29 +2,50 @@
 
 namespace Xeros;
 
+use Exception;
+use PDO;
+use RuntimeException;
+
 class Queue
 {
+    private PDO $db;
+
+    public function __construct()
+    {
+        $this->db = Database::getInstance();
+    }
+
     public function get(int $id): ?array
     {
-        return $this->db->queryFirstRow("SELECT id,date_created,command,data,trys FROM queue WHERE id=%i", $id);
+        $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE `id` = :id LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function getItems(string $command, int $limit = 100): array
     {
-        return toArray(
-            $this->db->query("SELECT id,date_created,command,data,trys FROM queue WHERE command=%s AND trys<5 ORDER BY id LIMIT %i;", $command, $limit)
-        );
+        $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE command=:command and trys <5 LIMIT :limit;';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'command', $command, DatabaseHelpers::TEXT, 32);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'limit', $limit, DatabaseHelpers::INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function incrementFails(int $id): bool
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->query("UPDATE queue SET trys=trys+1 WHERE id=%i", $id);
+            $this->db->beginTransaction();
+            $query = 'UPDATE queue SET trys=trys+1 WHERE id=:id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+            $stmt->execute();
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception) {
             $this->db->rollback();
         }
         return $result;
@@ -34,11 +55,14 @@ class Queue
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->query("UPDATE queue SET trys=0 WHERE id=%i", $id);
+            $this->db->beginTransaction();
+            $query = 'UPDATE queue SET trys=0 WHERE id=:id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+            $stmt->execute();
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception) {
             $this->db->rollback();
         }
         return $result;
@@ -46,38 +70,47 @@ class Queue
 
     public function add(string $command, string $data): int
     {
-        if (empty($command) || strlen($command) > 32) {
-            return 0;
-        }
-
         try {
-            $this->db->startTransaction();
+            $this->db->beginTransaction();
 
-            $this->db->insert('queue', [
-                'date_created' => time(),
-                'command' => $command,
-                'data' => $data,
-                'trys' => 0,
-            ]);
-            $id = $this->db->insertId();
+            // prepare the statement and execute
+            $query = 'INSERT INTO queue (`command`,`date_created`,`data`,`trys`) VALUES (:command,:date_created,:data,:trys)';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $command, pdoType: DatabaseHelpers::TEXT, maxLength: 32);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'data', value: $data, pdoType: DatabaseHelpers::TEXT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: time(), pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'trys', value: 0, pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
+            // ensure the block was stored
+            $id = $this->db->lastInsertId();
+            if ($id <= 0) {
+                throw new RuntimeException('failed to add queue to the database: ' . $command);
+            }
             $this->db->commit();
-        } catch (MeekroDBException|Exception $ex) {
+        } catch (Exception $ex) {
             $id = 0;
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->rollback();
         }
+
         return $id;
     }
 
-    // prune in batches so it doesn't lock the system up
-    public function prune()
+    public function prune(): bool
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->query("DELETE FROM queue WHERE trys > 4 LIMIT 100;");
+            $this->db->beginTransaction();
+
+            // delete the block
+            $query = 'DELETE FROM queue WHERE trys > 4;';
+            $this->db->query($query);
+
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception) {
+        } catch (Exception|RuntimeException $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->rollback();
         }
         return $result;
@@ -87,12 +120,18 @@ class Queue
     {
         $result = false;
         try {
-            $this->db->startTransaction();
-            $this->db->delete('queue', 'id=%i', $id);
+            $this->db->beginTransaction();
+
+            // delete the block
+            $query = 'DELETE FROM queue WHERE `id` = :id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt->execute();
+
             $this->db->commit();
             $result = true;
-        } catch (MeekroDBException|Exception $ex) {
-            print_r($ex);
+        } catch (Exception|RuntimeException $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
             $this->db->rollback();
         }
         return $result;
