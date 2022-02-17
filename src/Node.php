@@ -171,16 +171,16 @@ class Node
                                             Console::log('Received peer_invite_req');
                                             // get the IP we see, not what was given
                                             $packet = null;
-                                            $peerAddress = socket_getpeername($client, $address) ?: null;
+                                            socket_getpeername($client, $peerAddress) ?: null;
                                             $peerPort = (int)$data['port'] ?: null;
                                             if ($peerAddress !== null && $peerPort !== null) {
-                                                if (filter_var($peerAddress, FILTER_VALIDATE_IP) && $peerAddress > 0 && $peerAddress <= 65535) {
-                                                    $hostAddress = $address . ':' . $port;
-                                                    if ($this->peer->getByHostAddress($hostAddress)) {
+                                                if (filter_var($peerAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && $peerPort > 0 && $peerPort <= 65535) {
+                                                    $hostAddress = $peerAddress . ':' . $port;
+                                                    if ($this->peer->getByHostAddress($hostAddress) === null) {
                                                         $this->peer->add($hostAddress);
                                                         Console::log('Sending response OK to peer_invite_req');
-                                                        $packet = json_encode(['type' => 'peer_inv_resp', 'result' => 'ok']);
                                                     }
+                                                    $packet = json_encode(['type' => 'peer_inv_resp', 'result' => 'ok']);
                                                 }
                                             }
                                             if ($packet === null) {

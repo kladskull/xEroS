@@ -83,7 +83,7 @@ class Queue
             $stmt->execute();
 
             // ensure the block was stored
-            $id = $this->db->lastInsertId();
+            $id = (int)$this->db->lastInsertId();
             if ($id <= 0) {
                 throw new RuntimeException('failed to add queue to the database: ' . $command);
             }

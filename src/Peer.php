@@ -155,12 +155,13 @@ class Peer
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $address, pdoType: DatabaseHelpers::TEXT, maxLength: 256);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'last_ping', value: 0, pdoType: DatabaseHelpers::INT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'blacklisted', value: $blist, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'reserve', value: 0, pdoType: DatabaseHelpers::INT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'fails', value: 0, pdoType: DatabaseHelpers::INT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: time(), pdoType: DatabaseHelpers::INT);
             $stmt->execute();
 
             // ensure the block was stored
-            $id = $this->db->lastInsertId();
+            $id = (int)$this->db->lastInsertId();
             if ($id <= 0) {
                 throw new RuntimeException('failed to add peer to the database: ' . $address);
             }

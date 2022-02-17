@@ -58,7 +58,7 @@ class Account
             $stmt->execute();
 
             // ensure the block was stored
-            $id = $this->db->lastInsertId();
+            $id =(int)$this->db->lastInsertId();
             if ($id <= 0) {
                 throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
             }

@@ -75,7 +75,7 @@ class Mempool
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key', value: $transaction['signature'], pdoType: DatabaseHelpers::TEXT);
             $stmt->execute();
 
-            $transactionId = $this->db->lastInsertId();
+            $transactionId = (int)$this->db->lastInsertId();
             if ($transactionId <= 0) {
                 throw new RuntimeException('failed to add transaction to the database: ' . $transaction['block_id'] . ' - ' . $transaction['transaction_id']);
             }
@@ -110,7 +110,7 @@ class Mempool
                 $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
                 $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'script', value: $txIn['script'], pdoType: DatabaseHelpers::TEXT);
                 $stmt->execute();
-                $transactionTxId = $this->db->lastInsertId();
+                $transactionTxId = (int)$this->db->lastInsertId();
                 if ($transactionTxId <= 0) {
                     throw new RuntimeException('failed to add a new transaction tx: ' . $txIn['transaction_id'] . ' - ' . $txIn['$txIn']);
                 }
@@ -132,7 +132,7 @@ class Mempool
                 $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'spent', value: $txOut['spent'], pdoType: DatabaseHelpers::INT);
                 $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'script', value: $txOut['hash'], pdoType: DatabaseHelpers::TEXT);
                 $stmt->execute();
-                $transactionTxId = $this->db->lastInsertId();
+                $transactionTxId = (int)$this->db->lastInsertId();
                 if ($transactionTxId <= 0) {
                     throw new RuntimeException('failed to add a new transaction tx as unspent in the database: ' . $txOut['transaction_id'] . ' - ' . $txOut['$txIn']);
                 }
