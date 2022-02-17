@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace Xeros;
 
@@ -37,28 +37,26 @@ class Node
         $this->peer = new Peer();
     }
 
-    private function close($client, $reason)
-    {
-        Console::log('Kicking client: ' . $reason);
-        socket_set_block($client);
-        socket_set_option($client, SOL_SOCKET, SO_LINGER, ['l_onoff' => 1, 'l_linger' => 1]);
-        socket_close($client);
-    }
-
     private function send($client, string $data)
     {
         $data = trim($data);
-        socket_write($client, $data, strlen($data));
+
+        if (is_resource($client)) {
+            //socket_write($client, $data, strlen($data));
+            fwrite($client, $data, strlen($data));
+        }
     }
 
     public function listen(string $address, int $port)
     {
         Console::log('Opening a server socket on address: ' . $address . ' port: ' . $port);
-        $sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-        socket_set_option($sock, SOL_SOCKET, SO_REUSEADDR, 1);
-        socket_set_nonblock($sock);
-        socket_bind($sock, $address, $port);
-        socket_listen($sock, 100);
+        $sock = stream_socket_server("tcp://$address:$port", $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN) or die("Cannot create socket.\n");
+        stream_set_blocking($sock, false);
+        //$sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        //socket_set_option($sock, SOL_SOCKET, SO_REUSEADDR, 1);
+        //socket_set_nonblock($sock);
+        //socket_bind($sock, $address, $port);
+        //socket_listen($sock, 100);
 
         $this->port = $port;
         $server = $sock;
@@ -71,14 +69,17 @@ class Node
             $except = null;
 
             // Set up a blocking call to socket_select
-            $reads = socket_select($read, $write, $except, 0, 250000);
+            //$reads = socket_select($read, $write, $except, 0, 250000);
+
+
+            $read[] = $sock;
+            $reads = stream_select($read, $write, $except, 10,0);// 250000
 
             if ($reads > 0) {
-                Console::log('Port changes: ' . $reads);
-
                 // check if there is a client trying to connect
                 if (in_array($sock, $read)) {
-                    $newSocket = socket_accept($sock);
+                    //$newSocket = socket_accept($sock);
+                    $newSocket = stream_socket_accept($sock);
                     $clients[] = $newSocket;
 
                     Console::log('New peer connection');
@@ -92,11 +93,8 @@ class Node
                 // Handle Input
                 foreach ($clients as $key => $client) { // for each client
                     if (in_array($client, $read)) {
-                        if (false == ($data = trim(socket_read($client, 2048, PHP_BINARY_READ)))) {
-                            Console::log('Error: ' . socket_strerror(socket_last_error($client)));
-                            break 2;
-                        }
-
+                        //if (false == ($data = trim(socket_read($client, 2048, PHP_BINARY_READ)))) {
+                        $data = fread($client, 8192);
                         if ($data !== '') {
                             $data = json_decode(trim($data), true);
 
@@ -110,15 +108,17 @@ class Node
                                             if (Config::getNetworkIdentifier() !== ($data['network'] ?: '')) {
                                                 Console::log('Incompatible client <net_id>');
                                                 $this->send($client, json_encode(['type' => 'error', 'message' => 'wrong network id']));
-                                                $this->close($client, 'wrong network id');
+                                                fclose($client);
                                                 unset($clientInfo[$key]);
+                                                unset($clients[$key]);
                                             }
 
                                             if (bccomp($data['version'] ?: '', Config::getVersion(), 4) < 0) {
                                                 Console::log('Incompatible client <version>');
                                                 $this->send($client, json_encode(['type' => 'error', 'message' => 'incompatible version']));
-                                                $this->close($client, 'incompatible version');
+                                                fclose($client);
                                                 unset($clientInfo[$key]);
+                                                unset($clients[$key]);
                                             }
 
                                             // store values
@@ -132,8 +132,9 @@ class Node
 
                                         default:
                                             $this->send($client, json_encode(['type' => 'error', 'message' => 'expected handshake']));
-                                            $this->close($client, 'expected handshake');
+                                            fclose($client);
                                             unset($clientInfo[$key]);
+                                            unset($clients[$key]);
                                             break;
                                     }
                                 }
@@ -200,14 +201,12 @@ class Node
                             } else {
                                 Console::log('Unknown command received: ' . $key);
                                 $this->send($client, json_encode(['type' => 'error', 'message' => 'unknown command']));
-                                continue;
                             }
-                        }
-
-                        if ($data === '') {
-                            Console::log('Client closed socket');
-                            socket_close($client);
+                        } else {
+                            Console::log('Client disconnected');
+                            fclose($client);
                             unset($clientInfo[$key]);
+                            unset($clients[$key]);
                         }
                     }
                 }

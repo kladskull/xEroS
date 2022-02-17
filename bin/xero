@@ -1,5 +1,5 @@
 #!/usr/bin/php
-<?php declare(strict_types=1);
+<?php
 
 namespace Xeros;
 
@@ -60,4 +60,4 @@ if (!empty($argv[2])) {
 }
 
 $node = new Node();
-$node->listen($listenIp, $listenIp);
+$node->listen($listenIp, $listenPort);

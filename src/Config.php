@@ -136,7 +136,7 @@ class Config
 
     public static function getListenPort(): int
     {
-        return $_ENV['LISTEN_PORT'] ?? 7747;
+        return (int)$_ENV['LISTEN_PORT'] ?? 7747;
     }
 
     public static function getLockHeight(): int
