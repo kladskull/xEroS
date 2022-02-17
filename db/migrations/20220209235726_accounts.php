@@ -23,7 +23,7 @@ final class Accounts extends AbstractMigration
             ->addColumn('date_created', 'integer', ['signed' => false])
             ->addColumn('public_key', 'text')
             ->addColumn('private_key', 'text')
-            ->addColumn('public_hash', 'text')
+            ->addColumn('public_key_raw', 'text')
             ->addColumn('address', 'text', ['limit' => 64])
             ->addIndex(['address'], ['unique' => true, 'order' => ['address' => 'ASC']])
             ->addIndex(['public_key_raw'], ['unique' => true, 'order' => ['public_key_raw' => 'ASC']])

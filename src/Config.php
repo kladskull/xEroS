@@ -9,7 +9,8 @@ class Config
     private const ProductCopyright = 'Copyright (c)2021,2022 by Mike Curry <mike@currazy.com>';
     private const Version = '0.0001';
     private const NetworkIdentifier = "xv01";
-
+    private const Environment = "prod";
+    
     // Genesis block
     private const GenesisDate = 1638738156; // Sunday, December 5, 2021 4:02:36 PM GMT-05:00
 
@@ -87,6 +88,25 @@ class Config
     public static function getDefaultDifficulty(): int
     {
         return self::DefaultDifficulty;
+    }
+
+    public static function getDbEnvironment(): string
+    {
+        $return = '';
+
+        $env = $_ENV['ENVIRONMENT'] ?? self::Environment;
+        switch ($env) {
+            case 'dev':
+                $return = 'dev';
+                break;
+            case 'test':
+                $return = 'test';
+                break;
+            default:
+                break;
+
+        }
+        return $return;
     }
 
     public static function getGenesisDate(): int

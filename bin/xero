@@ -45,7 +45,13 @@ if ($block->getCurrentHeight() === 0) {
 $store = new DataStore();
 $state = $store->getKey('state', '');
 if (empty($state)) {
-    $store->add('state', NodeState::Syncing);
+    $store->add('state', Node::Syncing);
 }
 
-// start the network
+$port = 7747;
+if (isset($argv[1])) {
+    $port = (int)$argv[1];
+}
+
+$node = new Node();
+$node->listen('0.0.0.0', $port);

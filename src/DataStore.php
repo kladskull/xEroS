@@ -60,7 +60,7 @@ class DataStore
             $stmt = DatabaseHelpers::filterBind($stmt, 'data', $value, DatabaseHelpers::TEXT);
             $stmt = DatabaseHelpers::filterBind($stmt, 'expires', $expires, DatabaseHelpers::INT);
             $stmt->execute();
-            $id = $this->db->lastInsertId();
+            $id = (int)$this->db->lastInsertId();
 
             $this->db->commit();
         } catch (Exception $ex) {

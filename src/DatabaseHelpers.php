@@ -25,7 +25,7 @@ class DatabaseHelpers
                 break;
 
             case self::TEXT:
-                $value = filter_var($value, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH, FILTER_NULL_ON_FAILURE);
+                $value = trim($value);
                 if ($maxLength === 0) {
                     $stmt->bindParam(param: ':' . $fieldName, var: $value, type: $pdoType);
                 } else {
