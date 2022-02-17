@@ -21,7 +21,7 @@ final class Peers extends AbstractMigration
     {
         $table = $this->table('peers');
         $table
-            ->addColumn('address', 'text', ['limit' => 256])
+            ->addColumn('address', 'text')
             ->addColumn('reserve', 'integer', ['signed' => false])
             ->addColumn('last_ping', 'integer', ['signed' => false])
             ->addColumn('blacklisted', 'integer', ['signed' => false])

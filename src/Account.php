@@ -60,7 +60,7 @@ class Account
             // ensure the block was stored
             $id =(int)$this->db->lastInsertId();
             if ($id <= 0) {
-                throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
+                throw new RuntimeException("failed to add account to the database");
             }
             $this->db->commit();
         } catch (Exception $ex) {

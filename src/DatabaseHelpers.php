@@ -2,6 +2,7 @@
 
 namespace Xeros;
 
+use PDO;
 use PDOStatement;
 use RuntimeException;
 
@@ -21,21 +22,21 @@ class DatabaseHelpers
         switch ($pdoType) {
             case self::ALPHA_NUMERIC:
                 $value = preg_replace("/[^a-zA-Z0-9]/", '', $value);
-                $stmt->bindParam(param: ':' . $fieldName, var: $value, type: $pdoType, maxLength: $maxLength);
+                $stmt->bindParam(param: ':' . $fieldName, var: $value, maxLength: $maxLength);
                 break;
 
             case self::TEXT:
                 $value = trim($value);
                 if ($maxLength === 0) {
-                    $stmt->bindParam(param: ':' . $fieldName, var: $value, type: $pdoType);
+                    $stmt->bindParam(param: ':' . $fieldName, var: $value);
                 } else {
-                    $stmt->bindParam(param: ':' . $fieldName, var: $value, type: $pdoType, maxLength: $maxLength);
+                    $stmt->bindParam(param: ':' . $fieldName, var: $value, maxLength: $maxLength);
                 }
                 break;
 
             case self::INT:
                 $value = filter_var($value, FILTER_SANITIZE_NUMBER_INT, FILTER_NULL_ON_FAILURE);
-                $stmt->bindParam(param: ':' . $fieldName, var: $value, type: $pdoType);
+                $stmt->bindParam(param: ':' . $fieldName, var: $value, type: PDO::PARAM_INT);
                 break;
 
             default:
