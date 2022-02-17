@@ -134,10 +134,29 @@ class Peer
         return $result;
     }
 
+    private function isValidAddress(string $address): bool
+    {
+        $valid = false;
+        $host = explode(':', $address);
+        if (count($host) === 2) {
+            if (filter_var($host[0], FILTER_VALIDATE_IP)) {
+                if ((int)$host[1] > 0 && (int)$host[1] <= 65535) {
+                    $valid = true;
+                }
+            }
+        }
+        return $valid;
+    }
+
     public function add(string $address, bool $blacklisted = false): int
     {
+        if (!$this->isValidAddress($address)) {
+            Console::log('failed to add peer to the database - junk address: ' . $address);
+            return 0;
+        }
+
         if ($this->getByHostAddress($address) !== null) {
-            Console::log('failed to add peer to the database: ' . $address);
+            Console::log('duplicate peer address, not adding: ' . $address);
             return 0;
         }
 
@@ -150,7 +169,7 @@ class Peer
             }
 
             // prepare the statement and execute
-            $query = 'INSERT INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created`) VALUES (:address,:reserve,:last_ping,:blacklisted,:fails,:date_created)';
+            $query = 'INSERT OR REPLACE INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created`) VALUES (:address,:reserve,:last_ping,:blacklisted,:fails,:date_created)';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $address, pdoType: DatabaseHelpers::TEXT, maxLength: 256);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'last_ping', value: 0, pdoType: DatabaseHelpers::INT);

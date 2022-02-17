@@ -37,11 +37,6 @@ class Node
         $this->peer = new Peer();
     }
 
-    private function getPeers(): string
-    {
-        return '99.253.185.218:7777' . PHP_EOL . '99.253.185.218:8888' . PHP_EOL . '99.253.185.218:6666' . PHP_EOL;
-    }
-
     private function close($client, $reason)
     {
         Console::log('Kicking client: ' . $reason);
@@ -160,6 +155,7 @@ class Node
                                             Console::log('Received handshake_ok <complete>');
                                             break;
 
+                                        // {"type":"peer_list_req"}
                                         case 'peer_list_req':
                                             Console::log('Received peer_list_req');
                                             $peerList = $this->peer->getAll();
@@ -171,9 +167,9 @@ class Node
                                             Console::log('Received peer_invite_req');
                                             // get the IP we see, not what was given
                                             $packet = null;
-                                            socket_getpeername($client, $peerAddress) ?: null;
+                                            socket_getpeername($client, $peerAddress);
                                             $peerPort = (int)$data['port'] ?: null;
-                                            if ($peerAddress !== null && $peerPort !== null) {
+                                            if (!empty($peerAddress) && !empty($peerPort)) {
                                                 if (filter_var($peerAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && $peerPort > 0 && $peerPort <= 65535) {
                                                     $hostAddress = $peerAddress . ':' . $port;
                                                     if ($this->peer->getByHostAddress($hostAddress) === null) {
@@ -188,6 +184,13 @@ class Node
                                                 $packet = json_encode(['type' => 'peer_inv_resp', 'result' => 'nok']);
                                             }
                                             $this->send($client, $packet);
+                                            break;
+
+                                        case 'peer_list':
+                                            $peerList = $data['peers'] ?: [];
+                                            foreach ($peerList as $peer) {
+                                                $this->peer->add($peer['address']);
+                                            }
                                             break;
 
                                         default:

@@ -48,10 +48,16 @@ if (empty($state)) {
     $store->add('state', Node::Syncing);
 }
 
-$port = 7747;
-if (isset($argv[1])) {
-    $port = (int)$argv[1];
+$listenIp = Config::getListenAddress();
+$listenPort = Config::getListenPort();
+
+if (!empty($argv[1])) {
+    $listenIp = $argv[1];
+}
+
+if (!empty($argv[2])) {
+    $listenPort = (int)$argv[2];
 }
 
 $node = new Node();
-$node->listen('0.0.0.0', $port);
+$node->listen($listenIp, $listenIp);

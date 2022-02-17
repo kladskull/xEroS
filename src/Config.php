@@ -10,7 +10,11 @@ class Config
     private const Version = '0.0001';
     private const NetworkIdentifier = "xv01";
     private const Environment = "prod";
-    
+
+    // network
+    private const ListenAddress = "0.0.0.0";
+    private const ListenPort = 7747;
+
     // Genesis block
     private const GenesisDate = 1638738156; // Sunday, December 5, 2021 4:02:36 PM GMT-05:00
 
@@ -52,7 +56,8 @@ class Config
 
     // Initial Peers to connect to
     private const InitialPeerList = [
-        'http://peer1.solutionxero.io/',
+        '3.97.76.137:7747',
+        '3.99.119.232:7747',
     ];
 
     public static function getAddressHeader(): string
@@ -122,6 +127,16 @@ class Config
     public static function getInitialPeers(): array
     {
         return self::InitialPeerList;
+    }
+
+    public static function getListenAddress(): string
+    {
+        return $_ENV['LISTEN_IP'] ?? '0.0.0.0';
+    }
+
+    public static function getListenPort(): int
+    {
+        return $_ENV['LISTEN_PORT'] ?? 7747;
     }
 
     public static function getLockHeight(): int
