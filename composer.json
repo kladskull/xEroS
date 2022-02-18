@@ -32,7 +32,8 @@
     "drupol/phpmerkle": "^2.2",
     "vlucas/phpdotenv": "^5.4",
     "ext-zlib": "*",
-    "ext-sockets": "*"
+    "ext-sockets": "*",
+    "symfony/yaml": "^6.0"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",

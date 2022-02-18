@@ -79,7 +79,7 @@ while (1) {
                                 'value' => $reward,
                                 'script' => $script->encodeScript($scriptText),
                                 'lock_height' => $lockHeight,
-                                'hash' => Hash::doubleSha256ToBase58($transactionId . '0' . $toAddress . $reward . $lockHeight),
+                                'hash' => bin2hex($this->pow->doubleSha256($transactionId . '0' . $toAddress . $reward . $lockHeight)),
                             ]
                         ],
                     ];
@@ -132,6 +132,9 @@ while (1) {
                     if ($result['result'] === true && !empty($result['nonce'])) {
                         $newBlock['nonce'] = dechex($result['nonce']);
                         $newBlock['hash'] = $result['hash'];
+                        echo $result['hash'];
+                        echo "<--- check this\n";
+                        exit(0);
                         break;
                     }
 

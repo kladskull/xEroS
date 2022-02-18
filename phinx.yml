@@ -1,0 +1,24 @@
+paths:
+  migrations: "%%PHINX_CONFIG_DIR%%/db/migrations"
+  seeds: "%%PHINX_CONFIG_DIR%%/db/seeds"
+
+environments:
+  default_migration_table: phinxlog
+  default_database: development
+  production:
+    adapter: sqlite
+    name: xero
+    suffix: .db
+    charset: utf8
+
+  development:
+    adapter: sqlite
+    name: xero-dev
+    suffix: .db
+    charset: utf8
+
+  testing:
+    adapter: sqlite
+    name: xero-test
+    suffix: .db
+    charset: utf8

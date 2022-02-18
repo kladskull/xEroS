@@ -88,7 +88,7 @@ class Block
                     'value' => $amount,
                     'script' => $script->encodeScript($scriptText),
                     'lock_height' => $lockHeight,
-                    'hash' => $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight),
+                    'hash' => bin2hex($this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)),
                 ]
             ],
         ];
@@ -117,9 +117,9 @@ class Block
 
     public function generateId(string $previousBlockId, int $date, int $height): string
     {
-        return $this->pow->doubleSha256(
+        return bin2hex($this->pow->doubleSha256(
             $previousBlockId . $date . $height
-        );
+        ));
     }
 
     public function get(int $id): ?array
@@ -437,6 +437,7 @@ class Block
                 // add txOut
                 foreach ($transaction[Transaction::Outputs] as $txOut) {
                     $txOut['transaction_id'] = $transaction['transaction_id'];
+                    $txOut['spent'] = 0; // set this to zero, it will be updated on the spent transaction
 
                     // add the txIn record to the db
                     $query = 'INSERT INTO transaction_outputs (`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash`) VALUES (:transaction_id,:tx_id,:address,:value,:script,:lock_height,:spent,:hash)';
