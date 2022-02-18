@@ -1,5 +1,5 @@
 #!/usr/bin/php
-<?php
+<?php declare(strict_types=1);
 
 namespace Xeros;
 
@@ -38,7 +38,7 @@ $dotenv->load();
 // bootstrap from Genesis?
 $block = new Block();
 if ($block->getCurrentHeight() === 0) {
-    $block->addFullBlock($block->genesis());
+    $block->addFullBlock($block->genesis(), false);
 }
 
 // if there is no state, we're likely needing to sync from the network

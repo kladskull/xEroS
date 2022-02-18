@@ -1,12 +1,6 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Xeros;
-
-use Exception;
-use JetBrains\PhpStorm\ArrayShape;
-use React;
-use JetBrains\PhpStorm\Pure;
-use Symfony\Component\Console\Exception\CommandNotFoundException;
 
 class Node
 {
@@ -17,32 +11,36 @@ class Node
 
     private TcpIp $tcpIp;
     private Peer $peer;
+    private Block $block;
+    private Transaction $transaction;
+    private Mempool $mempool;
 
     public const Syncing = 'sync';
     public const Mining = 'mine';
 
     private array $clientInfoArray = [
-        'init' => false,
-        'handshake' => false,
         'version' => '0',
-        'packets_in' => 0,
-        'packets_out' => 0,
+        'init' => 0,
         'connect_time' => 0,
         'last_ping' => 0,
+        'current_height' => 0,
+        'last_height' => 0
     ];
 
     public function __construct()
     {
         $this->tcpIp = new TcpIp();
         $this->peer = new Peer();
+        $this->block = new Block();
+        $this->transaction = new Transaction();
+        $this->mempool = new Mempool();
     }
 
     private function send($client, string $data)
     {
-        $data = trim($data);
-
+        // add a newline for back-to-back sends
+        $data = trim($data) . "\n";
         if (is_resource($client)) {
-            //socket_write($client, $data, strlen($data));
             fwrite($client, $data, strlen($data));
         }
     }
@@ -52,11 +50,6 @@ class Node
         Console::log('Opening a server socket on address: ' . $address . ' port: ' . $port);
         $sock = stream_socket_server("tcp://$address:$port", $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN) or die("Cannot create socket.\n");
         stream_set_blocking($sock, false);
-        //$sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-        //socket_set_option($sock, SOL_SOCKET, SO_REUSEADDR, 1);
-        //socket_set_nonblock($sock);
-        //socket_bind($sock, $address, $port);
-        //socket_listen($sock, 100);
 
         $this->port = $port;
         $server = $sock;
@@ -68,12 +61,9 @@ class Node
             $write = null;
             $except = null;
 
-            // Set up a blocking call to socket_select
-            //$reads = socket_select($read, $write, $except, 0, 250000);
-
-
+            // Set up a non-blocking call to socket_select
             $read[] = $sock;
-            $reads = stream_select($read, $write, $except, 10,0);// 250000
+            $reads = stream_select($read, $write, $except, 0, 250000);
 
             if ($reads > 0) {
                 // check if there is a client trying to connect
@@ -101,7 +91,7 @@ class Node
                             if (isset($data['type'])) {
 
                                 // only allow uninitialized connections access to these commands
-                                if ($clientInfo[$key]['init'] === false) {
+                                if ($clientInfo[$key]['init'] < 2) {
                                     switch ($data['type']) {
                                         case 'handshake':
                                             Console::log('Received handshake');
@@ -126,8 +116,36 @@ class Node
                                             $clientInfo[$key]['version'] = $data['version'];
 
                                             // we have a handshake, allow more commands
-                                            $clientInfo[$key]['init'] = true;
+                                            $clientInfo[$key]['init'] = 1;
                                             $this->send($client, json_encode(['type' => 'handshake_ok']));
+                                            break;
+
+                                        case 'handshake_ok':
+                                            if ($clientInfo[$key]['init'] !== 1) {
+                                                Console::log('Received handshake before `ok` response');
+                                                $this->send($client, json_encode([
+                                                    'type' => 'handshake_resp_nok',
+                                                    'result' => 'nok'
+                                                ]));
+                                                break;
+                                            }
+
+                                            Console::log('Received handshake');
+
+                                            // request a peer list
+                                            $this->send($client, json_encode([
+                                                'type' => 'peer_list_req'
+                                            ]));
+
+                                            //  send our peer details (IP doesn't matter, as other peer gets the real address)
+                                            $this->send($client, json_encode([
+                                                'type' => 'peer_invite_req',
+                                                'address' => "127.0.0.1",
+                                                'port' => $this->port
+                                            ]));
+
+                                            // complete the handshake process
+                                            $clientInfo[$key]['init'] = 2;
                                             break;
 
                                         default:
@@ -140,28 +158,30 @@ class Node
                                 }
 
                                 // only allow initialized connections for these commands
-                                if ($clientInfo[$key]['init'] === true) {
+                                if ($clientInfo[$key]['init'] >= 2) {
                                     switch ($data['type']) {
                                         case 'ping':
                                             Console::log('Received ping');
-                                            $this->send($client, json_encode(['type' => 'pong']));
+                                            $this->send($client, json_encode([
+                                                'type' => 'pong'
+                                            ]));
+
+                                            // renew the connection timeout
+                                            $clientInfo[$key]['last_ping'] = time();
                                             break;
 
                                         case 'pong':
                                             Console::log('Received pong');
-                                            $clientInfo[$key]['last_ping'] = time();
                                             break;
 
-                                        case 'handshake_ok':
-                                            Console::log('Received handshake_ok <complete>');
-                                            break;
-
-                                        // {"type":"peer_list_req"}
                                         case 'peer_list_req':
                                             Console::log('Received peer_list_req');
                                             $peerList = $this->peer->getAll();
                                             Console::log('Sent peer_list');
-                                            $this->send($client, json_encode(['type' => 'peer_list', 'peers' => $peerList]));
+                                            $this->send($client, json_encode([
+                                                'type' => 'peer_list',
+                                                'peers' => $peerList
+                                            ]));
                                             break;
 
                                         case 'peer_invite_req':
@@ -177,12 +197,18 @@ class Node
                                                         $this->peer->add($hostAddress);
                                                         Console::log('Sending response OK to peer_invite_req');
                                                     }
-                                                    $packet = json_encode(['type' => 'peer_inv_resp', 'result' => 'ok']);
+                                                    $packet = json_encode([
+                                                        'type' => 'peer_inv_resp',
+                                                        'result' => 'ok'
+                                                    ]);
                                                 }
                                             }
                                             if ($packet === null) {
                                                 Console::log('Sending response NOK to peer_invite_req');
-                                                $packet = json_encode(['type' => 'peer_inv_resp', 'result' => 'nok']);
+                                                $packet = json_encode([
+                                                    'type' => 'peer_inv_resp',
+                                                    'result' => 'nok'
+                                                ]);
                                             }
                                             $this->send($client, $packet);
                                             break;
@@ -192,6 +218,20 @@ class Node
                                             foreach ($peerList as $peer) {
                                                 $this->peer->add($peer['address']);
                                             }
+                                            break;
+
+                                        case 'height_req':
+                                            Console::log('Received a height request from: ' . $key);
+                                            $this->send($client, json_encode([
+                                                'type' => 'height',
+                                                'height' => 11
+                                            ]));
+                                            break;
+
+                                        case 'height':
+                                            $height = $data['height'] ?: 0;
+                                            Console::log('Received a height of ' . $height . ' request from: ' . $key);
+                                            $clientInfo[$key]['height'] = $height;
                                             break;
 
                                         default:
@@ -232,8 +272,23 @@ class Node
                     $this->send($client, json_encode($packet));
                 }
 
-                // send out pings
-                if ($clientInfo[$key]['init'] === true) {
+                // only allow advanced commands after we're initialized
+                if ($clientInfo[$key]['init'] === 2) {
+
+                    /**
+                     * Get all peer heights
+                     */
+                    $lastHeight = (int)$clientInfo[$key]['last_height'];
+                    if (time() - $lastHeight >= 5) {
+                        $clientInfo[$key]['last_height'] = time();
+                        Console::log('Requesting height from client: ' . $key);
+                        $packet = ['type' => 'height_req'];
+                        $this->send($client, json_encode($packet));
+                    }
+
+                    /**
+                     * refresh connections
+                     */
                     $lastPing = (int)$clientInfo[$key]['last_ping'];
                     if (time() - $lastPing >= 60) {
                         $clientInfo[$key]['last_ping'] = time();
@@ -241,10 +296,21 @@ class Node
                         $packet = ['type' => 'ping'];
                         $this->send($client, json_encode($packet));
                     }
+
+                }
+
+                /**
+                 * Time-out any quiet nodes
+                 */
+                $time = time() - (int)$clientInfo[$key]['last_ping'];
+                if ($time > 300) {
+                    Console::log('Closing client for lack of activity ID: ' . $key);
+                    fclose($client);
+                    unset($clientInfo[$key]);
+                    unset($clients[$key]);
                 }
             }
 
-            //end
         }
 
     }

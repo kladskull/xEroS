@@ -21,15 +21,8 @@ class Mempool
 
     public function __construct()
     {
-        parent::__construct();
-
         $this->db = Database::getInstance();
         $this->transaction = new Transaction();
-
-        //$this->peers = new Peer();
-        //$this->transferEncoding = new TransferEncoding();
-        //$this->address = new Address();
-        //$this->openSsl = new OpenSsl();
     }
 
     public function add(array $transaction): bool
@@ -61,7 +54,7 @@ class Mempool
             $this->db->beginTransaction();
 
             // lock tables
-            $this->db->exec('LOCK TABLES transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,mempool_transactions WRITE,mempool_inputs WRITE,mempool_outputs WRITE;');
+            //$this->db->exec('LOCK TABLES transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,mempool_transactions WRITE,mempool_inputs WRITE,mempool_outputs WRITE;');
 
             // prepare the statement and execute
             $query = 'INSERT INTO mempool_transactions (`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key`) VALUES (:block_id,:transaction_id,:date_created,:peer,:height,:version,:signature,:public_key)';
@@ -139,13 +132,13 @@ class Mempool
             }
 
             // unlock tables and commit
-            $this->db->exec('UNLOCK TABLES');
+            //$this->db->exec('UNLOCK TABLES');
             $this->db->commit();
 
             $result = true;
         } catch (Exception $ex) {
             Console::log('Rolling back transaction: ' . $ex->getMessage());
-            $this->db->exec('UNLOCK TABLES');
+            //$this->db->exec('UNLOCK TABLES');
             $this->db->rollback();
         }
 

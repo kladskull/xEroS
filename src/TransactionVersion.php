@@ -2,8 +2,8 @@
 
 namespace Xeros;
 
-enum TransactionVersion
+class TransactionVersion
 {
-    case Coinbase;
-    case Transfer;
+    public const Coinbase = '0';
+    public const Transfer = '1';
 }
