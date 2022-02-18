@@ -32,7 +32,7 @@ class Miner
         return sprintf('%.2f%s', $hashesPerSecond / (1000 ** ((int)$mag)), $magnitudes[(int)$mag]);
     }
 
-    public function mineBlock(string $blockHeader, int $difficulty, int $height, string $miningUrl, int $startingNonce = 0): array|bool
+    public function mineBlock(string $blockHeader, int $difficulty, int $height, int $startingNonce = 0, bool $checkNewBlocks = true): array|bool
     {
         $start = time();
         $nonce = $startingNonce;
@@ -100,7 +100,7 @@ class Miner
             }
 
             // break out?
-            if ($hashes % 250000 === 0) {
+            if ($checkNewBlocks && $hashes % 250000 === 0) {
                 // check state, we may need to sync from the network
                 $currentHeight = $this->block->getCurrentHeight();
 

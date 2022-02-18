@@ -48,23 +48,8 @@ echo PHP_EOL, Config::getProductName(), " Node v", Config::getVersion(), PHP_EOL
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
 // check if migration was run
-$db = Database::getInstance();
-$tableCount = 0;
-$requiredTables = ['accounts', 'blocks', 'key_value_store', 'logs', 'mempool_inputs', 'mempool_outputs', 'mempool_transactions', 'peers', 'queue', 'transaction_inputs', 'transaction_outputs', 'transactions'];
-foreach ($requiredTables as $requiredTable) {
-    $query = 'SELECT name FROM sqlite_master WHERE type=\'table\' AND name=:table_name';
-    $stmt = $db->prepare($query);
-    $stmt = DatabaseHelpers::filterBind($stmt, 'table_name', $requiredTable, DatabaseHelpers::TEXT);
-    $stmt->execute();
-    $tableExists = $stmt->fetchColumn();
-    if (in_array($tableExists, $requiredTables)) {
-        $tableCount++;
-    }
-}
-if (count($requiredTables) !== $tableCount) {
-    Console::log('Error: Before you run ' . Config::getProductName() . ' you must run ./phinx migrate');
-    exit(0);
-}
+$app = new App();
+$app->checkMigrations();
 
 // bootstrap from Genesis?
 $block = new Block();

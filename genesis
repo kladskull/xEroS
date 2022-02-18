@@ -3,72 +3,21 @@
 
 namespace Xeros;
 
-use Dotenv\Dotenv;
 use Exception;
 
-declare(ticks=1);
-bcscale(0);
-date_default_timezone_set('UTC');
-mb_internal_encoding('UTF-8');
-$utf_set = ini_set('default_charset', 'utf-8');
-
-// set path constants
-$appDir = dirname(__FILE__) . DIRECTORY_SEPARATOR;
-define('APP_DIR', $appDir);
-
-/**
- * Make sure they have installed and executed composer
- */
-if (!file_exists(APP_DIR . 'vendor/autoload.php')) {
-    echo 'Error: You have to install composer and run `composer install` before you can continue.', PHP_EOL;
-    exit(0);
-}
-
-// includes
-require APP_DIR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
-
-// get the interpreter version
-$phpVersion = ((PHP_MAJOR_VERSION * 10000) + (PHP_MINOR_VERSION * 1000) + PHP_RELEASE_VERSION);
-if ($phpVersion < 81001) {
-    Console::log('Error: The minimum version of PHP must be 8.1');
-    exit(1);
-}
-
-// setup .env
-if (!file_exists(APP_DIR . '.env')) {
-    echo 'Error: rename .env_sample to .env, and change the values accordingly', PHP_EOL;
-    exit(0);
-}
-
-// load the environment
-$dotenv = Dotenv::createImmutable(APP_DIR);
-$dotenv->load();
-
-echo "\n" . Config::getProductName() . " Genesis Miner v" . Config::getVersion() . "\n";
-echo Config::getProductCopyright() . "\n\n";
-
-$app = new App();
-$app->checkMigrations();
+include 'bootstrap.php';
 
 $block = new Block();
-$transaction = new Transaction();
 $miner = new Miner();
 $pow = new Pow();
-
-$blockHeader = '';
-$difficulty = Config::getDefaultDifficulty();
 $nonce = 0;
-$account = [];
-
-$publicKey = file_get_contents(APP_DIR . 'public.key');
-$privateKey = file_get_contents(APP_DIR . 'private.key');
 
 $candidateBlock = $block->genesis();
 $blockHeader = $block->generateBlockHeader($candidateBlock);
 
 while (1) {
     try {
-        $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], 1, 'http://localhost/', $nonce);
+        $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], 1, $nonce, false);
         if ($result['result'] === true) {
             break;
         }
