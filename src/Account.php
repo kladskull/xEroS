@@ -48,7 +48,7 @@ class Account
             $dateCreated = time();
 
             // prepare the statement and execute
-            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) VALUES (:public_key,:public_key_raw,:private_key,:address,`date_created`)';
+            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) VALUES (:public_key,:public_key_raw,:private_key,:address,:date_created)';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key', value: $keys['public_key'], pdoType: DatabaseHelpers::TEXT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key_raw', value: $keys['public_key_raw'], pdoType: DatabaseHelpers::TEXT);
@@ -58,7 +58,7 @@ class Account
             $stmt->execute();
 
             // ensure the block was stored
-            $id =(int)$this->db->lastInsertId();
+            $id = (int)$this->db->lastInsertId();
             if ($id <= 0) {
                 throw new RuntimeException("failed to add account to the database");
             }

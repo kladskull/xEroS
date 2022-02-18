@@ -44,11 +44,11 @@ class Block
         $date = 1644364863;
         $previousBlockId = '';
 
-        $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2rurp8hen6Wepcz0X+4kWqtqEk7e+46Mx4hjDDlYw2j7XXiEpSHAz0ZWwKfDlBSBV8yYVBSGI+URjoBn7+ZH/cuHaSNCxg5JTxSG5DyWgeG1OHUnILnfLdJpo0H/mGscVdf/Nws21j/XbG9eXICFIVfojKKqZWLax8XLyuf/Gl4Oj7RAuRVseN7CRiq73x8kcMSzUgLyitefWaH1GxmATTm3ygey5itn8ddf4iow78lM56hPHXl5id0JV+WsRL6QbuFvrC5Eo42iAyN0dsHrpqkK1+2fKVrfedJy3aa6LqjQZdfebJtw4PCdKBpn1ZVIeDJILy2lQUuBXu52Qc93QQIDAQAB';
 
-        //$publicKeyRaw = $openSsl->stripPem(file_get_contents(__DIR__ . '/../../public.key'));
-        //$privateKeyRaw = $openSsl->stripPem(file_get_contents(__DIR__ . '/../../private.key'));
+        $publicKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
+        $privateKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
 
+        //$publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2rurp8hen6Wepcz0X+4kWqtqEk7e+46Mx4hjDDlYw2j7XXiEpSHAz0ZWwKfDlBSBV8yYVBSGI+URjoBn7+ZH/cuHaSNCxg5JTxSG5DyWgeG1OHUnILnfLdJpo0H/mGscVdf/Nws21j/XbG9eXICFIVfojKKqZWLax8XLyuf/Gl4Oj7RAuRVseN7CRiq73x8kcMSzUgLyitefWaH1GxmATTm3ygey5itn8ddf4iow78lM56hPHXl5id0JV+WsRL6QbuFvrC5Eo42iAyN0dsHrpqkK1+2fKVrfedJy3aa6LqjQZdfebJtw4PCdKBpn1ZVIeDJILy2lQUuBXu52Qc93QQIDAQAB';
         $hash = '0000000ddc4bae812455272176cdf3c8b7ed8d6a1e0eb7ba2709c14741fbb732';
         $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
         $signature = '0287167c3f5fb62a9a416a414a008ee322a337ca8650b114c146e014be36769855ecaf019b37b20ccaaade079ead27d317156d4da3b3824029711d7acfed0dd1d88ec9faaf77da9184c968b7503e81fa504d5271592f75c4d9d9232d3e6627752add52384228e1ca01163b3be1036ab9672ca9eae7a58eded6ea3afb9df3333638f6a2fd6c261db3fe6e5ae8ca3d9848f19d03c5b42868f088b62a74ef867dd63654bcb9b28c0757828254102799968a8a7e8680752b50e33d4527e59009c4c065d23ac9c8230b6bb692574ae05c597799f19c0a50ae01d8dea3de39ed6274519f6a10964aa37970f5a35c2e4ebf9935a5898ff79762d23f8557365385142814';
@@ -94,8 +94,8 @@ class Block
         ];
 
         // sign
-        $transactionRecord['signature'] = $signature;
-        //$transactionRecord['signature'] = $transaction->signTransaction($transactionRecord, $ossl->formatPem($publicKeyRaw, false), $ossl->formatPem($privateKeyRaw, true));
+        //$transactionRecord['signature'] = $signature;
+        $transactionRecord['signature'] = $transaction->signTransaction($transactionRecord, $openSsl->formatPem($publicKeyRaw, false), $openSsl->formatPem($privateKeyRaw, true));
 
         return [
             'network_id' => Config::getNetworkIdentifier(),
@@ -124,7 +124,7 @@ class Block
 
     public function get(int $id): ?array
     {
-        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `id` = :id LIMIT 1';
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT);
         $stmt->execute();
@@ -134,7 +134,7 @@ class Block
 
     public function getByBlockId(string $blockId): ?array
     {
-        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `block_id` = :block_id LIMIT 1';
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `block_id` = :block_id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
@@ -143,7 +143,7 @@ class Block
 
     public function getByPreviousBlockId(string $previousBlockId): ?array
     {
-        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `previous_block_id` = :previous_block_id LIMIT 1';
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `previous_block_id` = :previous_block_id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'previous_block_id', $previousBlockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
@@ -160,7 +160,7 @@ class Block
     public function getByHeight(int $height): ?array
     {
         // prepare the statement
-        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan` = 0 AND `height` = :height LIMIT 1';
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan` = 0 AND `height` = :height LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'height', $height, DatabaseHelpers::INT, 0);
         $stmt->execute();
@@ -169,7 +169,7 @@ class Block
 
     public function getCurrent(): ?array
     {
-        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan`=0 ORDER BY height DESC LIMIT 1';
+        $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE `orphan`=0 ORDER BY height DESC LIMIT 1';
         $stmt = $this->db->query($query);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
@@ -204,7 +204,8 @@ class Block
     public function validateFullBlock(array $block): array
     {
         $transactions = $block['transactions'];
-        return $this->validate($block, $transactions, count($transactions));
+        unset($block['transactions']);
+        return $this->validate($block, $transactions, $block['transaction_count']);
     }
 
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
@@ -313,7 +314,7 @@ class Block
 
         // clip transactions
         $transactions = $block['transactions'];
-        unset($transactions);
+        unset($block['transactions']);
 
         // defaults
         if ((int)$block['date_created'] <= 0) {
@@ -328,7 +329,7 @@ class Block
             // $this->db->exec('LOCK TABLES accounts WRITE, blocks WRITE, transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,peers WRITE;');
 
             // prepare the statement and execute
-            $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transactions`,`previous_hash`,`hash`,`orphan`) VALUES (:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,:transactions,:previous_hash,:hash,:orphan)';
+            $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan`) VALUES (:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,:transaction_count,:previous_hash,:hash,:orphan)';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'network_id', value: $block['network_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 4);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $block['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
@@ -338,7 +339,7 @@ class Block
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'nonce', value: $block['nonce'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 16);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'difficulty', value: $block['difficulty'], pdoType: DatabaseHelpers::INT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'merkle_root', value: $block['merkle_root'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transactions', value: count($block['transactions']), pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_count', value: $block['transaction_count'], pdoType: DatabaseHelpers::INT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'hash', value: $block['hash'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_hash', value: $block['previous_hash'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'orphan', value: 0, pdoType: DatabaseHelpers::INT);
@@ -351,7 +352,7 @@ class Block
             }
 
             // add the transactions
-            foreach ($block['transactions'] as $transaction) {
+            foreach ($transactions as $transaction) {
                 $transaction['block_id'] = $block['block_id'];
 
                 // defaults

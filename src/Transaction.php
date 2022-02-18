@@ -100,11 +100,11 @@ class Transaction
         $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
 
-        $transactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: null;
         foreach ($transactions as $transaction) {
             // attach the details
-            $transaction[self::Inputs] = $this->getTransactionInputs($transaction['transaction_id']);
-            $transaction[self::Outputs] = $this->getTransactionOutputs($transaction['transaction_id']);
+            $transaction[self::Inputs] = $this->getTransactionInputs($transaction['transaction_id']) ?: [];
+            $transaction[self::Outputs] = $this->getTransactionOutputs($transaction['transaction_id']) ?: [];
             $returnTransactions[] = $transaction;
         }
 
