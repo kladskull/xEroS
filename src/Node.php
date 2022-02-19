@@ -204,32 +204,54 @@ class Node
                                                 $id = 0;
                                                 $validate = $block->validateFullBlock($block);
                                                 if ($validate['validated']) {
-                                                    // dealing with an orphan?
+
+                                                    // check if its an orphan
                                                     if ($block['height'] > 1) {
                                                         $prevBlock = $this->block->getByHeight($block['height'] - 1);
                                                         if ($block['previous_block_id'] !== $prevBlock['block_id'] || $block['previous_hash'] !== $prevBlock['hash']) {
-                                                            // new block is an orphan - ignore it
+                                                            // new block is an orphan - add and ignore it for now
+                                                            $this->block->add($block, false, true);
                                                             $this->send($client, json_encode([
                                                                 'type' => 'block',
-                                                                'result' => 'nok'
+                                                                'result' => 'ok'
                                                             ]));
                                                             break;
                                                         }
                                                     }
 
-                                                    // check to current
+                                                    // check to current block
                                                     $localHeight = $this->block->getCurrentHeight();
                                                     $remoteHeight = (int)$block['height'];
 
-                                                    // received another competing block
+                                                    // received a competing block
                                                     if ($remoteHeight === $localHeight) {
+                                                        /**
+                                                         * Competing Block Received!
+                                                         */
                                                         $currBlock = $block->getCurrent();
-                                                        $this->block->processFork($currBlock, $block);
-                                                    } else if ($remoteHeight > $localHeight) {
+
                                                         // add it
+                                                        $id = $this->block->add($block, false, true);
+
+                                                        // choose the block based on features
+                                                        $selectedBlock = $this->block->blockSelector($currBlock, $block);
+                                                        $this->block->acceptBlock($selectedBlock['block_id'], $selectedBlock['height']);
+                                                    } else if ($remoteHeight > $localHeight) {
+                                                        /**
+                                                         * New Block Received!
+                                                         */
                                                         $id = $this->block->add($block, false);
+                                                        $this->block->acceptBlock($block['block_id'], $block['height']);
+
+                                                        // check if we are behind
+                                                        if ($this->block->isCurrentHeightOrphan()) {
+                                                            $this->queue->add('resolve_forks', $block['block_id']);
+                                                        }
                                                     } else {
-                                                        // we have an older block... just add it, but modify nothing - initiate a fork test
+                                                        /**
+                                                         * Got an older block... just add it
+                                                         */
+                                                        // we have an older block...
                                                         $id = $this->block->add($block, false, false, false);
                                                         $this->queue->add('fork_test', $block['height']);
                                                     }

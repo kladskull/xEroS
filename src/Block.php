@@ -371,6 +371,18 @@ class Block
     }
 
     /**
+     * This just tests if our highest block is an orphan
+     *
+     * @return bool
+     */
+    public function isCurrentHeightOrphan(): bool
+    {
+        $query = 'SELECT `orphan` FROM blocks ORDER BY `height` DESC LIMIT 1';
+        $stmt = $this->db->query($query);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /**
      * This goes from TOP to BOTTOM and resolves all forks. It chooses the highest height to start with.
      * @return void
      */
@@ -420,7 +432,7 @@ class Block
      * @param array $block2
      * @return array|null
      */
-    private function blockSelector(array $block1, array $block2): ?array
+    public function blockSelector(array $block1, array $block2): ?array
     {
         $block = null;
         if ($this->isFork($block1, $block2)) {
@@ -560,12 +572,17 @@ class Block
      *
      * @param array $block
      * @param bool $validate
-     * @param bool $updateBalances
+     * @param bool $orphan
      * @return bool
      */
-    public function add(array $block, bool $validate = true, bool $updateBalances = true): bool
+    public function add(array $block, bool $validate = true, bool $orphan = false): bool
     {
         $result = false;
+
+        $orphanVal = 0;
+        if ($orphan) {
+            $orphanVal = 1;
+        }
 
         if ($validate) {
             try {
@@ -612,7 +629,7 @@ class Block
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_count', value: $block['transaction_count'], pdoType: DatabaseHelpers::INT);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'hash', value: $block['hash'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_hash', value: $block['previous_hash'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'orphan', value: $orphan, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'orphan', value: $orphanVal, pdoType: DatabaseHelpers::INT);
             $stmt->execute();
 
             // ensure the block was stored
@@ -670,18 +687,6 @@ class Block
                         throw new RuntimeException("Cannot unlock script for: " . $txIn['transaction_id']);
                     }
 
-                    if ($updateBalances) {
-                        // mark the transaction as spent
-                        $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=1 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
-                        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
-                        $stmt->execute();
-                        $transactionTxId = (int)$this->db->lastInsertId();
-                        if ($transactionTxId <= 0) {
-                            throw new RuntimeException('failed to update transaction tx as spent in the database: ' . $txIn['transaction_id'] . ' - ' . $txIn['transaction_id']);
-                        }
-                    }
-
                     // add the txIn record to the db
                     $query = 'INSERT INTO transaction_inputs (`block_id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script`) VALUES (:block_id,:transaction_id,:tx_id,:previous_transaction_id,:previous_tx_out_id,:script)';
                     $stmt = $this->db->prepare($query);
@@ -695,14 +700,6 @@ class Block
                     $transactionTxId = (int)$this->db->lastInsertId();
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException('failed to add a new transaction tx: ' . $txIn['transaction_id'] . ' - ' . $txIn['$txIn']);
-                    }
-
-                    if ($updateBalances) {
-                        // delete mempool transactions
-                        $stmt = $this->db->prepare('DELETE from mempool_inputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id');
-                        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['tx_id'], pdoType: DatabaseHelpers::INT);
-                        $stmt->execute();
                     }
                 }
 
@@ -729,14 +726,6 @@ class Block
                     $transactionTxId = (int)$this->db->lastInsertId();
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException('failed to add a new transaction tx as unspent in the database: ' . $txOut['transaction_id'] . ' - ' . $txOut['$txIn']);
-                    }
-
-                    if ($updateBalances) {
-                        // delete mempool transactions
-                        $stmt = $this->db->prepare('DELETE from mempool_outputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id');
-                        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['tx_id'], pdoType: DatabaseHelpers::INT);
-                        $stmt->execute();
                     }
                 }
             }
