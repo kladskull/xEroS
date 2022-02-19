@@ -34,8 +34,8 @@ $candidateBlock['hash'] = $result['hash'];
 $candidateBlock['nonce'] = dechex($result['nonce']);
 
 $reason = $block->validateFullBlock($candidateBlock);
-
 print_r($candidateBlock);
+print_r($reason);
 
 echo "\nFound in " . number_format($result['hashes'], 0) . " Hashes\n";
 echo "Nonce: {$result['nonce']}\n";

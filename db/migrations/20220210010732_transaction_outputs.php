@@ -20,15 +20,16 @@ final class TransactionOutputs extends AbstractMigration
     {
         $table = $this->table('transaction_outputs');
         $table
+            ->addColumn('block_id', 'text', ['limit' => 64])
             ->addColumn('transaction_id', 'text', ['limit' => 64])
             ->addColumn('tx_id', 'integer', ['signed' => false])
             ->addColumn('address', 'text', ['limit' => 40])
-            ->addColumn('value', 'integer', ['signed' => false])
+            ->addColumn('value', 'text')
             ->addColumn('script', 'text')
             ->addColumn('lock_height', 'integer', ['signed' => false])
             ->addColumn('spent', 'integer', ['signed' => false, 'default' => 0])
             ->addColumn('hash', 'text')
-            ->addIndex(['transaction_id', 'tx_id'], ['unique' => true, 'order' => ['transaction_id' => 'ASC', 'tx_id' => 'ASC']])
+            ->addIndex(['block_id', 'transaction_id', 'tx_id'], ['unique' => true, 'order' => ['block_id', 'transaction_id' => 'ASC', 'tx_id' => 'ASC']])
             ->addIndex(['address', 'spent'], ['unique' => false, 'order' => ['address' => 'ASC', 'spent' => 'ASC']])
             ->create();
     }

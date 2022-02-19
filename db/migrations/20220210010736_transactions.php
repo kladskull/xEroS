@@ -29,8 +29,7 @@ final class Transactions extends AbstractMigration
             ->addColumn('version', 'text', ['limit' => 2])
             ->addColumn('signature', 'text')
             ->addColumn('public_key', 'text')
-            ->addIndex(['transaction_id'], ['unique' => true, 'order' => ['transaction_id' => 'ASC']])
-            ->addIndex(['block_id', 'transaction_id'], ['unique' => true, 'order' => ['previous_transaction_id' => 'ASC', 'previous_tx_out_id' => 'ASC']])
+            ->addIndex(['block_id', 'transaction_id'], ['unique' => true, 'order' => ['block_id' => 'ASC', 'transaction_id' => 'ASC']])
             ->create();
     }
 }

@@ -9,11 +9,13 @@ class Node
     private int $port;
     private string $externalIp;
 
+    private Account $account;
     private TcpIp $tcpIp;
     private Peer $peer;
     private Block $block;
     private Transaction $transaction;
     private Mempool $mempool;
+    private Queue $queue;
 
     public const Syncing = 'sync';
     public const Mining = 'mine';
@@ -29,6 +31,7 @@ class Node
 
     public function __construct()
     {
+        $this->account = new Account();
         $this->tcpIp = new TcpIp();
         $this->peer = new Peer();
         $this->block = new Block();
@@ -83,7 +86,6 @@ class Node
                 // Handle Input
                 foreach ($clients as $key => $client) { // for each client
                     if (in_array($client, $read)) {
-                        //if (false == ($data = trim(socket_read($client, 2048, PHP_BINARY_READ)))) {
                         $data = fread($client, 8192);
                         if ($data !== '') {
                             $data = json_decode(trim($data), true);
@@ -160,6 +162,180 @@ class Node
                                 // only allow initialized connections for these commands
                                 if ($clientInfo[$key]['init'] >= 2) {
                                     switch ($data['type']) {
+                                        /**
+                                         * Account get/create actions are prohibited in the node
+                                         */
+                                        case 'address_balance_req':
+                                            Console::log('Received an account balance request from: ' . $key);
+                                            $address = $data['address'] ?: null;
+                                            if ($address->validateAddress($address)) {
+                                                $acct = $this->account->getByAddress($address);
+                                                if ($acct !== null) {
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'balance',
+                                                        'address' => $address,
+                                                        'balance' => $this->account->getBalance($address),
+                                                        'pending_balance' => $this->account->getPendingBalance($address),
+                                                    ]));
+                                                } else {
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'balance',
+                                                        'result' => 'nok',
+                                                    ]));
+                                                }
+                                            }
+                                            break;
+
+                                        /**
+                                         * Blockchain
+                                         */
+                                        case 'block_submit_req':
+                                            Console::log('Received a block submission from: ' . $key);
+                                            $block = $data['block'] ?: null;
+
+                                            // invalid or duplicate? if so, ignore...
+                                            if (empty($block) || $this->block->getByBlockId($block['block_id']) !== null) {
+                                                $this->send($client, json_encode([
+                                                    'type' => 'block_resp',
+                                                    'result' => 'ok',
+                                                ]));
+                                                break;
+                                            } else {
+                                                $id = 0;
+                                                $validate = $block->validateFullBlock($block);
+                                                if ($validate['validated']) {
+                                                    // dealing with an orphan?
+                                                    if ($block['height'] > 1) {
+                                                        $prevBlock = $this->block->getByHeight($block['height'] - 1);
+                                                        if ($block['previous_block_id'] !== $prevBlock['block_id'] || $block['previous_hash'] !== $prevBlock['hash']) {
+                                                            // new block is an orphan - ignore it
+                                                            $this->send($client, json_encode([
+                                                                'type' => 'block',
+                                                                'result' => 'nok'
+                                                            ]));
+                                                            break;
+                                                        }
+                                                    }
+
+                                                    // check to current
+                                                    $localHeight = $this->block->getCurrentHeight();
+                                                    $remoteHeight = (int)$block['height'];
+
+                                                    // received another competing block
+                                                    if ($remoteHeight === $localHeight) {
+                                                        $currBlock = $block->getCurrent();
+                                                        $this->block->processFork($currBlock, $block);
+                                                    } else if ($remoteHeight > $localHeight) {
+                                                        // add it
+                                                        $id = $this->block->addFullBlock($block, false);
+                                                    } else {
+                                                        // we have an older block... just add it, but modify nothing - initiate a fork test
+                                                        $id = $this->block->addFullBlock($block, false, false, false);
+                                                        $this->queue->add('fork_test', $block['height']);
+                                                    }
+
+                                                    // propagate the new block
+                                                    if ($id > 0) {
+                                                        $this->queue->add('propagate_block', $block['block_id']);
+                                                        $this->send($client, json_encode([
+                                                            'type' => 'block',
+                                                            'result' => 'ok'
+                                                        ]));
+                                                    }
+                                                } else {
+                                                    // new block is invalid...
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'block',
+                                                        'result' => 'nok'
+                                                    ]));
+                                                }
+                                            }
+                                            break;
+
+                                        case 'block_req':
+                                            Console::log('Received a block request from: ' . $key);
+                                            $blockId = $data['block_id'] ?: null;
+                                            $height = $data['height'] ?: 0;
+                                            if ($blockId !== null) {
+                                                $this->send($client, json_encode([
+                                                    'type' => 'block',
+                                                    'block' => $this->block->assembleFullBlock($blockId['block_id'])
+                                                ]));
+                                            } else if ($height !== 0) {
+                                                $block = $this->block->getByHeight((int)$height);
+                                                $this->send($client, json_encode([
+                                                    'type' => 'block',
+                                                    'block' => $this->block->assembleFullBlock($block['block_id'])
+                                                ]));
+                                            } else {
+                                                $block = $this->block->getCurrent();
+                                                $this->send($client, json_encode([
+                                                    'type' => 'block',
+                                                    'block' => $this->block->assembleFullBlock($block['block_id'])
+                                                ]));
+                                            }
+                                            break;
+
+                                        case 'height_req':
+                                            Console::log('Received a height request from: ' . $key);
+                                            $this->send($client, json_encode([
+                                                'type' => 'height',
+                                                'height' => 11
+                                            ]));
+                                            break;
+
+                                        case 'height':
+                                            $height = $data['height'] ?: 0;
+                                            Console::log('Received a height of ' . $height . ' request from: ' . $key);
+                                            $clientInfo[$key]['height'] = $height;
+                                            break;
+
+                                        /**
+                                         * Mempool
+                                         */
+                                        case 'mempool_size_req':
+                                            Console::log('Received a mempool size request from: ' . $key);
+                                            $this->send($client, json_encode([
+                                                'type' => 'mempool_size',
+                                                'height' => 11
+                                            ]));
+                                            break;
+
+                                        /**
+                                         * Mining
+                                         */
+                                        case 'mining_info_req':
+                                            Console::log('Received a mining info request from: ' . $key);
+                                            $currentBlock = $this->block->getCurrent();
+                                            if ($currentBlock !== null) {
+                                                $this->send($client, json_encode([
+                                                    'type' => 'mining_info',
+                                                    'network_id' => Config::getNetworkIdentifier(),
+                                                    'block_id' => $currentBlock['block_id'],
+                                                    'hash' => $currentBlock['hash'],
+                                                    'height' => $this->block->getCurrentHeight(),
+                                                    'recommendation' => Node::getStatus(),
+                                                    'difficulty' => $this->block->getDifficulty(),
+                                                ]));
+                                            } else {
+                                                $this->send($client, json_encode([
+                                                    'type' => 'mining_info',
+                                                    'result' => 'nok'
+                                                ]));
+                                            }
+                                            break;
+
+                                        // TODO: Provide mining work
+                                        case 'mining_work_req':
+                                            break;
+
+                                        // TODO: submit new work
+                                        case 'mining_new_block':
+                                            break;
+
+                                        /**
+                                         * Networking
+                                         */
                                         case 'ping':
                                             Console::log('Received ping');
                                             $this->send($client, json_encode([
@@ -174,6 +350,17 @@ class Node
                                             Console::log('Received pong');
                                             break;
 
+                                        case 'version_req':
+                                            Console::log('Received version req');
+                                            $this->send($client, json_encode([
+                                                'type' => 'version',
+                                                'version' => Config::getVersion()
+                                            ]));
+                                            break;
+
+                                        /**
+                                         * Peering
+                                         */
                                         case 'peer_list_req':
                                             Console::log('Received peer_list_req');
                                             $peerList = $this->peer->getAll();
@@ -220,19 +407,6 @@ class Node
                                             }
                                             break;
 
-                                        case 'height_req':
-                                            Console::log('Received a height request from: ' . $key);
-                                            $this->send($client, json_encode([
-                                                'type' => 'height',
-                                                'height' => 11
-                                            ]));
-                                            break;
-
-                                        case 'height':
-                                            $height = $data['height'] ?: 0;
-                                            Console::log('Received a height of ' . $height . ' request from: ' . $key);
-                                            $clientInfo[$key]['height'] = $height;
-                                            break;
 
                                         default:
                                             break;

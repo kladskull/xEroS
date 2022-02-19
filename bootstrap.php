@@ -55,9 +55,6 @@ $app->checkMigrations();
 $block = new Block();
 if ($block->getCurrentHeight() === 0) {
     $block->addFullBlock($block->genesis(), false);
-    $genesis = $block->getByHeight(1);
-    $genesis = $block->assembleFullBlock($genesis['block_id']);
-    $result = $block->validateFullBlock($genesis);
 }
 
 // if there is no state, we're likely needing to sync from the network

@@ -33,8 +33,20 @@ class Transaction
 
     public function exists(string $transactionId): bool
     {
-        $query = 'SELECT `id` FROM transactions WHERE `id` = :transaction_id LIMIT 1';
+        $query = 'SELECT `id` FROM transactions WHERE `transaction_id` = :transaction_id LIMIT 1';
         $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt->execute();
+
+        $id = $stmt->fetchColumn() ?: null;
+        return ($id !== null && $id > 0);
+    }
+
+    public function existStrict(string $blockId, string $transactionId): bool
+    {
+        $query = 'SELECT `id` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = :transaction_id LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt->execute();
 
@@ -46,16 +58,17 @@ class Transaction
     {
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $id, DatabaseHelpers::INT, 0);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT, 0);
         $stmt->execute();
 
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function getByTransactionId(string $transactionId): array|null
+    public function getByTransactionId(string $blockId, string $transactionId): array|null
     {
-        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = :transaction_id LIMIT 1';
         $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt = DatabaseHelpers::filterBind($stmt, 'transaction_id', $transactionId, DatabaseHelpers::ALPHA_NUMERIC, 64);
         $stmt->execute();
         $transaction = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -72,20 +85,22 @@ class Transaction
         return $transaction;
     }
 
-    public function getTransactionInputs(string $transactionId): array
+    public function getTransactionInputs(string $blockId, string $transactionId): array
     {
-        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script` FROM transaction_inputs WHERE transaction_id=:transaction_id;';
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script` FROM transaction_inputs WHERE `block_id`=:block_id AND `transaction_id`=:transaction_id;';
         $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt->execute();
 
         return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
     }
 
-    public function getTransactionOutputs(string $transactionId): bool|array|null
+    public function getTransactionOutputs(string $blockId, string $transactionId): array
     {
-        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` FROM transaction_outputs WHERE transaction_id=:transaction_id;';
+        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` FROM transaction_outputs WHERE `block_id`=:block_id AND transaction_id=:transaction_id;';
         $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
         $stmt->execute();
 
@@ -103,15 +118,15 @@ class Transaction
         $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: null;
         foreach ($transactions as $transaction) {
             // attach the details
-            $transaction[self::Inputs] = $this->getTransactionInputs($transaction['transaction_id']) ?: [];
-            $transaction[self::Outputs] = $this->getTransactionOutputs($transaction['transaction_id']) ?: [];
+            $transaction[self::Inputs] = $this->getTransactionInputs($blockId, $transaction['transaction_id']) ?: [];
+            $transaction[self::Outputs] = $this->getTransactionOutputs($blockId, $transaction['transaction_id']) ?: [];
             $returnTransactions[] = $transaction;
         }
 
         return $returnTransactions;
     }
 
-    private function stripInternalFields(array $transaction): array
+    public function stripInternalFields(array $transaction): array
     {
         // remove internal columns
         unset($transaction['id'], $transaction['block_id']);
@@ -119,14 +134,14 @@ class Transaction
         // remove internal columns
         $inputs = [];
         foreach ($transaction[self::Inputs] as $in) {
-            unset($in['id'], $in['transaction_id']);
+            unset($in['id'], $in['block_id'], $in['transaction_id']);
             $inputs[] = $in;
         }
         $transaction[self::Inputs] = $inputs;
 
         $outputs = [];
         foreach ($transaction[self::Outputs] as $out) {
-            unset($out['id'], $out['transaction_id'], $out['spent']);
+            unset($out['id'], $out['block_id'], $out['transaction_id'], $out['spent']);
             $outputs[] = $out;
         }
         $transaction[self::Outputs] = $outputs;

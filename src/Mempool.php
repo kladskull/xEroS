@@ -28,10 +28,7 @@ class Mempool
     public function add(array $transaction): bool
     {
         $result = false;
-        // validate transaction
-        $validationResult = [
-            'validated' => false
-        ];
+
         try {
             $validationResult = $this->transaction->validate($transaction);
             if ($validationResult['validated'] === false) {
@@ -44,7 +41,7 @@ class Mempool
 
         // store and clip off the spent
         $txIns = $transaction[Transaction::Inputs];
-        unset($transaction[Transaction::Inputs]);
+        unset($transaction[Transaction::Inputs],);
 
         // store and clip off the unspent
         $txOuts = $transaction[Transaction::Outputs];
@@ -53,11 +50,8 @@ class Mempool
         try {
             $this->db->beginTransaction();
 
-            // lock tables
-            //$this->db->exec('LOCK TABLES transactions WRITE,transaction_inputs WRITE,transaction_outputs WRITE,mempool_transactions WRITE,mempool_inputs WRITE,mempool_outputs WRITE;');
-
             // prepare the statement and execute
-            $query = 'INSERT INTO mempool_transactions (`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key`) VALUES (:block_id,:transaction_id,:date_created,:peer,:height,:version,:signature,:public_key)';
+            $query = 'INSERT INTO mempool_transactions (`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key`) VALUES (:transaction_id,:date_created,:peer,:height,:version,:signature,:public_key)';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
             $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: $transaction['date_created'], pdoType: DatabaseHelpers::INT);
@@ -74,7 +68,7 @@ class Mempool
             }
 
             // add txIn
-            foreach ($transaction[Transaction::Inputs] as $txIn) {
+            foreach ($txIns as $txIn) {
                 $txIn['transaction_id'] = $transaction['transaction_id'];
 
                 // make sure there is a previous unspent transaction
@@ -110,7 +104,7 @@ class Mempool
             }
 
             // add txOut
-            foreach ($transaction[Transaction::Outputs] as $txOut) {
+            foreach ($txOuts as $txOut) {
                 $txOut['transaction_id'] = $transaction['transaction_id'];
 
                 // add the txIn record to the db
@@ -132,13 +126,10 @@ class Mempool
             }
 
             // unlock tables and commit
-            //$this->db->exec('UNLOCK TABLES');
             $this->db->commit();
-
             $result = true;
         } catch (Exception $ex) {
             Console::log('Rolling back transaction: ' . $ex->getMessage());
-            //$this->db->exec('UNLOCK TABLES');
             $this->db->rollback();
         }
 
@@ -230,6 +221,13 @@ class Mempool
         }
 
         return $returnTransactions;
+    }
+
+    public function getMempoolCount(): array
+    {
+        $stmt = $this->db->query('SELECT count(1) FROM mempool_transactions;');
+        $stmt->execute();
+        return $stmt->fetchColumn() ?: 0;
     }
 
 }

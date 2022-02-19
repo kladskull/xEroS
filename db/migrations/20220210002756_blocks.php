@@ -33,7 +33,7 @@ final class Blocks extends AbstractMigration
             ->addColumn('hash', 'text', ['limit' => 64])
             ->addColumn('orphan', 'integer', ['signed' => false, 'default' => '0'])
             ->addIndex(['block_id'], ['unique' => true, 'order' => ['block_id' => 'ASC']])
-            ->addIndex(['previous_block_id'], ['unique' => true, 'order' => ['previous_block_id' => 'ASC']])
+            ->addIndex(['previous_block_id'], ['unique' => false, 'order' => ['previous_block_id' => 'ASC']])
             ->addIndex(['height'], ['unique' => false, 'order' => ['height' => 'ASC']])
             ->create();
     }

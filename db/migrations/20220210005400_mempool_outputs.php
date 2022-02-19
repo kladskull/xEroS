@@ -23,7 +23,7 @@ final class MempoolOutputs extends AbstractMigration
             ->addColumn('transaction_id', 'text', ['limit' => 64])
             ->addColumn('tx_id', 'integer', ['signed' => false])
             ->addColumn('address', 'text', ['limit' => 40])
-            ->addColumn('value', 'integer', ['signed' => false])
+            ->addColumn('value', 'text')
             ->addColumn('script', 'text')
             ->addColumn('lock_height', 'integer', ['signed' => false])
             ->addColumn('spent', 'integer', ['signed' => false, 'default' => 0])
