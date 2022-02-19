@@ -16,6 +16,7 @@ class Node
     private Transaction $transaction;
     private Mempool $mempool;
     private Queue $queue;
+    private DataStore $dataStore;
 
     public const Syncing = 'sync';
     public const Mining = 'mine';
@@ -330,13 +331,18 @@ class Node
                                             Console::log('Received a mining info request from: ' . $key);
                                             $currentBlock = $this->block->getCurrent();
                                             if ($currentBlock !== null) {
+                                                $state = $this->dataStore->getKey('state');
+                                                if (empty($state)) {
+                                                    $this->dataStore->add('state', Node::Syncing);
+                                                }
+
                                                 $this->send($client, json_encode([
                                                     'type' => 'mining_info',
                                                     'network_id' => Config::getNetworkIdentifier(),
                                                     'block_id' => $currentBlock['block_id'],
                                                     'hash' => $currentBlock['hash'],
                                                     'height' => $this->block->getCurrentHeight(),
-                                                    'recommendation' => Node::getStatus(),
+                                                    'recommendation' => $state,
                                                     'difficulty' => $this->block->getDifficulty(),
                                                 ]));
                                             } else {

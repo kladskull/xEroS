@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
+use Xeros\Script;
+use Xeros\TransactionVersion;
 
 class ScriptTest extends TestCase
 {
@@ -24,7 +26,7 @@ class ScriptTest extends TestCase
                     'transaction_id' => 'TX_ID',
                     'date_created' => $date,
                     'fee' => "0.5",
-                    'version' => Version::Coinbase,
+                    'version' => TransactionVersion::Coinbase,
                     'signature' => "480f0fd1080d84692b6d0371930d5ed40c5a954473d8fbe4ad9b5f774d41d85eaa68868acb88f07e5b484e97d6a3d1513285962829dbd8031984c24a5c9208c51d31fd820cd87741b9d2f614305863261d50036808fdae0685d89a3a41fccaeadd10c689cbe4b8a8d49db2bfc83e01f53650930c212c11292f79a88470991b5c726625a9e8d5af0decb45c9ef7b88e924bfbe51855062b0d5667f2fbdbdc1079dfe0978f341ec6104ea09b65475b767d41ac280ed7e11c6c2ce5c55f3255447ac343d2d87724c8ebed6dbbb4527a51901016e184d2f5d0720db26efae64369464f81c377ad0d378fb1a1a5495a366e956ca2689e20f6a54103d40a761a8472d5",
                     'public_key' => "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAufnOzEGWNt3F8jVB6iH1MWtGSA7J+tczrf0fsA84WUBqtOwzafHVSc6UAylOyHzHXgD5hlOIMThNKDwYz6tGqv486MVuxyj40iZ+9d0hACpJJ1uA4S8PYV4vl5yszBu8zo3ue481b/tKbSqdp4UTmuuWhrGl0xK/erZF6rW634OwUCD/hV9e061hRo/844cAudLfPyFZT02SkrNTaEfdmRiQhZolj3PgbD+Pq5lN54sK7xjUA1NuFzoZdGRjQ6UX/MHAGXsHanEvndR1wS9CZMoZXBHJ4aGD7GH0sYuzYAGcc9ZwHOFYAZ6YGm8nI71fmjHiy0hkW8z1s4m11A+tawIDAQAB",
                     'tx_in' => [
@@ -42,7 +44,7 @@ class ScriptTest extends TestCase
                             'value' => '50',
                             'script' => '',
                             'lock_height' => '51',
-                            'version' => Version::Coinbase,
+                            'version' => TransactionVersion::Coinbase,
                         ],
                     ],
                 ],
@@ -68,7 +70,7 @@ class ScriptTest extends TestCase
 
     public function testScriptLoading(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
 
         $script = new Script([]);
         $result = $script->loadScript($program);
@@ -77,7 +79,7 @@ class ScriptTest extends TestCase
 
     public function testMov(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
 
         $script = new Script([]);
         $script->loadScript($program);
@@ -89,12 +91,12 @@ class ScriptTest extends TestCase
 
     public function testAssignAllRegisters(): void
     {
-        $program = 'mov ax,1;';
-        $program .= 'mov bx,2;';
-        $program .= 'mov cx,3;';
-        $program .= 'mov dx,4;';
-        $program .= 'mov ex,5;';
-        $program .= 'mov sx,6;';
+        $program = 'mov 1,ax;';
+        $program .= 'mov 2,bx;';
+        $program .= 'mov 3,cx;';
+        $program .= 'mov 4,dx;';
+        $program .= 'mov 5,ex;';
+        $program .= 'mov 6,sx;';
 
         $script = new Script([]);
         $script->loadScript($program);
@@ -111,10 +113,10 @@ class ScriptTest extends TestCase
 
     public function testPushAndOverPop(): void
     {
-        $program = 'mov ax,test;';
+        $program = 'mov test,ax;';
         $program .= 'push ax;';
         $program .= 'pop bx;';
-        $program .= 'mov cx,1;';
+        $program .= 'mov 1,cx;';
         $program .= 'pop cx;';
 
         $script = new Script([]);
@@ -142,10 +144,10 @@ class ScriptTest extends TestCase
 
     public function testClr(): void
     {
-        $program = 'mov ax,A;';
-        $program .= 'mov bx,B;';
-        $program .= 'mov ax,B;';
-        $program .= 'mov bx,A;';
+        $program = 'mov A,ax;';
+        $program .= 'mov B,bx;';
+        $program .= 'mov B,ax;';
+        $program .= 'mov A,bx;';
         $program .= 'clr ax;';
 
         $script = new Script([]);
@@ -159,8 +161,8 @@ class ScriptTest extends TestCase
 
     public function testStringCompareLt(): void
     {
-        $program = 'mov ax,A;';
-        $program .= 'mov bx,B;';
+        $program = 'mov A,ax;';
+        $program .= 'mov B,bx;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -175,8 +177,8 @@ class ScriptTest extends TestCase
 
     public function testStringCompareGt(): void
     {
-        $program = 'mov ax,B;';
-        $program .= 'mov bx,A;';
+        $program = 'mov B,ax;';
+        $program .= 'mov A,bx;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -191,8 +193,8 @@ class ScriptTest extends TestCase
 
     public function testStringCompareEq(): void
     {
-        $program = 'mov ax,A;';
-        $program .= 'mov bx,A;';
+        $program = 'mov A,ax;';
+        $program .= 'mov B,bx;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -207,8 +209,8 @@ class ScriptTest extends TestCase
 
     public function testIntCompareLt(): void
     {
-        $program = 'mov ax,1;';
-        $program .= 'mov bx,2;';
+        $program = 'mov 1,ax;';
+        $program .= 'mov 2,bx;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -223,8 +225,8 @@ class ScriptTest extends TestCase
 
     public function testIntCompareGt(): void
     {
-        $program = 'mov ax,2;';
-        $program .= 'mov bx,1;';
+        $program = 'mov 2,ax;';
+        $program .= 'mov 1,bx;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -239,8 +241,8 @@ class ScriptTest extends TestCase
 
     public function testIntCompareEq(): void
     {
-        $program = 'mov ax,2;';
-        $program .= 'mov bx,2;';
+        $program = 'mov 2,ax;';
+        $program .= 'mov 2,bx;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -255,7 +257,7 @@ class ScriptTest extends TestCase
 
     public function testIntCompareWithOneValue(): void
     {
-        $program = 'mov ax,2;';
+        $program = 'mov 2,ax;';
         $program .= 'cmp ax,bx;';
 
         $script = new Script([]);
@@ -269,8 +271,8 @@ class ScriptTest extends TestCase
 
     public function testAdd(): void
     {
-        $program = 'mov ax,100000000000000000000000000;';
-        $program .= 'mov bx,1;';
+        $program = 'mov 100000000000000000000000000,ax;';
+        $program .= 'mov 1,bx;';
         $program .= 'add ax,2;';
         $program .= 'cmp ax,bx;';
 
@@ -286,7 +288,7 @@ class ScriptTest extends TestCase
     public function testPrecision(): void
     {
         $program = 'prec 3;';
-        $program .= 'mov ax,10.34;';
+        $program .= 'mov 10.34,ax;';
         $program .= 'add ax,0.16;';
         $program .= 'cmp ax,bx;';
 
@@ -301,7 +303,7 @@ class ScriptTest extends TestCase
     public function testPrecisionWithoutPrecision(): void
     {
         $program = 'prec 0;';
-        $program .= 'mov ax,10.34;';
+        $program .= 'mov 10.34,ax;';
         $program .= 'add ax,1.16;';
         $program .= 'cmp ax,bx;';
 
@@ -315,7 +317,7 @@ class ScriptTest extends TestCase
 
     public function testSub(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
         $program .= 'sub ax,3;';
 
         $script = new Script([]);
@@ -328,7 +330,7 @@ class ScriptTest extends TestCase
 
     public function testSubNegative(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
         $program .= 'sub ax,-3;';
 
         $script = new Script([]);
@@ -341,7 +343,7 @@ class ScriptTest extends TestCase
 
     public function testMul(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
         $program .= 'mul ax,3;';
 
         $script = new Script([]);
@@ -354,7 +356,7 @@ class ScriptTest extends TestCase
 
     public function testDiv(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
         $program .= 'div ax,3;';
 
         $script = new Script([]);
@@ -367,7 +369,7 @@ class ScriptTest extends TestCase
 
     public function testDivByZero(): void
     {
-        $program = 'mov ax,10;';
+        $program = 'mov 10,ax;';
         $program .= 'div ax,0;';
 
         $script = new Script([]);
@@ -429,8 +431,8 @@ class ScriptTest extends TestCase
 
     public function testMin(): void
     {
-        $program = 'mov ax,10;';
-        $program .= 'mov bx, 5;';
+        $program = 'mov 10,ax;';
+        $program .= 'mov 5,bx;';
         $program .= 'min ax, bx;';
 
         $script = new Script([]);
@@ -457,7 +459,7 @@ class ScriptTest extends TestCase
 
     public function testMax(): void
     {
-        $program = 'mov ax, 5;';
+        $program = 'mov 5,ax;';
         $program .= 'max ax, 10;';
 
         $script = new Script([]);
@@ -470,7 +472,7 @@ class ScriptTest extends TestCase
 
     public function testNeg(): void
     {
-        $program = 'mov ax, 5;';
+        $program = 'mov 5,ax;';
         $program .= 'neg ax;';
 
         $script = new Script([]);
@@ -483,7 +485,7 @@ class ScriptTest extends TestCase
 
     public function testNegANegative(): void
     {
-        $program = 'mov ax, -5;';
+        $program = 'mov -5,ax;';
         $program .= 'neg ax;';
 
         $script = new Script([]);
@@ -496,7 +498,7 @@ class ScriptTest extends TestCase
 
     public function testNot0to1(): void
     {
-        $program = 'mov ax, 0;';
+        $program = 'mov 0,ax;';
         $program .= 'not ax;';
 
         $script = new Script([]);
@@ -509,7 +511,7 @@ class ScriptTest extends TestCase
 
     public function testNot5to0(): void
     {
-        $program = 'mov ax, 5;';
+        $program = 'mov 5,ax;';
         $program .= 'not ax;';
 
         $script = new Script([]);
@@ -545,7 +547,7 @@ class ScriptTest extends TestCase
 
     public function testBase64Encode(): void
     {
-        $program = 'mov ax,this should be base64!;';
+        $program = 'mov this should be base64!,ax;';
         $program .= 'b64e ax;';
 
         $script = new Script([]);
@@ -559,7 +561,7 @@ class ScriptTest extends TestCase
 
     public function testBase64Decode(): void
     {
-        $program = 'mov ax,dGhpcyBzaG91bGQgYmUgYmFzZTY0IQ==;';
+        $program = 'mov dGhpcyBzaG91bGQgYmUgYmFzZTY0IQ==,ax;';
         $program .= 'b64d ax;';
 
         $script = new Script([]);
@@ -573,7 +575,7 @@ class ScriptTest extends TestCase
 
     public function testBase58Encode(): void
     {
-        $program = 'mov ax,this should work;';
+        $program = 'mov this should work,ax;';
         $program .= 'b58e ax;';
 
         $script = new Script([]);
@@ -587,7 +589,7 @@ class ScriptTest extends TestCase
 
     public function testBase58Decode(): void
     {
-        $program = 'mov ax,FNiwznCj81uoBubBgMBUTC;';
+        $program = 'mov FNiwznCj81uoBubBgMBUTC,ax;';
         $program .= 'b58d ax;';
 
         $script = new Script([]);
@@ -601,7 +603,7 @@ class ScriptTest extends TestCase
 
     public function testHexEncode(): void
     {
-        $program = 'mov ax,This should end up being hex;';
+        $program = 'mov This should end up being hex,ax;';
         $program .= 'hexe ax;';
 
         $script = new Script([]);
@@ -615,7 +617,7 @@ class ScriptTest extends TestCase
 
     public function testHexDecode(): void
     {
-        $program = 'mov ax,546869732073686f756c6420656e64207570206265696e6720686578;';
+        $program = 'mov 546869732073686f756c6420656e64207570206265696e6720686578,ax;';
         $program .= 'hexd ax;';
 
         $script = new Script([]);
@@ -629,7 +631,7 @@ class ScriptTest extends TestCase
 
     public function testripemd160(): void
     {
-        $program = 'mov ax,This should hash nicely;';
+        $program = 'mov This should hash nicely,ax;';
         $program .= 'r160 ax;';
         $program .= 'hexe ax;';
 
@@ -644,7 +646,7 @@ class ScriptTest extends TestCase
 
     public function testSha256(): void
     {
-        $program = 'mov ax,This should hash nicely;';
+        $program = 'mov This should hash nicely,ax;';
         $program .= 's256 ax;';
         $program .= 'hexe ax;';
 
@@ -659,7 +661,7 @@ class ScriptTest extends TestCase
 
     public function testCreateAddressFromPublicKey(): void
     {
-        $program = 'mov ax,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAufnOzEGWNt3F8jVB6iH1MWtGSA7J+tczrf0fsA84WUBqtOwzafHVSc6UAylOyHzHXgD5hlOIMThNKDwYz6tGqv486MVuxyj40iZ+9d0hACpJJ1uA4S8PYV4vl5yszBu8zo3ue481b/tKbSqdp4UTmuuWhrGl0xK/erZF6rW634OwUCD/hV9e061hRo/844cAudLfPyFZT02SkrNTaEfdmRiQhZolj3PgbD+Pq5lN54sK7xjUA1NuFzoZdGRjQ6UX/MHAGXsHanEvndR1wS9CZMoZXBHJ4aGD7GH0sYuzYAGcc9ZwHOFYAZ6YGm8nI71fmjHiy0hkW8z1s4m11A+tawIDAQAB;';
+        $program = 'mov MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAufnOzEGWNt3F8jVB6iH1MWtGSA7J+tczrf0fsA84WUBqtOwzafHVSc6UAylOyHzHXgD5hlOIMThNKDwYz6tGqv486MVuxyj40iZ+9d0hACpJJ1uA4S8PYV4vl5yszBu8zo3ue481b/tKbSqdp4UTmuuWhrGl0xK/erZF6rW634OwUCD/hV9e061hRo/844cAudLfPyFZT02SkrNTaEfdmRiQhZolj3PgbD+Pq5lN54sK7xjUA1NuFzoZdGRjQ6UX/MHAGXsHanEvndR1wS9CZMoZXBHJ4aGD7GH0sYuzYAGcc9ZwHOFYAZ6YGm8nI71fmjHiy0hkW8z1s4m11A+tawIDAQAB,ax;';
         $program .= 'adpk ax;';
 
         $script = new Script([]);
@@ -675,9 +677,9 @@ class ScriptTest extends TestCase
     {
         $block = $this->dummyBlock;
 
-        $program = 'mov ax,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAufnOzEGWNt3F8jVB6iH1MWtGSA7J+tczrf0fsA84WUBqtOwzafHVSc6UAylOyHzHXgD5hlOIMThNKDwYz6tGqv486MVuxyj40iZ+9d0hACpJJ1uA4S8PYV4vl5yszBu8zo3ue481b/tKbSqdp4UTmuuWhrGl0xK/erZF6rW634OwUCD/hV9e061hRo/844cAudLfPyFZT02SkrNTaEfdmRiQhZolj3PgbD+Pq5lN54sK7xjUA1NuFzoZdGRjQ6UX/MHAGXsHanEvndR1wS9CZMoZXBHJ4aGD7GH0sYuzYAGcc9ZwHOFYAZ6YGm8nI71fmjHiy0hkW8z1s4m11A+tawIDAQAB;';
+        $program = 'mov MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAufnOzEGWNt3F8jVB6iH1MWtGSA7J+tczrf0fsA84WUBqtOwzafHVSc6UAylOyHzHXgD5hlOIMThNKDwYz6tGqv486MVuxyj40iZ+9d0hACpJJ1uA4S8PYV4vl5yszBu8zo3ue481b/tKbSqdp4UTmuuWhrGl0xK/erZF6rW634OwUCD/hV9e061hRo/844cAudLfPyFZT02SkrNTaEfdmRiQhZolj3PgbD+Pq5lN54sK7xjUA1NuFzoZdGRjQ6UX/MHAGXsHanEvndR1wS9CZMoZXBHJ4aGD7GH0sYuzYAGcc9ZwHOFYAZ6YGm8nI71fmjHiy0hkW8z1s4m11A+tawIDAQAB,ax;';
         $program .= 'adpk ax;';
-        $program .= 'mov bx,txoadr;';
+        $program .= 'mov txoadr,bx;';
         $program .= 'vadr bx,txoadr;';
 
         $script = new Script($block);
@@ -698,9 +700,9 @@ class ScriptTest extends TestCase
     {
         $block = $this->dummyBlock;
 
-        $program = 'mov ax,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB;';
+        $program = 'mov MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB,ax;';
         $program .= 'adpk ax;';
-        $program .= 'mov bx,txoadr;';
+        $program .= 'mov txoadr,bx;';
         $program .= 'vadr ax,bx;';
 
         $script = new Script($block);
@@ -732,7 +734,7 @@ class ScriptTest extends TestCase
 
     public function testVerificationForceTrue(): void
     {
-        $program = 'mov ax,1;';
+        $program = 'mov 1,ax;';
         $program .= 'vtru;';
 
         $script = new Script([]);
@@ -748,9 +750,9 @@ class ScriptTest extends TestCase
     {
         $block = $this->dummyBlock;
 
-        $program = 'mov ax,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB;';
+        $program = 'mov MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB,ax;';
         $program .= 'adpk ax;';
-        $program .= 'mov bx,txoadr;';
+        $program .= 'mov txoadr,bx;';
         $program .= 'vadr ax,bx;';
 
         $script = new Script($block);
@@ -761,8 +763,8 @@ class ScriptTest extends TestCase
 
     public function testCreateAddressFromPartial(): void
     {
-        $program = 'mov bx,MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB;';
-        $program .= 'mov ax,5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055;';
+        $program = 'mov MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB,bx;';
+        $program .= 'mov 5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055,ax;';
         $program .= 'hexd ax;';
         $program .= 'adha ax;';
         $program .= 'adpa bx;';
@@ -780,8 +782,8 @@ class ScriptTest extends TestCase
 
     public function testPayToPublicKeyHash(): void
     {
-        $program = 'mov ax,5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055;';
-        $program .= 'mov bx,ax;';
+        $program = 'mov 5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055,ax;';
+        $program .= 'mov ax,bx;';
         $program .= 'hexd ax;';
         $program .= 'adha ax;';
 
@@ -797,7 +799,7 @@ class ScriptTest extends TestCase
 
     public function testHexAMessage(): void
     {
-        $program = 'mov ax,The Year of Inflation Infamy - The New York Times 16/Dec/2021;';
+        $program = 'mov The Year of Inflation Infamy - The New York Times 16/Dec/2021,ax;';
         $program .= 'hexe ax;';
 
         $script = new Script([]);
@@ -818,14 +820,14 @@ class ScriptTest extends TestCase
  *  -> push [signature];push [publicKey];dup;
  *  --------------------------------------------------------------------------------------------------------------
  *  push [signature];   // push the sig to the stack
- *  push [publicKey];   // put the public key in a register
+ *  push [publicKey];   // push the public key into the stack
  *  dup;                // duplicate the public key to the stack
  *
  *  --------------------------------------------------------------------------------------------------------------
  *  Pay to Public Key Hash - use this instead - doesn't expose public key (part 2 - script to claim this unspent output)
- *  -> mov ax,<sha256>;adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;vsig ax,<hash>,bx;
+ *  -> mov <sha256>,ax;adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;vsig ax,<hash>,bx;
  *  --------------------------------------------------------------------------------------------------------------
- *  mov ax,<sha256>;    // move the hashed public key into a register
+ *  mov <sha256>,ax;    // move the hashed public key into a register
  *  adha ax;            // convert the hash to an address
  *  pop bx;             // pop the first public key
  *  adpk bx;            // convert the public key to an address
@@ -839,17 +841,17 @@ class ScriptTest extends TestCase
 
 /**
  * Pay to Public Key - Shouldn't use - exposes public key
- *  mov ax,<public_key>;
+ *  mov <public_key>,ax;
  *  adpk ax;
- *  mov bx,txoadr;
+ *  mov txoadr,bx;
  *  vadr bx,txoadr;
  */
 
 /**
  * Pay to Public Key Hash - use this instead - doesn't expose public key
- *  mov ax,<sha256>;
+ *  mov <sha256>,ax;
  *  hexd ax;
  *  adha ax; // hash to address
- *  mov bx,txoadr;
+ *  mov txoadr,bx;
  *  vadr bx,txoadr;
  */

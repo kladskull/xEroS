@@ -131,7 +131,7 @@ class ScriptFunctions
     public function abs(StateMachine $stateMachine, string $location): void
     {
         $value = $stateMachine->getRegister($location);
-        if (bccomp($value, 0, $stateMachine->getPrecision()) < 0) {
+        if (bccomp($value, "0", $stateMachine->getPrecision()) < 0) {
             $stateMachine->setRegister($location, bcmul($stateMachine->getRegister($location), "-1", $stateMachine->getPrecision()));
         }
     }
@@ -269,7 +269,7 @@ class ScriptFunctions
         }
     }
 
-    public function mov(StateMachine $stateMachine, string $destination, string|bool|int $source): void
+    public function mov(StateMachine $stateMachine, string|bool|int $source, string $destination): void
     {
         if ($stateMachine->isRegister($source)) {
             $source = $stateMachine->getRegister($source);
