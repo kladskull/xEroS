@@ -292,6 +292,85 @@ class Block
     }
 
     /**
+     * This function goes through all blocks and makes sure that all the records are sound.
+     * @return void
+     */
+    public function checkIntegrity(): void
+    {
+        // TODO: Check all blocks, and transactions and compare to external nodes
+        // - foreach block (from top to bottom) get full block, and validate it - if it fails, we request it
+    }
+
+    /**
+     * This function determines if the two given blocks are at a fork
+     *
+     * [block_1]     [block_2]
+     *          \   /
+     *           \/
+     *           |
+     * @param array|null $block1
+     * @param array|null $block2
+     * @return bool
+     */
+    private function isFork(?array $block1, ?array $block2): bool
+    {
+        if ($block1 == null || $block2 == null) {
+            return false;
+        }
+
+        // same block?
+        if ($block1['block_id'] == $block2['block_id']) {
+            return false;
+        }
+
+        // not the same height?
+        if ((int)$block1['height'] != (int)$block2['height']) {
+            return false;
+        }
+
+        // is this a fork? If not, get out
+        if ($block1['previous_block_id'] != $block2['previous_block_id']) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * This cleans the blockchain by removing all orphan blocks & transactions. This should be called
+     * AFTER resolveForks() so that you don't delete the wrong blocks.
+     *
+     * @return void
+     */
+    public function cleanBlockchain(): void
+    {
+        /**
+         * Get the highest height and work down
+         */
+        // get top 2 blocks by height
+        $height = $this->getCurrentHeight();
+        if ($height > 1) {
+
+            /**
+             * iterate from the highest to the lowest (or lowest save)
+             * TODO: Need to store progress so we don't have to do the whole blockchain
+             */
+            $query = 'SELECT `block_id` FROM blocks WHERE orphan=1 ORDER BY `height` DESC LIMIT 1';
+            $stmt = $this->db->query($query);
+            $rows = $stmt->fetchAll();
+            $counter = 0;
+            foreach ($rows as $row) {
+                $this->delete($row['block_id']);
+
+                // let's not kill the CPU
+                if ($counter++ % 100 === 0) {
+                    usleep(5000);
+                }
+            }
+        }
+    }
+
+    /**
      * This goes from TOP to BOTTOM and resolves all forks. It chooses the highest height to start with.
      * @return void
      */
@@ -356,30 +435,6 @@ class Block
             }
         }
         return $block;
-    }
-
-    private function isFork(?array $block1, ?array $block2): bool
-    {
-        if ($block1 == null || $block2 == null) {
-            return false;
-        }
-
-        // same block?
-        if ($block1['block_id'] == $block2['block_id']) {
-            return false;
-        }
-
-        // not the same height?
-        if ((int)$block1['height'] != (int)$block2['height']) {
-            return false;
-        }
-
-        // is this a fork? If not, get out
-        if ($block1['previous_block_id'] != $block2['previous_block_id']) {
-            return false;
-        }
-
-        return true;
     }
 
     public function generateBlockHeader(array $block): string
@@ -481,7 +536,7 @@ class Block
 
             // block time was slow, decrease difficulty
             if ($blockTime >= Config::getDesiredBlockTime() + 30) {
-                --$difficulty;
+                $difficulty--;
             }
         }
 
