@@ -292,21 +292,225 @@ class Block
     }
 
     /**
-     * Add a block, and its transactions. It's all done in here to avoid PDO transactions being done
-     * over several external calls, etc. Lock the tables, and do it in one go.
+     * This goes from TOP to BOTTOM and resolves all forks. It chooses the highest height to start with.
+     * @return void
+     */
+    public function resolveForks(): void
+    {
+        /**
+         * We need to make sure that the two highest blocks are not competing blocks
+         */
+        // get top 2 blocks by height
+        $query = 'SELECT `block_id`,`height` FROM blocks ORDER BY `height` DESC LIMIT 2';
+        $stmt = $this->db->query($query);
+        $rows = $stmt->fetchAll();
+
+        if ($rows != null) {
+
+            // check to see if there are two competing blocks at the same height
+            $block1 = $this->getByBlockId($rows[0]['block_id']);
+            $block2 = $this->getByBlockId($rows[1]['block_id']);
+
+            // resolve
+            $selectedBlock = $this->blockSelector($block1, $block2);
+            if ($selectedBlock != null) {
+                $block = $selectedBlock;
+            } else {
+                $block = $block1;
+            }
+
+            /**
+             * iterate from the highest to the lowest (or lowest save)
+             * TODO: Need to store progress so we don't have to do the whole blockchain
+             */
+            $height = (int)$block['height'];
+            $blockId = $block['block_id'];
+            $this->acceptBlock($blockId, $height);
+
+            while ($height > 1) {
+                $block = $this->getByBlockId($block['previous_block_id']);
+                $this->acceptBlock($block['block_id'], $height--);
+            }
+        }
+    }
+
+    /**
+     * This function chooses BLOCK_1 or BLOCK_2 to break any ties based on a couple rules.
+     *
+     * @param array $block1
+     * @param array $block2
+     * @return array|null
+     */
+    private function blockSelector(array $block1, array $block2): ?array
+    {
+        $block = null;
+        if ($this->isFork($block1, $block2)) {
+            // two valid blocks, get the better one and adjust the chain
+            $strength = bccomp(BcmathExtensions::bchexdec($block1['hash']), BcmathExtensions::bchexdec($block2['hash']));
+
+            // always prefer stronger hashes with more transactions
+            if ($strength >= 0 && (int)$block1['transaction_count'] > (int)$block2['transaction_count']) {
+                $block = $block1;
+            } else {
+                $block = $block2;
+            }
+        }
+        return $block;
+    }
+
+    private function isFork(?array $block1, ?array $block2): bool
+    {
+        if ($block1 == null || $block2 == null) {
+            return false;
+        }
+
+        // same block?
+        if ($block1['block_id'] == $block2['block_id']) {
+            return false;
+        }
+
+        // not the same height?
+        if ((int)$block1['height'] != (int)$block2['height']) {
+            return false;
+        }
+
+        // is this a fork? If not, get out
+        if ($block1['previous_block_id'] != $block2['previous_block_id']) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function generateBlockHeader(array $block): string
+    {
+        return
+            $block['network_id'] .
+            $block['block_id'] .
+            $block['previous_block_id'] .
+            $block['date_created'] .
+            $block['height'] .
+            $block['difficulty'] .
+            $block['merkle_root'] .
+            $block['transaction_count'] .
+            $block['previous_hash'];
+    }
+
+    #[Pure]
+    public function getRewardValue(int $nHeight): string
+    {
+        if ($nHeight <= 0) {
+            $nHeight = 1;
+        }
+        $strHeight = (string)$nHeight;
+
+        $targetModulus = (3600 / Config::getDesiredBlockTime()) * 24 * 365;
+        $reductions = bcdiv($strHeight, (string)$targetModulus, 0);
+
+        $nSubsidy = Config::getDefaultBlockReward(); // 100 coins
+
+        if (bccomp($reductions, "0") === 1) {
+            $reductions = (int)$reductions;
+            for ($i = 0; $i < $reductions; $i++) {
+                $reduction = bcmul($nSubsidy, "0.04");
+                $nSubsidy = bcsub($nSubsidy, $reduction, 0);
+                if (bccomp($nSubsidy, '100000000') <= 0) {
+                    break;
+                }
+            }
+        }
+
+        return $nSubsidy;
+    }
+
+    public function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
+    {
+        return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
+    }
+
+    /**
+     * calculates the difficulty
+     *
+     * the higher the difficulty number, the harder it is.
+     * the lower the difficulty number, the easier it is.
+     *
+     * @param int $height
+     * @param array|null $latestBlock
+     * @param array|null $oldestBlock
+     * @return int
+     */
+    public function getDifficulty(int $height = 0, array $latestBlock = null, array $oldestBlock = null): int
+    {
+        // get the current height, if not given
+        if ($height === 0) {
+            $height = $this->getCurrentHeight();
+        }
+
+        // get blocks per period
+        $blocksPerPeriod = (int)(3600 / Config::getDesiredBlockTime()) * 24;
+
+        // if less than 144 use the genesis difficulty
+        if ($height < $blocksPerPeriod) {
+            $genesisBlock = $this->getByHeight(1);
+            return (int)$genesisBlock['difficulty'];
+        }
+
+        // get the desired block height and get the current difficulty
+        if (empty($latestBlock)) {
+            $latestBlock = $this->getByHeight($height);
+            if (empty($latestBlock)) {
+                $latestBlock = $this->getByHeight($this->getCurrentHeight());
+            }
+        }
+
+        // use the difficulty of the latest block
+        $difficulty = (int)$latestBlock['difficulty'];
+
+        // adjust when it's been 144
+        if ($height % $blocksPerPeriod === 0) {
+            if ($oldestBlock === null) {
+                $oldestBlock = $this->getByHeight(max(1, $height - $blocksPerPeriod));
+            }
+
+            $blockTime = $this->getBlockTime($latestBlock['date_created'], $oldestBlock['date_created'], $blocksPerPeriod);
+
+            // block time was quick, increase difficulty
+            if ($blockTime <= Config::getDesiredBlockTime() - 30) {
+                ++$difficulty;
+            }
+
+            // block time was slow, decrease difficulty
+            if ($blockTime >= Config::getDesiredBlockTime() + 30) {
+                --$difficulty;
+            }
+        }
+
+        // never go less than the initial difficulty
+        $minimumDifficulty = Config::getDefaultDifficulty();
+        if ($difficulty < $minimumDifficulty) {
+            $difficulty = $minimumDifficulty;
+        }
+
+        // max out at 255 ~ almost impossible
+        if ($difficulty > 255) {
+            $difficulty = 255;
+        }
+
+        return $difficulty;
+    }
+
+    /**
+     * Warning, this is a simple "add a block and its transactions to the database". If you want the block to be active,
+     * you need to '$this->acceptBlock(block_id)'.
      *
      * @param array $block
      * @param bool $validate
+     * @param bool $updateBalances
      * @return bool
      */
-    public function addFullBlock(array $block, bool $validate = true, bool $setOrphan = false, bool $updateBalances = true): bool
+    public function add(array $block, bool $validate = true, bool $updateBalances = true): bool
     {
         $result = false;
-
-        $orphan = 0;
-        if ($setOrphan) {
-            $orphan = 1;
-        }
 
         if ($validate) {
             try {
@@ -371,13 +575,6 @@ class Block
                     throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
                 }
 
-                if ($updateBalances) {
-                    // delete mempool transactions with same transaction id's
-                    $stmt = $this->db->prepare('DELETE from mempool_transactions WHERE transaction_id=:transaction_id;');
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transaction['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt->execute();
-                }
-
                 // prepare the statement and execute
                 $query = 'INSERT INTO transactions (`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key`) VALUES (:block_id,:transaction_id,:date_created,:peer,:height,:version,:signature,:public_key)';
                 $stmt = $this->db->prepare($query);
@@ -405,7 +602,7 @@ class Block
                     $query = 'SELECT `block_id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`hash` FROM transaction_outputs WHERE spent=0 AND transaction_id=:transaction_id AND tx_id=:tx_id';
                     $stmt = $this->db->prepare($query);
                     $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_transaction_id', value: $txIn['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    //FUCK          $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
                     $stmt->execute();
                     $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     if (count($txOut) <= 0) {
@@ -499,187 +696,116 @@ class Block
         return $result;
     }
 
-    public function forkTest(): void
+    /**
+     * This function effectively processes a block and all of its transactions, and makes it active.
+     *
+     * @param string $blockId
+     * @param int $height
+     * @return bool
+     */
+    public function acceptBlock(string $blockId, int $height): bool
     {
-        // get the highest fork, orphan or not
-        $query = 'SELECT `block_id`,`height` FROM blocks ORDER BY `height` DESC LIMIT 1';
-        $stmt = $this->db->query($query);
-        $rows = $stmt->fetch();
-        if ($rows != null) {
-            $height = (int)$rows['height'];
-            $blockId = $rows['block_id'];
+        $result = false;
+        try {
+            $this->db->beginTransaction();
 
-            while ($height > 1) {
-                $block = $this->getByHeight($height);
-                $this->processFork($block);
+            // set this block as an orphan (if this is a duplicate)
+            $query = 'UPDATE blocks SET `orphan`=0 WHERE `height`= :height AND `block_id` = :block_id';
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
+            $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
+            $stmt->execute();
 
-                $height--;
+            // get all other blocks at this height and reverse them
+            $query = 'SELECT block_id FROM transactions WHERE `height`= :height AND `block_id` != :block_id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt->execute();
+            $blocks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // reverse all blocks at this height
+            foreach ($blocks as $block) {
+                $this->reverseBlock($block['block_id'], $block['height']);
             }
-        }
-    }
 
-    private function isFork(?array $block1, ?array $block2): bool
-    {
-        if ($block1 == null || $block2 == null) {
-            return false;
-        }
+            // get all transactions associated with this block
+            $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
+            $stmt = $this->db->prepare($query);
+            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+            $stmt->execute();
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($transactions as $transaction) {
 
-        // same block?
-        if ($block1['block_id'] == $block2['block_id']) {
-            return false;
-        }
+                // add txIn
+                foreach ($transaction[Transaction::Inputs] as $txIn) {
+                    $txIn['block_id'] = $transaction['block_id'];
+                    $txIn['transaction_id'] = $transaction['transaction_id'];
 
-        // not the same height?
-        if ((int)$block1['height'] != (int)$block2['height']) {
-            return false;
-        }
+                    // make sure there is a previous unspent transaction
+                    $query = 'SELECT `block_id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`hash` FROM transaction_outputs WHERE spent=0 AND transaction_id=:transaction_id AND tx_id=:tx_id';
+                    $stmt = $this->db->prepare($query);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_transaction_id', value: $txIn['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'previous_tx_out_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                    $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    if (count($txOut) <= 0) {
+                        throw new RuntimeException('failed to get unspent transaction for: ' . $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']);
+                    }
 
-        // is this a fork? If not, get out
-        if ($block1['previous_block_id'] != $block2['previous_block_id']) {
-            return false;
-        }
+                    // run script
+                    $result = $this->transaction->unlockTransaction($txIn, $txOut);
+                    if (!$result) {
+                        throw new RuntimeException("Cannot unlock script for: " . $txIn['transaction_id']);
+                    }
 
-        return true;
-    }
+                    // mark the transaction as spent
+                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=1 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                    $transactionTxId = (int)$this->db->lastInsertId();
+                    if ($transactionTxId <= 0) {
+                        throw new RuntimeException('failed to update transaction tx as spent in the database: ' . $txIn['transaction_id'] . ' - ' . $txIn['transaction_id']);
+                    }
 
-    public function processFork(?array $block1, ?array $block2): void
-    {
-        if ($this->isFork($block1, $block2)) {
-            // two valid blocks, get the better one and adjust the chain
-            $strength = bccomp(BcmathExtensions::bchexdec($block1['hash']), BcmathExtensions::bchexdec($block2['hash']));
+                    // delete mempool transactions
+                    $stmt = $this->db->prepare('DELETE from mempool_inputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['tx_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
+                }
 
-            // always prefer stronger hashes with more transactions
-            if ($strength >= 0 && (int)$block1['transaction_count'] > (int)$block2['transaction_count']) {
-                // delete the old one
-                $this->delete($block2['block_id'], true);
-                $this->addFullBlock($block1, false);
-            } else {
-                // add new block
-                $this->delete($block1['block_id'], true);
-                $this->addFullBlock($block2, false);
-            }
-        }
-    }
+                // add txOut
+                foreach ($transaction[Transaction::Outputs] as $txOut) {
+                    $txOut['block_id'] = $transaction['block_id'];
+                    $txOut['transaction_id'] = $transaction['transaction_id'];
+                    $txOut['spent'] = 0; // set this to zero, it will be updated on the spent transaction
 
-    #[Pure]
-    public function getRewardValue(int $nHeight): string
-    {
-        if ($nHeight <= 0) {
-            $nHeight = 1;
-        }
-        $strHeight = (string)$nHeight;
-
-        $targetModulus = (3600 / Config::getDesiredBlockTime()) * 24 * 365;
-        $reductions = bcdiv($strHeight, (string)$targetModulus, 0);
-
-        $nSubsidy = Config::getDefaultBlockReward(); // 100 coins
-
-        if (bccomp($reductions, "0") === 1) {
-            $reductions = (int)$reductions;
-            for ($i = 0; $i < $reductions; $i++) {
-                $reduction = bcmul($nSubsidy, "0.04");
-                $nSubsidy = bcsub($nSubsidy, $reduction, 0);
-                if (bccomp($nSubsidy, '100000000') <= 0) {
-                    break;
+                    // delete mempool transactions
+                    $stmt = $this->db->prepare('DELETE from mempool_outputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id');
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['tx_id'], pdoType: DatabaseHelpers::INT);
+                    $stmt->execute();
                 }
             }
+
+            $this->db->commit();
+            $result = true;
+        } catch (Exception|RuntimeException $ex) {
+            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            $this->db->rollback();
         }
-
-        return $nSubsidy;
-    }
-
-    public function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
-    {
-        return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
+        return $result;
     }
 
     /**
-     * calculates the difficulty
+     * WARNING --- This will delete any block given, and does NOT reverse anything - generally safest to call
+     * reverseBlock() with delete flag set to true.
      *
-     * the higher the difficulty number, the harder it is.
-     * the lower the difficulty number, the easier it is.
-     *
-     * @param int $height
-     * @param array|null $latestBlock
-     * @param array|null $oldestBlock
-     * @return int
+     * @param string $blockId
+     * @param bool $restoreMempool
+     * @return bool
      */
-    public
-    function getDifficulty(int $height = 0, array $latestBlock = null, array $oldestBlock = null): int
-    {
-        // get the current height, if not given
-        if ($height === 0) {
-            $height = $this->getCurrentHeight();
-        }
-
-        // get blocks per period
-        $blocksPerPeriod = (int)(3600 / Config::getDesiredBlockTime()) * 24;
-
-        // if less than 144 use the genesis difficulty
-        if ($height < $blocksPerPeriod) {
-            $genesisBlock = $this->getByHeight(1);
-            return (int)$genesisBlock['difficulty'];
-        }
-
-        // get the desired block height and get the current difficulty
-        if (empty($latestBlock)) {
-            $latestBlock = $this->getByHeight($height);
-            if (empty($latestBlock)) {
-                $latestBlock = $this->getByHeight($this->getCurrentHeight());
-            }
-        }
-
-        // use the difficulty of the latest block
-        $difficulty = (int)$latestBlock['difficulty'];
-
-        // adjust when it's been 144
-        if ($height % $blocksPerPeriod === 0) {
-            if ($oldestBlock === null) {
-                $oldestBlock = $this->getByHeight(max(1, $height - $blocksPerPeriod));
-            }
-
-            $blockTime = $this->getBlockTime($latestBlock['date_created'], $oldestBlock['date_created'], $blocksPerPeriod);
-
-            // block time was quick, increase difficulty
-            if ($blockTime <= Config::getDesiredBlockTime() - 30) {
-                ++$difficulty;
-            }
-
-            // block time was slow, decrease difficulty
-            if ($blockTime >= Config::getDesiredBlockTime() + 30) {
-                --$difficulty;
-            }
-        }
-
-        // never go less than the initial difficulty
-        $minimumDifficulty = Config::getDefaultDifficulty();
-        if ($difficulty < $minimumDifficulty) {
-            $difficulty = $minimumDifficulty;
-        }
-
-        // max out at 255 ~ almost impossible
-        if ($difficulty > 255) {
-            $difficulty = 255;
-        }
-
-        return $difficulty;
-    }
-
-    public function generateBlockHeader(array $block): string
-    {
-        return
-            $block['network_id'] .
-            $block['block_id'] .
-            $block['previous_block_id'] .
-            $block['date_created'] .
-            $block['height'] .
-            $block['difficulty'] .
-            $block['merkle_root'] .
-            $block['transaction_count'] .
-            $block['previous_hash'];
-    }
-
-    public function delete(string $blockId, bool $restoreMempool = false): bool
+    public function delete(string $blockId): bool
     {
         $result = false;
         try {
@@ -698,27 +824,7 @@ class Block
             $stmt->execute();
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-
             foreach ($transactions as $transaction) {
-                // add mempool transactions back
-                if ($restoreMempool) {
-                    $this->mempool->add($transactions);
-                }
-
-                // reverse transactions
-                $spentItems = $this->db->query('SELECT previous_transaction_id, previous_tx_out_id from transaction_inputs WHERE transaction_id=%s;', $transaction['transaction_id']);
-                foreach ($spentItems as $spentItem) {
-                    // mark the transaction as unspent
-                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $spentItem['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $spentItem['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
-                    $stmt->execute();
-                    $transactionTxId = (int)$this->db->lastInsertId();
-                    if ($transactionTxId <= 0) {
-                        throw new RuntimeException('failed to update transaction tx as unspent in the database: ' . $spentItem['transaction_id'] . ' - ' . $spentItem['transaction_id']);
-                    }
-                }
-
                 // clear the transaction inputs
                 $query = 'DELETE FROM transaction_inputs WHERE `transaction_id` = :transaction_id;';
                 $stmt = $this->db->prepare($query);
@@ -741,56 +847,30 @@ class Block
         return $result;
     }
 
-    public function acceptBlock(string $blockId, int $height): bool
+    /**
+     * This is a recursive function that reverses the block given, and calls a recursive function 'reverse transactions`
+     *
+     * @param string $blockId
+     * @param bool $delete
+     * @return bool
+     */
+    public function reverseBlock(string $blockId, bool $delete = false): bool
     {
         $result = false;
         try {
             $this->db->beginTransaction();
 
             // set this block as an orphan
-            $query = 'UPDATE blocks SET `orphan`=0 WHERE `height`= :height AND `block_id` = :block_id';
+            $query = 'UPDATE blocks SET `orphan`=1 WHERE `block_id` = :block_id';
             $stmt = $this->db->prepare($query);
-            $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
             $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
             $stmt->execute();
 
-            // get all other blocks at this height and reverse them
-            $query = 'SELECT block_id FROM transactions WHERE `height`= :height AND `block_id` != :block_id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-            $stmt->execute();
-            $blocks = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($blocks as $block) {
-                $this->reverseBlock($block['block_id'], $block['height']);
+            $this->reverseTransactions($blockId, $delete);
+            if ($delete) {
+                $this->delete($blockId);
             }
 
-            // get all transactions associated with this block
-            $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-            $stmt->execute();
-            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($transactions as $transaction) {
-                // add mempool transactions back
-                $this->mempool->add($transactions);
-
-                // reverse transactions
-                $spentItems = $this->db->query('SELECT previous_transaction_id, previous_tx_out_id from transaction_inputs WHERE block_id=:block_id AND transaction_id=%s;', $transaction['transaction_id']);
-                foreach ($spentItems as $spentItem) {
-                    // mark the transaction as unspent
-                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;');
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $spentItem['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $spentItem['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
-                    $stmt->execute();
-                    $transactionTxId = (int)$this->db->lastInsertId();
-                    if ($transactionTxId <= 0) {
-                        throw new RuntimeException('failed to update transaction tx as unspent in the database: ' . $spentItem['transaction_id'] . ' - ' . $spentItem['transaction_id']);
-                    }
-                }
-            }
-
-            $this->db->commit();
             $result = true;
         } catch (Exception|RuntimeException $ex) {
             Console::log('Rolling back transaction: ' . $ex->getMessage());
@@ -799,72 +879,59 @@ class Block
         return $result;
     }
 
-    public function reverseTransactionChain(string $blockId, string $transactionId)
+    private function reverseTransactions(string $blockId, bool $delete = false)
     {
+        // get all transactions associated with this block
+        $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt->execute();
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    }
+        foreach ($transactions as $transaction) {
 
-    public function reverseBlock(string $blockId, int $height): bool
-    {
-        $result = false;
-        try {
-            $this->db->beginTransaction();
+            // add txIn
+            foreach ($transaction[Transaction::Inputs] as $txIn) {
+                $txIn['block_id'] = $transaction['block_id'];
+                $txIn['transaction_id'] = $transaction['transaction_id'];
 
-            // set this block as an orphan
-            $query = 'UPDATE blocks SET `orphan`=1 WHERE `height`= :height AND `block_id` = :block_id';
-            $stmt = $this->db->prepare($query);
-            $stmt->bindParam(param: ':height', var: $height, type: PDO::PARAM_INT);
-            $stmt->bindParam(param: ':block_id', var: $blockId, maxLength: 64);
-            $stmt->execute();
-
-            // get all transactions associated with this block
-            $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-            $stmt->execute();
-            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($transactions as $transaction) {
-
-                // add txIn
-                foreach ($transaction[Transaction::Inputs] as $txIn) {
-                    $txIn['block_id'] = $transaction['block_id'];
-                    $txIn['transaction_id'] = $transaction['transaction_id'];
-
-                    // mark the transaction as unspent
-                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE block_id=:block_id AND transaction_id=:transaction_id AND tx_id=:tx_id;');
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $txIn['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
-                    $stmt->execute();
-                }
-
-                // txOut
-                foreach ($transaction[Transaction::Outputs] as $txOut) {
-                    $txOut['block_id'] = $transaction['block_id'];
-                    $txOut['transaction_id'] = $transaction['transaction_id'];
-
-                    // mark this transaction as unspent
-                    $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE block_id=:block_id AND transaction_id=:transaction_id AND tx_id=:tx_id;');
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-                    $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
-                    $stmt->execute();
-
-                    // move up the chain reverse all blocks above
-
-                }
+                // reverse the transaction output that we point to
+                $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE block_id=:block_id AND transaction_id=:transaction_id AND tx_id=:tx_id;');
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $txIn['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txIn['previous_transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txIn['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                $stmt->execute();
             }
 
-            // put the mempool transactions back
-            $this->mempool->add($transactions);
+            // txOut
+            foreach ($transaction[Transaction::Outputs] as $txOut) {
+                $txOut['block_id'] = $transaction['block_id'];
+                $txOut['transaction_id'] = $transaction['transaction_id'];
 
-            $this->db->commit();
-            $result = true;
-        } catch (Exception|RuntimeException $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
-            $this->db->rollback();
+                // reverse this blocks output
+                $stmt = $this->db->prepare('UPDATE transaction_outputs SET spent=0 WHERE block_id=:block_id AND transaction_id=:transaction_id AND tx_id=:tx_id;');
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['previous_tx_out_id'], pdoType: DatabaseHelpers::INT);
+                $stmt->execute();
+
+                // get the `spent` transaction that is pointing to our outputs (if there is one)
+                $stmt = $this->db->prepare('SELECT `block_id` FROM transaction_inputs WHERE block_id=:block_id AND previous_transaction_id=:transaction_id AND previous_tx_out_id=:tx_id;');
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $txOut['block_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $txOut['transaction_id'], pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+                $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'tx_id', value: $txOut['tx_id'], pdoType: DatabaseHelpers::INT);
+                $stmt->execute();
+
+                // reverse the `spent` transaction that is pointing to this block
+                $rBlockId = $stmt->fetchColumn();
+                $this->reverseBlock($rBlockId, $delete);
+            }
         }
-        return $result;
+
+        /**
+         * put the mempool transactions back, even if we are deleting, the transactions are not part of the block and
+         * need to be taken care of.
+         */
+        $this->mempool->add($transactions);
     }
 }

@@ -227,10 +227,10 @@ class Node
                                                         $this->block->processFork($currBlock, $block);
                                                     } else if ($remoteHeight > $localHeight) {
                                                         // add it
-                                                        $id = $this->block->addFullBlock($block, false);
+                                                        $id = $this->block->add($block, false);
                                                     } else {
                                                         // we have an older block... just add it, but modify nothing - initiate a fork test
-                                                        $id = $this->block->addFullBlock($block, false, false, false);
+                                                        $id = $this->block->add($block, false, false, false);
                                                         $this->queue->add('fork_test', $block['height']);
                                                     }
 

@@ -54,7 +54,7 @@ $app->checkMigrations();
 // bootstrap from Genesis?
 $block = new Block();
 if ($block->getCurrentHeight() === 0) {
-    $block->addFullBlock($block->genesis(), false);
+    $block->add($block->genesis(), false);
 }
 
 // if there is no state, we're likely needing to sync from the network
