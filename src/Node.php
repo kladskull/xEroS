@@ -353,12 +353,8 @@ class Node
                                             }
                                             break;
 
-                                        // TODO: Provide mining work
-                                        case 'mining_work_req':
-                                            break;
-
-                                        // TODO: submit new work
-                                        case 'mining_new_block':
+                                        case 'mining_info':
+                                            Console::log('Received mining word response');
                                             break;
 
                                         /**
