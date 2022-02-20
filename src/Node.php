@@ -27,7 +27,9 @@ class Node
         'connect_time' => 0,
         'last_ping' => 0,
         'current_height' => 0,
-        'last_height' => 0
+        'last_height' => 0,
+        'mempool_size' => 0,
+
     ];
 
     public function __construct()
@@ -59,6 +61,7 @@ class Node
         $server = $sock;
         $clients = [$sock];
         $clientInfo = [];
+        $currentRequest = [];
 
         while (1) {
             $read = $clients;
@@ -132,7 +135,6 @@ class Node
                                                 ]));
                                                 break;
                                             }
-
                                             Console::log('Received handshake');
 
                                             // request a peer list
@@ -151,6 +153,18 @@ class Node
                                             $clientInfo[$key]['init'] = 2;
                                             break;
 
+                                        case 'handshake_resp_nok':
+                                            Console::log('Received invalid handshake');
+                                            break;
+
+                                        /**
+                                         * misc
+                                         */
+                                        case 'error':
+                                            $message = $data['message'];
+                                            Console::log('Received error: ' . $message);
+                                            break;
+
                                         default:
                                             $this->send($client, json_encode(['type' => 'error', 'message' => 'expected handshake']));
                                             fclose($client);
@@ -164,34 +178,16 @@ class Node
                                 if ($clientInfo[$key]['init'] >= 2) {
                                     switch ($data['type']) {
                                         /**
-                                         * Account get/create actions are prohibited in the node
-                                         */
-                                        case 'address_balance_req':
-                                            Console::log('Received an account balance request from: ' . $key);
-                                            $address = $data['address'] ?: null;
-                                            if ($address->validateAddress($address)) {
-                                                $acct = $this->account->getByAddress($address);
-                                                if ($acct !== null) {
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'balance',
-                                                        'address' => $address,
-                                                        'balance' => $this->account->getBalance($address),
-                                                        'pending_balance' => $this->account->getPendingBalance($address),
-                                                    ]));
-                                                } else {
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'balance',
-                                                        'result' => 'nok',
-                                                    ]));
-                                                }
-                                            }
-                                            break;
-
-                                        /**
                                          * Blockchain
                                          */
-                                        case 'block_submit_req':
-                                            Console::log('Received a block submission from: ' . $key);
+
+                                        case 'block_resp':
+                                            Console::log('Received a block response from: ' . $key);
+                                            $clientInfo[$key]['block'] = $data['result'];
+                                            break;
+
+                                        case 'block':
+                                            Console::log('Received a block from: ' . $key);
                                             $block = $data['block'] ?: null;
 
                                             // invalid or duplicate? if so, ignore...
@@ -202,7 +198,6 @@ class Node
                                                 ]));
                                                 break;
                                             } else {
-                                                $id = 0;
                                                 $validate = $block->validateFullBlock($block);
                                                 if ($validate['validated']) {
 
@@ -213,7 +208,7 @@ class Node
                                                             // new block is an orphan - add and ignore it for now
                                                             $this->block->add($block, false, true);
                                                             $this->send($client, json_encode([
-                                                                'type' => 'block',
+                                                                'type' => 'block_resp',
                                                                 'result' => 'ok'
                                                             ]));
                                                             break;
@@ -261,14 +256,14 @@ class Node
                                                     if ($id > 0) {
                                                         $this->queue->add('propagate_block', $block['block_id']);
                                                         $this->send($client, json_encode([
-                                                            'type' => 'block',
+                                                            'type' => 'block_resp',
                                                             'result' => 'ok'
                                                         ]));
                                                     }
                                                 } else {
                                                     // new block is invalid...
                                                     $this->send($client, json_encode([
-                                                        'type' => 'block',
+                                                        'type' => 'block_resp',
                                                         'result' => 'nok'
                                                     ]));
                                                 }
@@ -322,6 +317,11 @@ class Node
                                                 'type' => 'mempool_size',
                                                 'height' => 11
                                             ]));
+                                            break;
+
+                                        case 'mempool_size':
+                                            Console::log('Received a mempool response from: ' . $key);
+                                            $clientInfo[$key]['mempool_size'] = (int)$data['mempool_size'];
                                             break;
 
                                         /**
@@ -378,6 +378,11 @@ class Node
                                             Console::log('Received pong');
                                             break;
 
+                                        case 'version':
+                                            Console::log('Received peer version');
+                                            $clientInfo[$key]['version'] = $data['version'];
+                                            break;
+
                                         case 'version_req':
                                             Console::log('Received version req');
                                             $this->send($client, json_encode([
@@ -428,6 +433,11 @@ class Node
                                             $this->send($client, $packet);
                                             break;
 
+                                        case 'peer_invite_resp':
+                                            $result = $data['result'];
+                                            Console::log('Peer invite response: ' . $result);
+                                            break;
+
                                         case 'peer_list':
                                             $peerList = $data['peers'] ?: [];
                                             foreach ($peerList as $peer) {
@@ -435,11 +445,21 @@ class Node
                                             }
                                             break;
 
+                                        /**
+                                         * misc
+                                         */
+                                        case 'error':
+                                            $message = $data['message'];
+                                            Console::log('Received error: ' . $message);
+                                            break;
 
                                         default:
                                             break;
+
                                     }
                                 }
+
+
                             } else {
                                 Console::log('Unknown command received: ' . $key);
                                 $this->send($client, json_encode(['type' => 'error', 'message' => 'unknown command']));
