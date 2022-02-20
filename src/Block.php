@@ -252,7 +252,7 @@ class Block
         if (!$pow->verifyPow($block['hash'], $this->generateBlockHeader($block), $block['nonce'])) {
             return $this->returnValidateResult("Proof of work fail", false);
         }
-
+        
         // we must have all the transactions
         $transactions = Transaction::sort($transactions);
         if ($transactionCount !== count($transactions)) {
