@@ -2,6 +2,8 @@
 
 namespace Xeros;
 
+use JetBrains\PhpStorm\NoReturn;
+
 class Node
 {
     private array $connections;
@@ -40,9 +42,10 @@ class Node
         $this->block = new Block();
         $this->transaction = new Transaction();
         $this->mempool = new Mempool();
+        $this->dataStore = new DataStore();
     }
 
-    private function send($client, string $data)
+    private function send($client, string $data): void
     {
         // add a newline for back-to-back sends
         $data = trim($data) . "\n";
@@ -51,6 +54,7 @@ class Node
         }
     }
 
+    #[NoReturn]
     public function listen(string $address, int $port)
     {
         Console::log('Opening a server socket on address: ' . $address . ' port: ' . $port);
@@ -87,8 +91,13 @@ class Node
                     continue;
                 }
 
+                // do some work/get local state
+
+
                 // Handle Input
+                $exceptions = [];
                 foreach ($clients as $key => $client) { // for each client
+
                     if (in_array($client, $read)) {
                         $data = fread($client, 8192);
                         if ($data !== '') {
@@ -177,10 +186,10 @@ class Node
                                 // only allow initialized connections for these commands
                                 if ($clientInfo[$key]['init'] >= 2) {
                                     switch ($data['type']) {
+
                                         /**
                                          * Blockchain
                                          */
-
                                         case 'block_resp':
                                             Console::log('Received a block response from: ' . $key);
                                             $clientInfo[$key]['block'] = $data['result'];
@@ -191,7 +200,9 @@ class Node
                                             $block = $data['block'] ?: null;
 
                                             // invalid or duplicate? if so, ignore...
+                                            $id = 0;
                                             if (empty($block) || $this->block->getByBlockId($block['block_id']) !== null) {
+                                                // we will not be forwarding this block
                                                 $this->send($client, json_encode([
                                                     'type' => 'block_resp',
                                                     'result' => 'ok',
@@ -200,66 +211,68 @@ class Node
                                             } else {
                                                 $validate = $block->validateFullBlock($block);
                                                 if ($validate['validated']) {
-
-                                                    // check if its an orphan
                                                     if ($block['height'] > 1) {
-                                                        $prevBlock = $this->block->getByHeight($block['height'] - 1);
-                                                        if ($block['previous_block_id'] !== $prevBlock['block_id'] || $block['previous_hash'] !== $prevBlock['hash']) {
-                                                            // new block is an orphan - add and ignore it for now
-                                                            $this->block->add($block, false, true);
-                                                            $this->send($client, json_encode([
-                                                                'type' => 'block_resp',
-                                                                'result' => 'ok'
-                                                            ]));
-                                                            break;
+
+                                                        // check to current block
+                                                        $localHeight = $this->block->getCurrentHeight();
+                                                        $remoteHeight = (int)$block['height'];
+
+                                                        // received a competing block
+                                                        if ($remoteHeight === $localHeight) {
+                                                            /**
+                                                             * Competing Block Received!
+                                                             */
+                                                            $currBlock = $block->getCurrent();
+
+                                                            // add it
+                                                            $id = $this->block->add($block, false, true);
+
+                                                            // choose the block based on features
+                                                            $selectedBlock = $this->block->blockSelector($currBlock, $block);
+                                                            $this->block->acceptBlock($selectedBlock['block_id'], $selectedBlock['height']);
+                                                        } else if ($remoteHeight > $localHeight) {
+                                                            /**
+                                                             * New Block Received!
+                                                             */
+                                                            $id = $this->block->add($block, false);
+                                                            $this->block->acceptBlock($block['block_id'], $block['height']);
+
+                                                            // check if we are behind
+                                                            if ($this->block->isCurrentHeightOrphan()) {
+                                                                $this->queue->add('new_block', $block['block_id']);
+                                                            }
+                                                        } else {
+                                                            /**
+                                                             * Got an older block... just add it
+                                                             */
+                                                            // we have an older block...
+                                                            $id = $this->block->add($block, false, false, false);
+                                                            $this->queue->add('height_test', $block['height']);
                                                         }
                                                     }
+                                                }
 
-                                                    // check to current block
-                                                    $localHeight = $this->block->getCurrentHeight();
-                                                    $remoteHeight = (int)$block['height'];
+                                                // propagate the new block?
+                                                if ($id > 0) {
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'block_resp',
+                                                        'result' => 'ok'
+                                                    ]));
 
-                                                    // received a competing block
-                                                    if ($remoteHeight === $localHeight) {
-                                                        /**
-                                                         * Competing Block Received!
-                                                         */
-                                                        $currBlock = $block->getCurrent();
-
-                                                        // add it
-                                                        $id = $this->block->add($block, false, true);
-
-                                                        // choose the block based on features
-                                                        $selectedBlock = $this->block->blockSelector($currBlock, $block);
-                                                        $this->block->acceptBlock($selectedBlock['block_id'], $selectedBlock['height']);
-                                                    } else if ($remoteHeight > $localHeight) {
-                                                        /**
-                                                         * New Block Received!
-                                                         */
-                                                        $id = $this->block->add($block, false);
-                                                        $this->block->acceptBlock($block['block_id'], $block['height']);
-
-                                                        // check if we are behind
-                                                        if ($this->block->isCurrentHeightOrphan()) {
-                                                            $this->queue->add('resolve_forks', $block['block_id']);
+                                                    // don't overwrite client/etc
+                                                    foreach ($clients as $k => $c) {
+                                                        // don't send to self or current client
+                                                        if ($server === $c || $client === $c) {
+                                                            continue;
                                                         }
-                                                    } else {
-                                                        /**
-                                                         * Got an older block... just add it
-                                                         */
-                                                        // we have an older block...
-                                                        $id = $this->block->add($block, false, false, false);
-                                                        $this->queue->add('fork_test', $block['height']);
-                                                    }
 
-                                                    // propagate the new block
-                                                    if ($id > 0) {
-                                                        $this->queue->add('propagate_block', $block['block_id']);
-                                                        $this->send($client, json_encode([
-                                                            'type' => 'block_resp',
-                                                            'result' => 'ok'
+                                                        // new block is invalid...
+                                                        $this->send($c, json_encode([
+                                                            'type' => 'block',
+                                                            'block' => $block,
                                                         ]));
                                                     }
+
                                                 } else {
                                                     // new block is invalid...
                                                     $this->send($client, json_encode([
@@ -267,6 +280,7 @@ class Node
                                                         'result' => 'nok'
                                                     ]));
                                                 }
+
                                             }
                                             break;
 
@@ -322,6 +336,25 @@ class Node
                                         case 'mempool_size':
                                             Console::log('Received a mempool response from: ' . $key);
                                             $clientInfo[$key]['mempool_size'] = (int)$data['mempool_size'];
+                                            break;
+
+                                        case 'mempool_transaction':
+                                            Console::log('Received a new mempool transaction from: ' . $key);
+
+                                            // propagate transaction
+                                            foreach ($clients as $k => $c) {
+                                                // don't send to self or current client
+                                                if ($server === $c || $client === $c) {
+                                                    continue;
+                                                }
+
+                                                // new block is invalid...
+                                                $this->send($c, json_encode([
+                                                    'type' => 'block',
+                                                    'block' => $block,
+                                                ]));
+                                            }
+
                                             break;
 
                                         /**
@@ -528,7 +561,6 @@ class Node
                     unset($clients[$key]);
                 }
             }
-
         }
 
     }
