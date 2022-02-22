@@ -2,6 +2,7 @@
 
 namespace Xeros;
 
+use Exception;
 use PHPUnit\Framework\TestCase;
 use RichJenks\Merkle\Merkle;
 
@@ -111,27 +112,6 @@ class BlockTest extends TestCase
         $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(200));
         $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(2000));
         $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(2015));
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function testAdd(): void
-    {
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function testGetCurrent(): void
-    {
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function testGetCurrentHeight(): void
-    {
     }
 
     /**

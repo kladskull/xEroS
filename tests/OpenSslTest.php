@@ -83,7 +83,7 @@ class OpenSslTest extends TestCase
         $signature = $this->openssl->signAndVerifyData($text, $public_key, $private_key);
 
         $this->assertGreaterThanOrEqual(349, strlen($signature));
-        $this->assertTrue($this->pow->verifyPow($text, $signature, $public_key));
+        $this->assertTrue($this->openssl->verifySignature($text, $signature, $public_key));
     }
 
     public function textDataProvider(): array
