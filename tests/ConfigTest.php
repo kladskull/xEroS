@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+namespace Xeros;
+
 use JetBrains\PhpStorm\ArrayShape;
 use PHPUnit\Framework\TestCase;
 

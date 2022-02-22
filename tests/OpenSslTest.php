@@ -1,19 +1,24 @@
 <?php declare(strict_types=1);
 
+namespace Xeros;
+
+use Exception;
 use PHPUnit\Framework\TestCase;
 
 class OpenSslTest extends TestCase
 {
     private OpenSsl $openssl;
+    private Pow $pow;
     private TransferEncoding $transferEncoding;
 
     protected function setUp(): void
     {
         $this->openssl = new OpenSsl();
+        $this->pow = new Pow();
         $this->transferEncoding = new TransferEncoding();
     }
 
-    public function testcreateRsaKeyPair(): void
+    public function testCreateRsaKeyPair(): void
     {
         $keys = $this->openssl->createRsaKeyPair();
         $this->assertCount(3, $keys);
@@ -29,7 +34,7 @@ class OpenSslTest extends TestCase
     }
 
     /**
-     * @throws Exception
+     * @throws Exception|Exception
      */
     public function testGetRandomBytesBinary(): void
     {
@@ -78,7 +83,7 @@ class OpenSslTest extends TestCase
         $signature = $this->openssl->signAndVerifyData($text, $public_key, $private_key);
 
         $this->assertGreaterThanOrEqual(349, strlen($signature));
-        $this->assertTrue($this->openssl->verifyPow($text, $signature, $public_key));
+        $this->assertTrue($this->pow->verifyPow($text, $signature, $public_key));
     }
 
     public function textDataProvider(): array

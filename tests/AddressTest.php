@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+namespace Xeros;
+
 use PHPUnit\Framework\TestCase;
 
 class AddressTest extends TestCase
@@ -36,7 +38,7 @@ class AddressTest extends TestCase
 
         $this->assertEquals($address, $address2);
 
-        $this->assertEquals('Bc', substr($address, 0, 2));
+        $this->assertEquals(Config::getAddressHeader(), substr($address, 0, 2));
     }
 
     public function testValidateAddress(): void

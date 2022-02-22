@@ -1,7 +1,8 @@
 <?php declare(strict_types=1);
 
-use PHPUnit\Framework\TestCase;
+namespace Xeros;
 
+use PHPUnit\Framework\TestCase;
 
 class ApiTest extends TestCase
 {
