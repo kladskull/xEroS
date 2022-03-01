@@ -70,26 +70,13 @@ class BlockTest extends TestCase
         return [];
     }
 
-    /**
-     * @throws Exception
-     */
-    public function testGenesis(): void
-    {
-
-    }
-
-    public function testMaxTransactions(): void
-    {
-        $this->assertEquals(100, $this->block->getMaxTransactions());
-    }
-
     public function testGetRewardValue(): void
     {
-        $this->assertEquals(0, bccomp("5", $this->block->getRewardValue(1)));
-        $this->assertEquals(0, bccomp("2.5", $this->block->getRewardValue(565001)));
-        $this->assertEquals(0, bccomp("1.25", $this->block->getRewardValue(1130002)));
-        $this->assertEquals(0, bccomp("0.625", $this->block->getRewardValue(1695003)));
-        $this->assertEquals(0, $this->block->getRewardValue(10000000));
+        $this->assertEquals('5000000000', $this->block->getRewardValue(1));
+        $this->assertEquals('3324163183', $this->block->getRewardValue(565001));
+        $this->assertEquals('2121611688', $this->block->getRewardValue(1130002));
+        $this->assertEquals('1354096029', $this->block->getRewardValue(1695003));
+        $this->assertEquals('99313533', $this->block->getRewardValue(10000000));
     }
 
     public function testDifficultyExpectations(): void
@@ -112,13 +99,6 @@ class BlockTest extends TestCase
         $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(200));
         $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(2000));
         $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(2015));
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function testDifficultyWithRealBlocksPerfectBlockTiming(): void
-    {
     }
 
 }
