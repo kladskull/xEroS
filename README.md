@@ -8,9 +8,13 @@ and mostly follows the technical design of Bitcoin. Xeros uses P2P technology to
 There are many differences to Bitcoin, such as the scripting language which is "XeroASM" which is a really dumbed down 
 version of assembler - one thing I'd like to do is offer easier scripting languages that "compile" down to the XeroASM. 
 
-## Status of the Project
-Currently, the blockchain has not launched. I plan on launching it in the next month or two - once I have some of 
-the higher priority tasks are done in the Github issues area of this project.
+## Contact
+You can join the [Xeros Discord server](https://discord.gg/mvacfndPXt), or email me: kladskull@protonmail.com.
+
+## Status of the Project (Yes it's active!)
+Currently, the blockchain has not launched - it is however close to its first release version. I plan on launching it
+in the next month or two - once I have some of the higher priority tasks are done in the Github issues area of this 
+project.
 
 ## Install
 ```
