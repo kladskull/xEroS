@@ -7,13 +7,13 @@
     "blockchain",
     "cryptocurrency"
   ],
-  "homepage": "https://solutionxero.io",
+  "homepage": "https://github.com/kladskull/xeros",
   "license": "MIT",
   "authors": [
     {
-      "name": "Mike Curry",
-      "email": "mikecurry74@gmail.com",
-      "homepage": "https://currazy.com",
+      "name": "Kladskull",
+      "email": "kladskull@protonmail.com",
+      "homepage": "https://github.com/kladskull/xeros",
       "role": "Lead Developer"
     }
   ],
