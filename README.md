@@ -6,7 +6,7 @@ Xeros is a digital currency that allows instant payments to anyone, anywhere. Xe
 and mostly follows the technical design of Bitcoin. Xeros uses P2P technology to operate with no central server. 
 
 There are many differences to Bitcoin, such as the scripting language which is "XeroASM" which is a really dumbed down 
-version of assembler - one thing I'd like to do is offer easier scripting languages that "compile" down to the XeroASM. 
+version of assembler - one thing I'd like to do is offer easier scripting languages that "compile" down to the XeroASM.
 
 ## Contact
 You can join the [Xeros Discord server](https://discord.gg/mvacfndPXt), or email me: kladskull@protonmail.com.
