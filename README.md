@@ -101,7 +101,7 @@ Minor features that are fully backward compatible with the current release may b
 Major new features should always be sent to the master branch, which contains the upcoming release.
 
 If you are unsure if your feature qualifies as a major or minor, please ask Kladskull in the #development channel 
-of the [Xeros Discord server](https://discord.gg/mvacfndPXt).
+of the [Xeros Discord server](https://discord.gg/mvacfndPXt). We are sending most git activity to this discord.
 
 ### Security Vulnerabilities
 If you discover a security vulnerability within Xeros, please send an email to Kladskull at kladskull@protonmail.com. 
