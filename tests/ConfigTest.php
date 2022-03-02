@@ -7,21 +7,6 @@ use PHPUnit\Framework\TestCase;
 
 final class ConfigTest extends TestCase
 {
-    /*
-    private $ba;
-    private $idsToDelete = [];
-    */
-
-    // execute before first test
-    public static function setUpBeforeClass(): void
-    {
-    }
-
-    // execute after last
-    public static function tearDownAfterClass(): void
-    {
-    }
-
     /**
      * (add multiple functions below)
      * @dataProvider additionProvider
@@ -53,16 +38,9 @@ final class ConfigTest extends TestCase
         ];
     }
 
-    /*
-    public function additionProvider(): CsvFileIterator
-    {
-        return new CsvFileIterator('data.csv');
-    }
-    */
-
     public function testGetDatabaseHost(): void
     {
-        $this->assertEquals(Config::getVersion(), '0.0001');
+        $this->assertEquals('0.0001', Config::getVersion());
     }
 
 }
