@@ -3,7 +3,9 @@
 [![Software License][ico-license]](LICENSE.md)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
-and follows the same technical design as Bitcoin. Xeros uses P2P technology to operate with no central server.
+and follows the much of the technical design of Bitcoin. Xeros uses P2P technology to operate with no central server. There are
+many differences, such as the scripting language which is "XeroASM" which is a really dumbed down version of assembler - one thing
+I'd like to do is offer easier scripting languages that "compile" down to the XeroASM. 
 
 ## Install
 
@@ -32,12 +34,14 @@ Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed re
 ## Testing
 
 ## Todo
+- Lots of unit tests, check out the issues section on Github. 
 
 ## Credits
 
 - Mike Curry <mikecurry74@gmail.com>
 ## Support & Funding
-If you are interested in showing support for this project, please use the addresses below, or become a [Patreon](https://www.patreon.com/user?u=32938240).   
+I wanted to learn how blockchains worked, and the only way was to actually sit down, research and finally - just start.
+I am not doing this for any monetary gain, however, if you would like to show support for this project, please use the addresses below, become a [Patreon](https://www.patreon.com/user?u=32938240) or [buy me a coffee](https://www.buymeacoffee.com/kladskull).   
 ```
 BTC: bc1q9svdtcr8cuvr9qfv7ha6c4femvnsjj5vfp2fes
 ETH: 0xd070069f968aD9C2e49C8E04d27006dc0C9c1543
