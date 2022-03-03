@@ -4,7 +4,7 @@
 ![Discord](https://img.shields.io/discord/948379180393984062?style=flat)
 [![Build Status](https://app.travis-ci.com/kladskull/xeros.svg?branch=main)](https://app.travis-ci.com/kladskull/xeros)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/kladskull/xeros/badges/quality-score.png?b=main)](https://scrutinizer-ci.com/g/kladskull/xeros/?branch=main)
-[![Code Coverage](https://scrutinizer-ci.com/g/kladskull/xeros/badges/coverage.png?b=main)](https://scrutinizer-ci.com/g/kladskull/xeros/?branch=main)
+[![Code Intelligence Status](https://scrutinizer-ci.com/g/kladskull/xeros/badges/code-intelligence.svg?b=main)](https://scrutinizer-ci.com/code-intelligence)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/kladskull?style=flat)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
