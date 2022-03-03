@@ -43,6 +43,7 @@ class Node
         $this->transaction = new Transaction();
         $this->mempool = new Mempool();
         $this->dataStore = new DataStore();
+        $this->queue = new Queue();
     }
 
     private function send($client, string $data): void
@@ -266,7 +267,6 @@ class Node
                                                             continue;
                                                         }
 
-                                                        // new block is invalid...
                                                         $this->send($c, json_encode([
                                                             'type' => 'block',
                                                             'block' => $block,
@@ -504,6 +504,13 @@ class Node
             }
 
             // handshakes, pings, etc
+            $propagationBlocks = [];
+            $queueItems = $this->queue->getItems('new_block');
+            foreach ($queueItems as $queueItem) {
+                $propagationBlocks[] = $this->block->assembleFullBlock($queueItem['data']);
+                $this->queue->delete($queueItem['id']);
+            }
+
             foreach ($clients as $key => $client) { // for each client
                 if ($server === $client) {
                     continue;
@@ -548,6 +555,15 @@ class Node
                         $this->send($client, json_encode($packet));
                     }
 
+                    /**
+                     * propagate blocks to peers
+                     */
+                    foreach ($propagationBlocks as $propagationBlock) {
+                        $this->send($client, json_encode([
+                            'type' => 'block',
+                            'block' => $propagationBlock,
+                        ]));
+                    }
                 }
 
                 /**
