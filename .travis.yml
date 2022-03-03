@@ -6,10 +6,6 @@ php:
 
 before_script:
   - sudo apt-get update -y
-  - sudo apt-get upgrade -y
-  - sudo apt install -y software-properties-common
-  - sudo add-apt-repository -y ppa:ondrej/php
-  - sudo apt-get update -y
   - sudo apt install -y unzip curl
   - sudo apt install -y php8.1 php8.1-common php8.1-sqlite3 php8.1-xml php8.1-xmlrpc php8.1-curl php8.1-cli php8.1-mbstring php8.1-bcmath php8.1-zip
   - composer install
