@@ -29,6 +29,14 @@ class Account
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    public function getNewestAccount(): ?array
+    {
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ORDER BY id DESC LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
     public function getByAddress(string $address): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `address` = :address LIMIT 1';

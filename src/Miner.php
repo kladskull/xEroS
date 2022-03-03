@@ -2,6 +2,9 @@
 
 namespace Xeros;
 
+use Exception;
+use JetBrains\PhpStorm\ArrayShape;
+
 class Miner
 {
     protected Block $block;
@@ -92,11 +95,12 @@ class Miner
             ++$hashes;
 
             // report
-            if ($hashes % 1200000 === 0) {
+            if ($hashes % 100000 === 0) {
                 $elapsed = max((time() - $start), 1);
                 $hashesPerSecond = $hashes / $elapsed;
                 $nonceHex = dechex($nonce);
                 Console::log("Height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) . "  difficulty: {$difficulty}  nonce: {$nonceHex}  elapsed: {$elapsed}s");
+                usleep(1);
             }
 
             // break out?
@@ -127,5 +131,45 @@ class Miner
             'elapsed_time' => $elapsed,
             'result' => true,
         ];
+    }
+
+    #[ArrayShape(['network_id' => "string", 'block_id' => "int|mixed", 'hash' => "mixed|string", 'height' => "int", 'difficulty' => "int"])]
+    public function getMiningInfo(): array
+    {
+        $block = new Block();
+
+        $blockId = 0;
+        $hash = '';
+        $currentBlock = $block->getCurrent();
+        if ($currentBlock !== null) {
+            $blockId = $currentBlock['block_id'];
+            $hash = $currentBlock['hash'];
+        }
+
+        return [
+            'network_id' => Config::getNetworkIdentifier(),
+            'block_id' => $blockId,
+            'hash' => $hash,
+            'height' => $block->getCurrentHeight(),
+            'difficulty' => $block->getDifficulty(),
+        ];
+    }
+
+    public function getMiningWork(): array
+    {
+        $mempool = new Mempool();
+        $work = false;
+        try {
+            $work = $mempool->getAllTransactions();
+        } catch (Exception) {
+        }
+
+        $block = new Block();
+        $currentBlock = $block->getCurrent();
+        $response = [];
+        $response['transactions'] = $work;
+        $response['last_block'] = $block->assembleFullBlock($currentBlock['block_id']);
+
+        return $response;
     }
 }

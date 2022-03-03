@@ -11,11 +11,6 @@ class Mempool
     protected PDO $db;
     protected Transaction $transaction;
 
-    //protected Peer $peers;
-    //protected TransferEncoding $transferEncoding;
-    //protected Address $address;
-    //protected OpenSsl $openSsl;
-
     public const Inputs = 'txIn';
     public const Outputs = 'txOut';
 
@@ -206,13 +201,14 @@ class Mempool
         return true;
     }
 
-    public function getAllTransactions(): array
+    public function getAllTransactions(int $height): array
     {
         $returnTransactions = [];
-        $stmt = $this->db->query('SELECT `id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM mempool_transactions');
+        $stmt = $this->db->query('SELECT `id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM mempool_transactions WHERE height=:height');
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'height', value: $height, pdoType: DatabaseHelpers::INT);
         $stmt->execute();
 
-        $transactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        $transactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         foreach ($transactions as $transaction) {
             // attach the details
             $transaction[self::Inputs] = $this->getTransactionInputs($transaction['transaction_id']);
@@ -223,9 +219,10 @@ class Mempool
         return $returnTransactions;
     }
 
-    public function getMempoolCount(): array
+    public function getMempoolCount(int $height): int
     {
-        $stmt = $this->db->query('SELECT count(1) FROM mempool_transactions;');
+        $stmt = $this->db->query('SELECT count(1) FROM mempool_transactions WHERE height=:height;');
+        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'height', value: $height, pdoType: DatabaseHelpers::INT);
         $stmt->execute();
         return $stmt->fetchColumn() ?: 0;
     }

@@ -3,166 +3,114 @@
 
 namespace Xeros;
 
+use cli\Arguments;
 use Exception;
 
+define('PROGRAM', 'Miner');
 include 'bootstrap.php';
 
+$account = new Account();
 $block = new Block();
-$transaction = new Transaction();
-$peer = new Peer();
 $pow = new Pow();
-$openSsl = new OpenSsl();
-$transferEncoding = new TransferEncoding();
-$address = new Address();
 $miner = new Miner();
-$script = new Script([]);
-$merkleRoot = new Merkle();
 
-$publicKey = file_get_contents(APP_DIR . 'public.key');
-$privateKey = file_get_contents(APP_DIR . 'private.key');
+// command line args
+$strict = in_array('--strict', $_SERVER['argv']);
+$arguments = new Arguments(compact('strict'));
 
-echo "\n" . Config::getProductName() . " Miner v" . Config::getVersion() . "\n";
-echo Config::getProductCopyright() . "\n\n";
+// set args
+$arguments->addFlag(['version', 'v'], 'Display the version');
+$arguments->addFlag(['help', 'h'], 'Show this help screen');
+$arguments->addFlag(['create-keypair', 'c'], [
+    'description' => 'Creates a new rsa keypair, and uses it to mine. Default behaviour is to just use the latest keypair created.'
+]);
+$arguments->addFlag(['developer'], [
+    'description' => 'This is a destructive command, never use it.',
+]);
+
+// parse the arguments
+$arguments->parse();
+
+if ($arguments['help']) {
+    echo $arguments->getHelpScreen();
+    exit(0);
+}
+
+if ($arguments['version']) {
+    echo 'Version: ', Config::getVersion(), PHP_EOL;
+    exit(0);
+}
+
+$forceMining = false;
+if ($arguments['developer']) {
+    Console::log('********************************************************************************************');
+    Console::log('* ');
+    Console::log('* WARNING!!! Forcing the miner to just use local data without a completed blockchain sync...');
+    Console::log('* ');
+    Console::log('********************************************************************************************');
+    $forceMining = true;
+}
+
+// use the newest key pair
+$acct = $account->getNewestAccount();
+if ($acct === null || $arguments['create-keypair']) {
+    // do we need to create a new key pair?
+    $id = $account->create();
+    $acct = $account->get($id);
+}
+$publicKey = $acct['public_key'];
+$privateKey = $acct['private_key'];
 
 // if there is no state, we're likely needing to sync from the network
 $store = new DataStore();
 $state = $store->getKey('state', '');
-if ($state !== 'mine') {
-    Console::log('Synchronization is required before mining may begin');
+if ($state !== 'mine' && $forceMining === false) {
+    Console::log('Synchronization is required before mining may begin.');
     exit(0);
 }
 
 while (1) {
-    $blockHeader = '';
-    $difficulty = $block->getDifficulty();
     $nonce = 0;
+    $height = $block->getCurrentHeight() + 1;
+    $candidateBlock = $block->getCandidateBlock($height, $publicKey, $privateKey);
+    $blockHeader = $block->generateBlockHeader($candidateBlock);
 
+    // inner loop, only exit on an event
     while (1) {
-        try {
-            // todo: change this to a command line option
-            $work = $http->get($miningUrl . 'mining_work.php');
-            if ($work !== false) {
-                $packet = json_decode($work, true);
-                if ($packet !== null) {
-                    $prevBlock = $packet['data']['last_block'];
-                    $transactions = $packet['data']['transactions'];
+        // assembled the block, now find a hash
+        $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], $height, $nonce);
 
-                    $date = time();
-                    $height = (int)$prevBlock['height'] + 1;
-                    $blockId = $block->generateId($prevBlock['block_id'], $date, $height);
-                    $publicKeyRaw = $openSsl->stripPem($publicKey);
-
-                    // add reward block
-                    $transactionId = $transaction->generateId($date, $blockId, $publicKey);
-                    $partialAddress = $transferEncoding->binToHex($address->createPartial($openSsl->formatPem($publicKeyRaw, false)));
-
-                    // pay to public Key hash
-                    $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;vsig ax,<hash>,bx;';
-                    $toAddress = $address->create($publicKey);
-                    $reward = bcadd($block->getRewardValue($height), $transaction->calculateMinerFee($transactions), 0);
-                    $lockHeight = $height + Config::getLockHeight();
-
-                    $coinbase = [
-                        'block_id' => $blockId,
-                        'transaction_id' => $transactionId,
-                        'date_created' => $date,
-                        'public_key' => $publicKeyRaw,
-                        'peer' => $peer->getUniquePeerId(),
-                        'version' => TransactionVersion::Coinbase,
-                        'height' => $height,
-                        Transaction::Inputs => [],
-                        Transaction::Outputs => [
-                            [
-                                'tx_id' => '0',
-                                'address' => $address->create($publicKey),
-                                'value' => $reward,
-                                'script' => $script->encodeScript($scriptText),
-                                'lock_height' => $lockHeight,
-                                'hash' => bin2hex($this->pow->doubleSha256($transactionId . '0' . $toAddress . $reward . $lockHeight)),
-                            ]
-                        ],
-                    ];
-
-                    $coinbase['signature'] = $transaction->signTransaction(
-                        $coinbase,
-                        $publicKey,
-                        $privateKey
-                    );
-
-                    // put the coinbase as the first transaction
-                    array_unshift($transactions, $coinbase);
-
-                    $validTransactions = [];
-                    foreach ($transactions as $tx) {
-                        $result = $transaction->validate($tx);
-                        if ($result['validated'] === true) {
-                            $validTransactions[] = $tx;
-                        } else {
-                            print_r($result);
-                            exit(0);
-                        }
-                    }
-
-                    // calculate the merkle root
-                    $validTransactions = Transaction::sort($validTransactions); // sort the array
-                    $merkleRoot = $merkleRoot->computeMerkleHash($validTransactions);
-
-                    $newBlock = [
-                        'network_id' => Config::getNetworkIdentifier(),
-                        'block_id' => '',
-                        'previous_block_id' => $prevBlock['block_id'],
-                        'date_created' => $date,
-                        'height' => $height,
-                        'difficulty' => $difficulty, // use the current block to decide
-                        'merkle_root' => $merkleRoot,
-                        'transaction_count' => count($validTransactions),
-                        'transactions' => $validTransactions,
-                        'nonce' => '',
-                        'hash' => '',
-                        'previous_hash' => $prevBlock['hash'],
-                    ];
-                    $newBlock['block_id'] = $block->generateId($newBlock['previous_block_id'], $date, $height);
-                    $blockHeader = $block->generateBlockHeader($newBlock);
-
-                    // assembled the block, now find a hash
-                    $result = $miner->mineBlock($blockHeader, $difficulty, $height, $nonce);
-
-                    // hash found
-                    if ($result['result'] === true && !empty($result['nonce'])) {
-                        $newBlock['nonce'] = dechex($result['nonce']);
-                        $newBlock['hash'] = $result['hash'];
-                        echo $result['hash'];
-                        echo "<--- check this\n";
-                        exit(0);
-                        break;
-                    }
-
-                    // something changed
-                    if ($result['result'] === false && empty($result['nonce'])) {
-                        break;
-                    }
-                }
-            }
-        } catch (Exception $e) {
-            echo $e->getMessage(), "\n";
-            exit(1);
+        // something changed
+        if ($result['result'] === false && empty($result['nonce'])) {
+            break;
         }
-    }
 
-    if ($result['result']) {
-        $verified = $pow->verifyPow($result['hash'], $blockHeader, dechex($result['nonce']));
-        if ($verified) {
-            Console::log('Block proof of work accepted for new block');
-            $result = $block->validateFullBlock($newBlock);
-            if ($result['validated']) {
-                Console::log('***** NEW BLOCK FOUND *****');
-                Console::log('Storing new block with block id ' . $newBlock['block_id']);
-                $newBlock = json_encode($newBlock);
+        // hash found
+        if ($result['result'] === true && !empty($result['nonce'])) {
+            $candidateBlock['nonce'] = dechex($result['nonce']);
+            $candidateBlock['hash'] = $result['hash'];
+            $verified = $pow->verifyPow($result['hash'], $blockHeader, dechex($result['nonce']));
 
-                // storing locally
-                $result = $http->post($miningUrl . 'block.php', $newBlock);
+            if ($verified) {
+                Console::log('Block proof of work accepted for new block');
+                try {
+                    $result = $block->validateFullBlock($candidateBlock);
+                    if ($result['validated']) {
+                        Console::log('***** NEW BLOCK FOUND *****');
+                        Console::log('Storing new block with block id ' . $candidateBlock['block_id']);
+
+                        // store and accept locally
+                        $block->add($candidateBlock);
+                        $this->block->acceptBlock($candidateBlock['block_id'], $candidateBlock['height']);
+
+                        // add queue item to send it out
+                        $this->queue->add('new_block', $candidateBlock['block_id']);
+                        break;
+                    }
+                } catch (Exception $e) {
+                    Console::log('Exception in miner: ' . $e->getMessage());
+                }
             }
         }
     }
 }
-
