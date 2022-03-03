@@ -11,9 +11,9 @@ class StateMachine
     private int $scriptCounter;
 
     // for function operations & storage
-    private string $registers_ax;
-    private string $registers_bx;
-    private string $registers_cx;
+    private string|int|bool $registers_ax;
+    private string|int|bool $registers_bx;
+    private string|int|bool $registers_cx;
     private int $registers_dx; // used for int status (only assignable internally)
     private bool $registers_ex; // used for compare status (only assignable internally)
     private int $registers_sx; // evaluated at end as completion state (only assignable internally)
@@ -204,7 +204,7 @@ class StateMachine
         return $value;
     }
 
-    // if its not a register, we will throw it on the stack
+    // if it's not a register, we will throw it on the stack
     public function setRegister(string $register, string|int|bool $value, bool $system = false): void
     {
         if ($this->isRegister($register)) {

@@ -55,7 +55,7 @@ class ScriptTest extends TestCase
             'previous_hash' => 'PREV_HASH',
             'hash' => 'SOME_HASH',
         ];
-        $this->dummyBlock['block_id'] = $block->generateId('', $date, $height);
+        $this->dummyBlock['block_id'] = $block->generateId('', (string)$date, $height, $height);
     }
 
     protected function tearDown(): void
@@ -110,7 +110,7 @@ class ScriptTest extends TestCase
         $this->assertEquals('3', $sm->getRegister('cx'));
         $this->assertEquals(-2, $sm->getRegister('dx'));
         $this->assertFalse($sm->getRegister('ex'));
-        $this->assertFalse($sm->getRegister('sx'));
+        $this->assertEquals(-2, $sm->getRegister('sx'));
     }
 
     public function testPushAndOverPop(): void
@@ -205,8 +205,8 @@ class ScriptTest extends TestCase
 
         $sm = $script->debugGetStateMachine();
         $this->assertEquals('A', $sm->getRegister('ax'));
-        $this->assertEquals('A', $sm->getRegister('bx'));
-        $this->assertEquals(0, $sm->getRegister('dx'));
+        $this->assertEquals('B', $sm->getRegister('bx'));
+        $this->assertEquals(-1, $sm->getRegister('dx'));
     }
 
     public function testIntCompareLt(): void
@@ -379,7 +379,7 @@ class ScriptTest extends TestCase
         $script->run(false);
 
         $sm = $script->debugGetStateMachine();
-        $this->assertEquals('0', $sm->getRegister('ax'));
+        $this->assertEquals('0', (string)$sm->getRegister('ax'));
     }
 
     public function testInc(): void
@@ -672,7 +672,7 @@ class ScriptTest extends TestCase
         $script->run(false);
 
         $sm = $script->debugGetStateMachine();
-        $this->assertEquals('Bc14BDGV11UKCHhjSQcHc4cfSky1dfkWPfnD', $sm->getRegister('ax'));
+        $this->assertEquals('Xa14BDGV11UKCHhjSQcHc4cfSky1dfkWPfnD', $sm->getRegister('ax'));
     }
 
     public function testVerificationOfAddressFromPublicKey(): void
@@ -689,7 +689,7 @@ class ScriptTest extends TestCase
 
         // get state, ensure state is false
         $sm = $script->debugGetStateMachine();
-        $this->assertEquals(false, $sm->getRegister('sx'));
+        $this->assertEquals(-2, $sm->getRegister('sx'));
 
         $script->run(false);
 
@@ -712,7 +712,7 @@ class ScriptTest extends TestCase
 
         // get state, ensure state is false
         $sm = $script->debugGetStateMachine();
-        $this->assertEquals(false, $sm->getRegister('sx'));
+        $this->assertEquals(-2 , $sm->getRegister('sx'));
 
         $script->run(false);
 
@@ -761,42 +761,6 @@ class ScriptTest extends TestCase
         $compressed = $script->encodeScript($program);
         $uncompressed = $script->decodeScript($compressed);
         $this->assertEquals($program, $uncompressed);
-    }
-
-    public function testCreateAddressFromPartial(): void
-    {
-        $program = 'mov MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAowRVqZ8r6LYWw+TysgTDM6K7JXqH1ralIbeU6j+BZ14IeuISAzCezkDW5/dtGUjF+tjCK9wj9hVlk48z6p2J3ZVXTOMNXeE0xWIQnYU/4G8pSmf31V2sLk1Wu9+xDPf/r7U9YSfSnV9oL7tDnll/7bi1i9PD9rpjcOcByPp1rZ6cV4rl3nv6FpB16UW+ZvWvrVvYqtcs3A92XcCbBAVDlaO+bJHfOjv1oh8/+pYxdDF30fr2WDDxXY9cNy+Z7TDkRW1+9y1IWY7CDHLIeOLo+WfdX71KrmkIX/i/r87SISYwbmS3dql4EcQpxqwLw5umiwPFbHCcNe5p6hJkQd2D+QIDAQAB,bx;';
-        $program .= 'mov 5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055,ax;';
-        $program .= 'hexd ax;';
-        $program .= 'adha ax;';
-        $program .= 'adpa bx;';
-        $program .= 'hexe bx;';
-
-        $script = new Script([]);
-        $script->loadScript($program);
-
-        $script->run(false);
-
-        $sm = $script->debugGetStateMachine();
-        $this->assertEquals('Bc1KeciJDMgd9f3qASsnspspiq7ao7W9Kyet', $sm->getRegister('ax'));
-        $this->assertEquals('5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055', $sm->getRegister('bx'));
-    }
-
-    public function testPayToPublicKeyHash(): void
-    {
-        $program = 'mov 5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055,ax;';
-        $program .= 'mov ax,bx;';
-        $program .= 'hexd ax;';
-        $program .= 'adha ax;';
-
-        $script = new Script([]);
-        $script->loadScript($program);
-
-        $script->run(false);
-
-        $sm = $script->debugGetStateMachine();
-        $this->assertEquals('Bc1KeciJDMgd9f3qASsnspspiq7ao7W9Kyet', $sm->getRegister('ax'));
-        $this->assertEquals('5fb13528c685dcbe50e29f19630c73ae193816bd8585cfda34427d4250454055', $sm->getRegister('bx'));
     }
 
     public function testHexAMessage(): void

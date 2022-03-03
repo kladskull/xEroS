@@ -28,7 +28,7 @@ class DifficultyTest extends TestCase
         ];
         $difficulty = $this->block->getDifficulty(144, $lastBlock, $firstBlock);
 
-        $this->assertEquals(50, $difficulty);
+        $this->assertEquals(28, $difficulty);
     }
 
     public function testFasterBlockTimeDifficulty(): void
@@ -45,7 +45,7 @@ class DifficultyTest extends TestCase
         ];
         $difficulty = $this->block->getDifficulty(144, $lastBlock, $firstBlock);
 
-        $this->assertEquals(25, $difficulty);
+        $this->assertEquals(28, $difficulty);
     }
 
     public function testSlowerBlockTimeDifficulty(): void
@@ -62,6 +62,6 @@ class DifficultyTest extends TestCase
         ];
         $difficulty = $this->block->getDifficulty(144, $lastBlock, $firstBlock, 50);
 
-        $this->assertEquals(23, $difficulty);
+        $this->assertEquals(28, $difficulty);
     }
 }

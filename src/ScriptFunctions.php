@@ -206,7 +206,7 @@ class ScriptFunctions
     // negate the location (flip the sign)
     public function neg(StateMachine $stateMachine, string $location): void
     {
-        if (bccomp($stateMachine->getRegister($location), 0) >= 0) {
+        if (bccomp($stateMachine->getRegister($location), '0') >= 0) {
             $stateMachine->setRegister($location, bcmul($stateMachine->getRegister($location), "-1", $stateMachine->getPrecision()));
         }
     }
@@ -226,10 +226,10 @@ class ScriptFunctions
     // if 0 or 1, flip, otherwise make 0
     public function not(StateMachine $stateMachine, string $location): void
     {
-        $value = $stateMachine->getRegister($location);
-        if (bccomp($value, 0, $stateMachine->getPrecision()) === 0) {
+        $value = (string)$stateMachine->getRegister($location);
+        if (bccomp($value, '0', $stateMachine->getPrecision()) === 0) {
             $value = "1";
-        } else if (bccomp($value, 1, $stateMachine->getPrecision()) === 0) {
+        } else if (bccomp($value, '1', $stateMachine->getPrecision()) === 0) {
             $value = "0";
         } else {
             $value = "0";

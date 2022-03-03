@@ -2,6 +2,7 @@
 
 namespace Xeros;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 class TransferEncodingTest extends TestCase
