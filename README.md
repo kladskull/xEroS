@@ -1,6 +1,7 @@
 # Xeros
 
 [![Software License][ico-license]](LICENSE.md)
+[![Build Status](https://img.shields.io/travis/kladskull/xeros/master.svg?style=flat-square)](https://travis-ci.org/kladskull/xeros)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
 and mostly follows the technical design of Bitcoin. Xeros uses P2P technology to operate with no central server. 
