@@ -3,6 +3,8 @@
 ![GitHub](https://img.shields.io/github/license/kladskull/xeros?style=flat)
 ![Discord](https://img.shields.io/discord/948379180393984062?style=flat)
 [![Build Status](https://app.travis-ci.com/kladskull/xeros.svg?branch=main)](https://app.travis-ci.com/kladskull/xeros)
+[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/kladskull/xeros/badges/quality-score.png?b=main)](https://scrutinizer-ci.com/g/kladskull/xeros/?branch=main)
+[![Code Coverage](https://scrutinizer-ci.com/g/kladskull/xeros/badges/coverage.png?b=main)](https://scrutinizer-ci.com/g/kladskull/xeros/?branch=main)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/kladskull?style=flat)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
@@ -43,7 +45,8 @@ Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed re
 
 ## Xeros Sponsors
 ### Bronze Supporters
-- [Travis-CI](https://www.travis-ci.com/) 
+- [Travis](https://www.travis-ci.com/) 
+- [Scrutinizer](https://scrutinizer-ci.com/)
 
 If you are looking to sponsor, fund or donate, please see the Support & Funding section below.
 
