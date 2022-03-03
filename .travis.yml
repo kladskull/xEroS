@@ -4,12 +4,11 @@ dist: focal
 
 php:
   - '8.1.2'
-  - nightly
 
 before_install:
   - sudo apt-get update -y
   - sudo apt-get install -y unzip curl libargon2-0 libargon2-1
-  - sudo apt-get install -y php-sqlite3 php-xml php-xmlrpc php-curl php-cli php-mbstring php-bcmath php-zip
+  - sudo apt-get install -y php-sqlite3 php-xml php-xmlrpc php-xmlrpc php-curl php-cli php-mbstring php-bcmath php-zip
   - phpenv config-add php.travis.ini
 
 before_script:
