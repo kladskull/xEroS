@@ -21,7 +21,7 @@ before_script:
   - cp .env_sample .env
   - vendor/robmorgan/phinx/bin/phinx migrate
 
-script: phpunit
+script: phpunit --bootstrap bootstrap.php tests/
 
 addons:
   apt:
