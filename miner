@@ -13,6 +13,7 @@ $account = new Account();
 $block = new Block();
 $pow = new Pow();
 $miner = new Miner();
+$queue = new Queue();
 
 // command line args
 $strict = in_array('--strict', $_SERVER['argv']);
@@ -101,10 +102,10 @@ while (1) {
 
                         // store and accept locally
                         $block->add($candidateBlock);
-                        $this->block->acceptBlock($candidateBlock['block_id'], $candidateBlock['height']);
+                        $block->acceptBlock($candidateBlock['block_id'], $candidateBlock['height']);
 
                         // add queue item to send it out
-                        $this->queue->add('new_block', $candidateBlock['block_id']);
+                        $queue->add('new_block', $candidateBlock['block_id']);
                         break;
                     }
                 } catch (Exception $e) {
