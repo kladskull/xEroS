@@ -6,14 +6,10 @@ class Config
 {
     // Project
     private const ProductName = 'Xero';
-    private const ProductCopyright = 'Copyright (c)2021,2022 by Mike Curry <mike@currazy.com>';
+    private const ProductCopyright = 'Copyright (c)2021,2022 by Kladskull <kladskull@protonmail.com>';
     private const Version = '0.0001';
     private const NetworkIdentifier = "xv01";
     private const Environment = "prod";
-
-    // network
-    private const ListenAddress = "0.0.0.0";
-    private const ListenPort = 7747;
 
     // Genesis block
     private const GenesisDate = 1638738156; // Sunday, December 5, 2021 4:02:36 PM GMT-05:00

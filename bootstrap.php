@@ -44,7 +44,11 @@ $dotenv = Dotenv::createImmutable(APP_DIR);
 $dotenv->load();
 
 // display a header
-echo PHP_EOL, Config::getProductName(), " Node v", Config::getVersion(), PHP_EOL;
+$program = 'Node';
+if (defined('PROGRAM')) {
+    $program = PROGRAM;
+}
+echo PHP_EOL, Config::getProductName(), ' ', $program, PHP_EOL;
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
 // check if migration was run

@@ -12,15 +12,27 @@ class Block
 {
     public const maxLifeTimeBlocks = 9999999999999;
 
-    private PDO $db;
-    public Transaction $transaction;
-    private Pow $pow;
+    private Address $address;
     private Mempool $mempool;
+    private Merkle $merkle;
+    private OpenSsl $openSsl;
+    private PDO $db;
+    private Peer $peer;
+    private Pow $pow;
+    private Script $script;
+    public Transaction $transaction;
+    private TransferEncoding $transferEncoding;
 
     public function __construct()
     {
         $this->db = Database::getInstance();
+        $this->address = new Address();
+        $this->openSsl = new OpenSsl();
+        $this->peer = new Peer();
+        $this->script = new Script([]);
+        $this->merkle = new Merkle();
         $this->transaction = new Transaction();
+        $this->transferEncoding = new TransferEncoding();
         $this->mempool = new Mempool();
         $this->pow = new Pow();
     }
@@ -38,9 +50,6 @@ class Block
      */
     public function genesis(): array
     {
-        $transaction = new Transaction();
-        $openSsl = new OpenSsl();
-
         // block details
         $height = 1;
         $date = 1644364863;
@@ -65,13 +74,13 @@ class Block
         $address = new Address();
         $transferEncoding = new TransferEncoding();
         $script = new Script([]);
-        $partialAddress = $transferEncoding->binToHex($address->createPartial($openSsl->formatPem($publicKeyRaw, false)));
+        $partialAddress = $transferEncoding->binToHex($address->createPartial($this->openSsl->formatPem($publicKeyRaw, false)));
         $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E656420696E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
         $txId = 0;
         $lockHeight = $height + Config::getLockHeight();
-        $toAddress = $address->create($openSsl->formatPem($publicKeyRaw, false));
+        $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
 
-        $transactionId = $transaction->generateId($date, $blockId, $publicKeyRaw);
+        $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
         $transactionRecord = [
             'id' => 1,
             'block_id' => $blockId,
@@ -117,11 +126,98 @@ class Block
         ];
     }
 
+    public function getCandidateBlock($height, $publicKey, $privateKey): array
+    {
+        $difficulty = $this->getDifficulty($height);
+        $prevBlock = $this->getByHeight($height - 1);
+        $transactions = $this->mempool->getAllTransactions($height);
+
+        $date = time();
+        $blockId = $this->generateId(Config::getNetworkIdentifier(), $prevBlock['block_id'], $date, $height);
+        $publicKeyRaw = $this->openSsl->stripPem($publicKey);
+
+        // add reward block
+        $transactionId = $this->transaction->generateId($date, $blockId, $publicKey);
+        $partialAddress = $this->transferEncoding->binToHex($this->address->createPartial($this->openSsl->formatPem($publicKeyRaw, false)));
+
+        // pay to public Key hash
+        $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;vsig ax,<hash>,bx;';
+        $toAddress = $this->address->create($publicKey);
+        $reward = bcadd($this->getRewardValue($height), $this->transaction->calculateMinerFee($transactions), 0);
+        $lockHeight = $height + Config::getLockHeight();
+
+        $coinbase = [
+            'block_id' => $blockId,
+            'transaction_id' => $transactionId,
+            'date_created' => $date,
+            'public_key' => $publicKeyRaw,
+            'peer' => $this->peer->getUniquePeerId(),
+            'version' => TransactionVersion::Coinbase,
+            'height' => $height,
+            Transaction::Inputs => [],
+            Transaction::Outputs => [
+                [
+                    'tx_id' => '0',
+                    'address' => $this->address->create($publicKey),
+                    'value' => $reward,
+                    'script' => $this->script->encodeScript($scriptText),
+                    'lock_height' => $lockHeight,
+                    'hash' => base64_encode($this->pow->doubleSha256($transactionId . '0' . $toAddress . $reward . $lockHeight)),
+                ]
+            ],
+        ];
+
+        try {
+            $coinbase['signature'] = $this->transaction->signTransaction(
+                $coinbase,
+                $publicKey,
+                $privateKey
+            );
+        } catch (Exception) {
+        }
+
+        // put the coinbase as the first transaction
+        array_unshift($transactions, $coinbase);
+
+        $validTransactions = [];
+        foreach ($transactions as $tx) {
+            try {
+                $result = $this->transaction->validate($tx);
+                if ($result['validated'] === true) {
+                    $validTransactions[] = $tx;
+                } else {
+                    print_r($result);
+                    exit(0);
+                }
+            } catch (Exception) {
+            }
+        }
+
+        // calculate the merkle root
+        $validTransactions = Transaction::sort($validTransactions); // sort the array
+        $merkleRoot = $this->merkle->computeMerkleHash($validTransactions);
+
+        return [
+            'network_id' => Config::getNetworkIdentifier(),
+            'block_id' => $blockId,
+            'previous_block_id' => $prevBlock['block_id'],
+            'date_created' => $date,
+            'height' => $height,
+            'difficulty' => $difficulty, // use the current block to decide
+            'merkle_root' => $merkleRoot,
+            'transaction_count' => count($validTransactions),
+            'transactions' => $validTransactions,
+            'nonce' => '',
+            'hash' => '',
+            'previous_hash' => $prevBlock['hash'],
+        ];
+    }
+
     #[Pure]
-    public function generateId(string $networkId, string $previousBlockId, int $date, int $height, string $merkleRoot): string
+    public function generateId(string $networkId, string $previousBlockId, int $date, int $height): string
     {
         return bin2hex($this->pow->doubleSha256(
-            $networkId . $previousBlockId . $date . $height . $merkleRoot
+            $networkId . $previousBlockId . $date . $height
         ));
     }
 
@@ -252,7 +348,7 @@ class Block
         if (!$pow->verifyPow($block['hash'], $this->generateBlockHeader($block), $block['nonce'])) {
             return $this->returnValidateResult("Proof of work fail", false);
         }
-        
+
         // we must have all the transactions
         $transactions = Transaction::sort($transactions);
         if ($transactionCount !== count($transactions)) {
