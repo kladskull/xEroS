@@ -12,7 +12,6 @@ before_install:
   - sudo apt-get update -y
   - sudo apt-get install -y unzip curl libargon2-0 libargon2-1
   - sudo apt-get install -y php8.1-sqlite3 php8.1-xml php8.1-xmlrpc php8.1-curl php8.1-cli php8.1-mbstring php8.1-bcmath php8.1-zip
-  - sudo phpenv config-add php.travis.ini
 
 before_script:
   - composer self-update
