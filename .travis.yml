@@ -17,6 +17,7 @@ before_script:
   - composer self-update
   - composer update
   - composer install --prefer-source --no-interaction --dev
+  - cd $TRAVIS_BUILD_DIR
   - cp .env_sample .env
   - phinx migrate
 
