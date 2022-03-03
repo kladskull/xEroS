@@ -27,14 +27,14 @@
     "ext-xml": "*",
     "ext-xmlrpc": "*",
     "ext-zip": "*",
+    "ext-sockets": "*",
+    "ext-zlib": "*",
+    "ext-openssl": "*",
     "robmorgan/phinx": "^0.12.10",
     "stephenhill/base58": "^1.1",
     "drupol/phpmerkle": "^2.2",
     "vlucas/phpdotenv": "^5.4",
-    "ext-zlib": "*",
-    "ext-sockets": "*",
     "symfony/yaml": "^6.0",
-    "ext-openssl": "*",
     "wp-cli/php-cli-tools": "^0.11.13"
   },
   "require-dev": {
