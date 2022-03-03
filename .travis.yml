@@ -19,7 +19,7 @@ before_script:
   - composer install --prefer-source --no-interaction --dev
   - cd $TRAVIS_BUILD_DIR
   - cp .env_sample .env
-  - vendor/robmorgan/phinx/bin/phinx migrate
+  - ./phinx migrate
 
 script: phpunit --bootstrap bootstrap.php tests/
 
