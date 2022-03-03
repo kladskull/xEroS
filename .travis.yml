@@ -20,9 +20,8 @@ before_script:
   - cd $TRAVIS_BUILD_DIR
   - cp .env_sample .env
   - ./phinx migrate
-  - cp *.db tests
 
-script: phpunit --bootstrap bootstrap.php tests/
+script: phpunit --bootstrap $TRAVIS_BUILD_DIR/bootstrap.php $TRAVIS_BUILD_DIR/tests/
 
 addons:
   apt:
