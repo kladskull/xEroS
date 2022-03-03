@@ -2,7 +2,7 @@
 
 [![Software License][ico-license]](LICENSE.md)
 ![Discord](https://img.shields.io/discord/948379180393984062)
-[![build status](http://img.shields.io/travis/badges/shields.svg)](https://travis-ci.org/badges/shields)
+[![Build Status](https://app.travis-ci.com/kladskull/xeros.svg?branch=main)](https://app.travis-ci.com/kladskull/xeros)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/kladskull)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
