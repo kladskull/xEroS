@@ -321,7 +321,7 @@ class Transaction
         }
 
         // coinbase - the inputs must be zero, and the outputs must be > 0
-        if (($transaction['version'] === TransactionVersion::Coinbase) && bccomp($totalInputs, "0") === 0) {
+        if (($transaction['version'] === TransactionVersion::Coinbase) && bccomp($totalInputs, "0") !== 0) {
             return $this->returnValidateError('the coinbase inputs must be zero.');
         }
 

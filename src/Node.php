@@ -46,13 +46,45 @@ class Node
         $this->queue = new Queue();
     }
 
-    private function send($client, string $data): void
+    public function send($client, string $data): void
     {
         // add a newline for back-to-back sends
+        Console::log('SEND: ' . trim($data));
         $data = trim($data) . "\n";
         if (is_resource($client)) {
-            fwrite($client, $data, strlen($data));
+            @fwrite($client, $data, strlen($data));
         }
+    }
+
+    public function receive($client): string
+    {
+        // todo: add a loop with timeout
+        $data = null;
+        if (is_resource($client)) {
+            $data = fread($client, 16384);
+        }
+        return $data;
+    }
+
+    public function sendHandshake($client)
+    {
+        Console::log('Sending handshake request to peer');
+        $packet = [
+            'type' => 'handshake',
+            'network' => Config::getNetworkIdentifier(),
+            'version' => Config::getVersion(),
+        ];
+        $this->send($client, json_encode($packet));
+    }
+
+    public function parseResponse($data): array
+    {
+        $packets = [];
+        $tokens = explode(PHP_EOL, $data);
+        foreach ($tokens as $token) {
+            $packets[] = json_decode(trim($token), true);
+        }
+        return $packets;
     }
 
     #[NoReturn]
@@ -102,12 +134,15 @@ class Node
                     if (in_array($client, $read)) {
                         $data = fread($client, 8192);
                         if ($data !== '') {
+                            if (is_bool($data)) {
+                                continue;
+                            }
                             $data = json_decode(trim($data), true);
 
                             if (isset($data['type'])) {
 
                                 // only allow uninitialized connections access to these commands
-                                if ($clientInfo[$key]['init'] < 2) {
+                                if (isset($clientInfo[$key]['init']) && $clientInfo[$key]['init'] < 2) {
                                     switch ($data['type']) {
                                         case 'handshake':
                                             Console::log('Received handshake');
@@ -137,15 +172,7 @@ class Node
                                             break;
 
                                         case 'handshake_ok':
-                                            if ($clientInfo[$key]['init'] !== 1) {
-                                                Console::log('Received handshake before `ok` response');
-                                                $this->send($client, json_encode([
-                                                    'type' => 'handshake_resp_nok',
-                                                    'result' => 'nok'
-                                                ]));
-                                                break;
-                                            }
-                                            Console::log('Received handshake');
+                                            Console::log('Received positive handshake response');
 
                                             // request a peer list
                                             $this->send($client, json_encode([
@@ -185,7 +212,7 @@ class Node
                                 }
 
                                 // only allow initialized connections for these commands
-                                if ($clientInfo[$key]['init'] >= 2) {
+                                if (isset($clientInfo[$key]['init']) && $clientInfo[$key]['init'] >= 2) {
                                     switch ($data['type']) {
 
                                         /**
@@ -312,7 +339,7 @@ class Node
                                             Console::log('Received a height request from: ' . $key);
                                             $this->send($client, json_encode([
                                                 'type' => 'height',
-                                                'height' => 11
+                                                'height' => $this->block->getCurrentHeight(),
                                             ]));
                                             break;
 
@@ -520,14 +547,7 @@ class Node
                 if (!isset($clientInfo[$key])) {
                     $clientInfo[$key] = $this->clientInfoArray;
                     $clientInfo[$key]['last_ping'] = time();
-
-                    Console::log('Sending handshake for client: ' . $key);
-                    $packet = [
-                        'type' => 'handshake',
-                        'network' => Config::getNetworkIdentifier(),
-                        'version' => Config::getVersion(),
-                    ];
-                    $this->send($client, json_encode($packet));
+                    $this->sendHandshake($client);
                 }
 
                 // only allow advanced commands after we're initialized
