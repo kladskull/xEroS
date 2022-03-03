@@ -21,7 +21,7 @@ before_script:
   - cp .env_sample .env
   - ./phinx migrate
 
-script: phpunit --bootstrap $TRAVIS_BUILD_DIR/bootstrap.php $TRAVIS_BUILD_DIR/tests/
+script: $TRAVIS_BUILD_DIR/vendor/phpunit/phpunit/phpunit --bootstrap $TRAVIS_BUILD_DIR/bootstrap.php $TRAVIS_BUILD_DIR/tests/
 
 addons:
   apt:
