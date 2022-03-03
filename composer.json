@@ -25,7 +25,6 @@
     "ext-pdo": "*",
     "ext-sqlite3": "*",
     "ext-xml": "*",
-    "ext-xmlrpc": "*",
     "ext-zip": "*",
     "ext-sockets": "*",
     "ext-zlib": "*",
