@@ -42,7 +42,10 @@ composer install
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
 
 ## Xeros Sponsors
-None yet! If you are looking to sponsor, fund or donate, please see the Support & Funding section below.
+### Bronze Supporters
+- [Travis-CI](https://www.travis-ci.com/) 
+
+If you are looking to sponsor, fund or donate, please see the Support & Funding section below.
 
 ## Contributing
 The codebase is maintained using the "contributor workflow" where everyone without exception contributes patch proposals using "pull requests" (PRs). This facilitates social contribution, easy testing and peer review.
