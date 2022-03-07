@@ -75,7 +75,7 @@ class StateMachine
         echo "| Register bx    : `$this->registers_bx`\n";
         echo "| Register cx    : `$this->registers_cx`\n";
         echo "| Register dx    : " . $this->registers_dx . "\n";
-        echo "| Register ex    : " . $this->showBool($this->registers_ex) . "\n";
+        echo "| Register ex    : " . $this->showBool((int)$this->registers_ex) . "\n";
         echo "| Register sx    : " . $this->showBool($this->registers_sx) . "\n";
         echo "+----------------+\n";
         foreach ($this->container as $key => $item) {
@@ -163,7 +163,7 @@ class StateMachine
     {
         return match ($value) {
             'ax', 'bx', 'cx', 'dx', 'ex', 'sx' => true,
-            default => false,
+        default => false,
         };
     }
 
@@ -246,5 +246,4 @@ class StateMachine
         }
         return $value;
     }
-
 }

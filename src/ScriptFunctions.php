@@ -57,8 +57,8 @@ class ScriptFunctions
         's256' => ['instruction' => 114, 'required_params' => 1],
 
         // verification (program flow/result) any false value exits and doesn't execute any further
-        'vadr' => ['instruction' => 130, 'required_params' => 2], // compare coin addresses and set the program state (trans accepted/denied)
-        'vsig' => ['instruction' => 131, 'required_params' => 3], // compare coin addresses and set the program state (trans accepted/denied)
+        'vadr' => ['instruction' => 130, 'required_params' => 2], // compare add (trans accepted/denied)
+        'vsig' => ['instruction' => 131, 'required_params' => 3], // compare add (trans accepted/denied)
         'vfal' => ['instruction' => 132, 'required_params' => 0], // force transaction to fail
         'vtru' => ['instruction' => 133, 'required_params' => 0], // force transaction to pass
 
@@ -110,9 +110,9 @@ class ScriptFunctions
         // straight digits or formatted hex
         if (ctype_digit($leftValue) && ctype_digit($rightValue)) {
             $result = bccomp($leftValue, $rightValue, $stateMachine->getPrecision());
-        } else if ($leftValue < $rightValue) {
+        } elseif ($leftValue < $rightValue) {
             $result = -1;
-        } else if ($leftValue > $rightValue) {
+        } elseif ($leftValue > $rightValue) {
             $result = 1;
         } else {
             $result = 0;
@@ -132,20 +132,29 @@ class ScriptFunctions
     {
         $value = $stateMachine->getRegister($location);
         if (bccomp($value, "0", $stateMachine->getPrecision()) < 0) {
-            $stateMachine->setRegister($location, bcmul($stateMachine->getRegister($location), "-1", $stateMachine->getPrecision()));
+            $stateMachine->setRegister(
+                $location,
+                bcmul($stateMachine->getRegister($location), "-1", $stateMachine->getPrecision())
+            );
         }
     }
 
     // add number with the location
     public function add(StateMachine $stateMachine, string $location, string $number): void
     {
-        $stateMachine->setRegister($location, bcadd($stateMachine->getRegister($location), $number, $stateMachine->getPrecision()));
+        $stateMachine->setRegister(
+            $location,
+            bcadd($stateMachine->getRegister($location), $number, $stateMachine->getPrecision())
+        );
     }
 
     // decrement the location
     public function dec(StateMachine $stateMachine, string $location): void
     {
-        $stateMachine->setRegister($location, bcsub($stateMachine->getRegister($location), "1", $stateMachine->getPrecision()));
+        $stateMachine->setRegister(
+            $location,
+            bcsub($stateMachine->getRegister($location), "1", $stateMachine->getPrecision())
+        );
     }
 
     // divide [register value] with the number
@@ -166,7 +175,10 @@ class ScriptFunctions
     // increment the location
     public function inc(StateMachine $stateMachine, string $location): void
     {
-        $stateMachine->setRegister($location, bcadd($stateMachine->getRegister($location), "1", $stateMachine->getPrecision()));
+        $stateMachine->setRegister(
+            $location,
+            bcadd($stateMachine->getRegister($location), "1", $stateMachine->getPrecision())
+        );
     }
 
     // sets location to the greater number
@@ -200,14 +212,20 @@ class ScriptFunctions
     // multiply number with the location
     public function mul(StateMachine $stateMachine, string $location, string $number): void
     {
-        $stateMachine->setRegister($location, bcmul($stateMachine->getRegister($location), $number, $stateMachine->getPrecision()));
+        $stateMachine->setRegister(
+            $location,
+            bcmul($stateMachine->getRegister($location), $number, $stateMachine->getPrecision())
+        );
     }
 
     // negate the location (flip the sign)
     public function neg(StateMachine $stateMachine, string $location): void
     {
         if (bccomp($stateMachine->getRegister($location), '0') >= 0) {
-            $stateMachine->setRegister($location, bcmul($stateMachine->getRegister($location), "-1", $stateMachine->getPrecision()));
+            $stateMachine->setRegister(
+                $location,
+                bcmul($stateMachine->getRegister($location), "-1", $stateMachine->getPrecision())
+            );
         }
     }
 
@@ -229,7 +247,7 @@ class ScriptFunctions
         $value = (string)$stateMachine->getRegister($location);
         if (bccomp($value, '0', $stateMachine->getPrecision()) === 0) {
             $value = "1";
-        } else if (bccomp($value, '1', $stateMachine->getPrecision()) === 0) {
+        } elseif (bccomp($value, '1', $stateMachine->getPrecision()) === 0) {
             $value = "0";
         } else {
             $value = "0";
@@ -247,7 +265,10 @@ class ScriptFunctions
     // subtract number with the location
     public function sub(StateMachine $stateMachine, string $location, string $number): void
     {
-        $stateMachine->setRegister($location, bcsub($stateMachine->getRegister($location), $number, $stateMachine->getPrecision()));
+        $stateMachine->setRegister(
+            $location,
+            bcsub($stateMachine->getRegister($location), $number, $stateMachine->getPrecision())
+        );
     }
 
     /********************************************************************************
@@ -261,7 +282,7 @@ class ScriptFunctions
         if ($source !== 'sx' && $stateMachine->isRegister($source)) {
             if ($source === 'ex') {
                 $stateMachine->setRegister($source, false);
-            } else if ($source === 'dx') {
+            } elseif ($source === 'dx') {
                 $stateMachine->setRegister($source, -2);
             } else {
                 $stateMachine->setRegister($source, '');
@@ -313,7 +334,8 @@ class ScriptFunctions
 
     public function adha(StateMachine $stateMachine, string $location): void
     {
-        $stateMachine->setRegister($location,
+        $stateMachine->setRegister(
+            $location,
             $this->address->createAddressFromPartial(
                 $this->transferEncoding->hexToBin($stateMachine->getRegister($location))
             )
@@ -344,13 +366,19 @@ class ScriptFunctions
     // base58encode
     public function b58e(StateMachine $stateMachine, string $location): void
     {
-        $stateMachine->setRegister($location, $this->transferEncoding->binToBase58($stateMachine->getRegister($location)));
+        $stateMachine->setRegister(
+            $location,
+            $this->transferEncoding->binToBase58($stateMachine->getRegister($location))
+        );
     }
 
     // base58decode
     public function b58d(StateMachine $stateMachine, string $location): void
     {
-        $stateMachine->setRegister($location, $this->transferEncoding->base58ToBin($stateMachine->getRegister($location)));
+        $stateMachine->setRegister(
+            $location,
+            $this->transferEncoding->base58ToBin($stateMachine->getRegister($location))
+        );
     }
 
     // base64encode
@@ -372,7 +400,10 @@ class ScriptFunctions
     // binary to hex
     public function hexe(StateMachine $stateMachine, string $location): void
     {
-        $stateMachine->setRegister($location, strtolower($this->transferEncoding->binToHex($stateMachine->getRegister($location))));
+        $stateMachine->setRegister(
+            $location,
+            strtolower($this->transferEncoding->binToHex($stateMachine->getRegister($location)))
+        );
     }
 
     // binary to hex
@@ -398,19 +429,18 @@ class ScriptFunctions
     }
 
     // binary to hex
-    public function vsig(StateMachine $stateMachine, string|bool|int $firstValue, string|bool|int $secondValue, string|bool|int $thirdValue): void
-    {
-        $result = false;
+    public function vsig(
+        StateMachine $stateMachine,
+        string|bool|int $firstValue,
+        string|bool|int $secondValue,
+        string|bool|int $thirdValue
+    ): void {
         $publicKey = $stateMachine->getRegister($firstValue);
         $text = $stateMachine->getRegister($secondValue);
         $signature = $stateMachine->getRegister($thirdValue);
 
         $nResult = 0;
-        $result = $this->openssl->verifySignature($text, $signature, $publicKey);
-        if ($result) {
-            $nResult = 1;
-        }
-
+        $this->openssl->verifySignature($text, $signature, $publicKey);
         $stateMachine->setRegister('sx', $nResult, true);
     }
 

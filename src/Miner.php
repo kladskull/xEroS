@@ -35,8 +35,13 @@ class Miner
         return sprintf('%.2f%s', $hashesPerSecond / (1000 ** ((int)$mag)), $magnitudes[(int)$mag]);
     }
 
-    public function mineBlock(string $blockHeader, int $difficulty, int $height, int $startingNonce = 0, bool $checkNewBlocks = true): array|bool
-    {
+    public function mineBlock(
+        string $blockHeader,
+        int $difficulty,
+        int $height,
+        int $startingNonce = 0,
+        bool $checkNewBlocks = true
+    ): array|bool {
         $start = time();
         $nonce = $startingNonce;
         $bytes = (int)ceil($difficulty / 8);
@@ -99,7 +104,10 @@ class Miner
                 $elapsed = max((time() - $start), 1);
                 $hashesPerSecond = $hashes / $elapsed;
                 $nonceHex = dechex($nonce);
-                Console::log("Height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) . "  difficulty: {$difficulty}  nonce: {$nonceHex}  elapsed: {$elapsed}s");
+                Console::log(
+                    "Height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) .
+                    "  difficulty: {$difficulty}  nonce: {$nonceHex}  elapsed: {$elapsed}s"
+                );
                 usleep(1);
             }
 
@@ -133,7 +141,13 @@ class Miner
         ];
     }
 
-    #[ArrayShape(['network_id' => "string", 'block_id' => "int|mixed", 'hash' => "mixed|string", 'height' => "int", 'difficulty' => "int"])]
+    #[ArrayShape([
+        'network_id' => "string",
+        'block_id' => "int|mixed",
+        'hash' => "mixed|string",
+        'height' => "int",
+        'difficulty' => "int"
+    ])]
     public function getMiningInfo(): array
     {
         $block = new Block();

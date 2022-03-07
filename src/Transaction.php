@@ -12,8 +12,8 @@ class Transaction
     private PDO $db;
     protected Pow $pow;
 
-    public const Inputs = 'txIn';
-    public const Outputs = 'txOut';
+    public const INPUTS = 'txIn';
+    public const OUTPUTS = 'txOut';
 
     public function __construct()
     {
@@ -35,7 +35,13 @@ class Transaction
     {
         $query = 'SELECT `id` FROM transactions WHERE `transaction_id` = :transaction_id LIMIT 1';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'transaction_id',
+            value: $transactionId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
         $stmt->execute();
 
         $id = $stmt->fetchColumn() ?: null;
@@ -44,10 +50,23 @@ class Transaction
 
     public function existStrict(string $blockId, string $transactionId): bool
     {
-        $query = 'SELECT `id` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = :transaction_id LIMIT 1';
+        $query = 'SELECT `id` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = '.
+            ':transaction_id LIMIT 1';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'block_id',
+            value: $blockId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'transaction_id',
+            value: $transactionId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
         $stmt->execute();
 
         $id = $stmt->fetchColumn() ?: null;
@@ -56,7 +75,8 @@ class Transaction
 
     public function get(int $id): array|null
     {
-        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,' .
+            '`public_key` FROM transactions WHERE `id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT, 0);
         $stmt->execute();
@@ -66,10 +86,24 @@ class Transaction
 
     public function getByTransactionId(string $blockId, string $transactionId): array|null
     {
-        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = :transaction_id LIMIT 1';
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`' .
+            ',`public_key` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = :transaction_id ' .
+            'LIMIT 1';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'transaction_id', $transactionId, DatabaseHelpers::ALPHA_NUMERIC, 64);
+        $stmt = DatabaseHelpers::filterBind(
+            $stmt,
+            'block_id',
+            $blockId,
+            DatabaseHelpers::ALPHA_NUMERIC,
+            64
+        );
+        $stmt = DatabaseHelpers::filterBind(
+            $stmt,
+            'transaction_id',
+            $transactionId,
+            DatabaseHelpers::ALPHA_NUMERIC,
+            64
+        );
         $stmt->execute();
         $transaction = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
@@ -78,8 +112,8 @@ class Transaction
             $txOuts = $this->getTransactionOutputs($transactionId);
 
             // attach the details
-            $transaction[self::Inputs] = $txIns;
-            $transaction[self::Outputs] = $txOuts;
+            $transaction[self::INPUTS] = $txIns;
+            $transaction[self::OUTPUTS] = $txOuts;
         }
 
         return $transaction;
@@ -87,10 +121,23 @@ class Transaction
 
     public function getTransactionInputs(string $blockId, string $transactionId): array
     {
-        $query = 'SELECT `id`,`block_id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script` FROM transaction_inputs WHERE `block_id`=:block_id AND `transaction_id`=:transaction_id;';
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`' .
+            ',`script` FROM transaction_inputs WHERE `block_id`=:block_id AND `transaction_id`=:transaction_id;';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'block_id',
+            value: $blockId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'transaction_id',
+            value: $transactionId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
         $stmt->execute();
 
         return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
@@ -98,10 +145,23 @@ class Transaction
 
     public function getTransactionOutputs(string $blockId, string $transactionId): array
     {
-        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` FROM transaction_outputs WHERE `block_id`=:block_id AND transaction_id=:transaction_id;';
+        $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` ' .
+            'FROM transaction_outputs WHERE `block_id`=:block_id AND transaction_id=:transaction_id;';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'block_id', value: $blockId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
-        $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'transaction_id', value: $transactionId, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 64);
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'block_id',
+            value: $blockId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'transaction_id',
+            value: $transactionId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
+        );
         $stmt->execute();
 
         return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
@@ -110,16 +170,23 @@ class Transaction
     public function getTransactionsByBlockId(string $blockId): array
     {
         $returnTransactions = [];
-        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` FROM transactions WHERE `block_id` = :block_id LIMIT 1';
+        $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`' .
+            ',`public_key` FROM transactions WHERE `block_id` = :block_id LIMIT 1';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
+        $stmt = DatabaseHelpers::filterBind(
+            $stmt,
+            'block_id',
+            $blockId,
+            DatabaseHelpers::ALPHA_NUMERIC,
+            64
+        );
         $stmt->execute();
 
         $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: null;
         foreach ($transactions as $transaction) {
             // attach the details
-            $transaction[self::Inputs] = $this->getTransactionInputs($blockId, $transaction['transaction_id']) ?: [];
-            $transaction[self::Outputs] = $this->getTransactionOutputs($blockId, $transaction['transaction_id']) ?: [];
+            $transaction[self::INPUTS] = $this->getTransactionInputs($blockId, $transaction['transaction_id']) ?: [];
+            $transaction[self::OUTPUTS] = $this->getTransactionOutputs($blockId, $transaction['transaction_id']) ?: [];
             $returnTransactions[] = $transaction;
         }
 
@@ -133,18 +200,18 @@ class Transaction
 
         // remove internal columns
         $inputs = [];
-        foreach ($transaction[self::Inputs] as $in) {
+        foreach ($transaction[self::INPUTS] as $in) {
             unset($in['id'], $in['block_id'], $in['transaction_id']);
             $inputs[] = $in;
         }
-        $transaction[self::Inputs] = $inputs;
+        $transaction[self::INPUTS] = $inputs;
 
         $outputs = [];
-        foreach ($transaction[self::Outputs] as $out) {
+        foreach ($transaction[self::OUTPUTS] as $out) {
             unset($out['id'], $out['block_id'], $out['transaction_id'], $out['spent']);
             $outputs[] = $out;
         }
-        $transaction[self::Outputs] = $outputs;
+        $transaction[self::OUTPUTS] = $outputs;
 
         return $transaction;
     }
@@ -161,12 +228,12 @@ class Transaction
     public function calculateMinerFee(array $transaction): string
     {
         $totalInputs = "0";
-        if (isset($transaction[self::Inputs])) {
-            foreach ($transaction[self::Inputs] as $txIn) {
+        if (isset($transaction[self::INPUTS])) {
+            foreach ($transaction[self::INPUTS] as $txIn) {
                 $previousTransaction = $this->getByTransactionId($txIn['previous_transaction_id']);
                 if ($previousTransaction !== null) {
                     // add if the value is unspent
-                    $unspent = $previousTransaction[self::Outputs][$txIn['tx_id']];
+                    $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
                     if ((int)$unspent['spent'] === 0) {
                         $totalInputs = bcadd($totalInputs, $unspent['value']);
                     }
@@ -175,8 +242,8 @@ class Transaction
         }
 
         $totalOutputs = "0";
-        if (isset($transaction[self::Outputs])) {
-            foreach ($transaction[self::Outputs] as $txOut) {
+        if (isset($transaction[self::OUTPUTS])) {
+            foreach ($transaction[self::OUTPUTS] as $txOut) {
                 // add values
                 $totalOutputs = bcadd($totalOutputs, $txOut['value']);
             }
@@ -212,16 +279,16 @@ class Transaction
         }
 
         // must have at least one unspent output
-        if (!isset($transaction[self::Outputs])) {
+        if (!isset($transaction[self::OUTPUTS])) {
             return $this->returnValidateError('unspent output transactions are a missing.');
         }
 
-        if (count($transaction[self::Inputs]) > Config::getMaxSpentTransactionCount()) {
-            return $this->returnValidateError(self::Inputs . ' > max input transaction unspent size.');
+        if (count($transaction[self::INPUTS]) > Config::getMaxSpentTransactionCount()) {
+            return $this->returnValidateError(self::INPUTS . ' > max input transaction unspent size.');
         }
 
-        if (count($transaction[self::Outputs]) > Config::getMaxUnspentTransactionCount()) {
-            return $this->returnValidateError(self::Outputs . ' > max output transaction spent size.');
+        if (count($transaction[self::OUTPUTS]) > Config::getMaxUnspentTransactionCount()) {
+            return $this->returnValidateError(self::OUTPUTS . ' > max output transaction spent size.');
         }
 
         if (!isset($transaction['version'])) {
@@ -238,18 +305,23 @@ class Transaction
 
         // no transactions before the genesis
         if ($transaction['date_created'] < Config::getGenesisDate()) {
-            return $this->returnValidateError('date created is before genesis block ' . $transaction['date_created'] . ' < ' . Config::getGenesisDate());
+            return $this->returnValidateError('date created is before genesis block ' .
+                $transaction['date_created'] . ' < ' . Config::getGenesisDate());
         }
 
         // validate signature
         $signatureText = $this->generateSignatureText($transaction);
-        if (!$openSsl->verifySignature($signatureText, $transaction['signature'], $openSsl->formatPem($transaction['public_key'], false))) {
+        if (!$openSsl->verifySignature(
+            $signatureText,
+            $transaction['signature'],
+            $openSsl->formatPem($transaction['public_key'], false)
+        )) {
             return $this->returnValidateError('Invalid signature');
         }
 
         $totalInputs = "0";
-        if (isset($transaction[self::Inputs])) {
-            foreach ($transaction[self::Inputs] as $txIn) {
+        if (isset($transaction[self::INPUTS])) {
+            foreach ($transaction[self::INPUTS] as $txIn) {
                 if (!isset($txIn['previous_transaction_id'])) {
                     return $this->returnValidateError(
                         'transaction_id: (' . $transaction['transaction_id'] . ') is a missing an unspent transaction'
@@ -258,20 +330,21 @@ class Transaction
 
                 if (!isset($txIn['previous_tx_out_id'])) {
                     return $this->returnValidateError(
-                        'transaction_id: (' . $transaction['transaction_id'] . ') is a missing an unspent transaction index'
+                        'transaction_id: (' . $transaction['transaction_id'] .
+                        ') is a missing an unspent transaction index'
                     );
                 }
 
                 $previousTransaction = $this->getByTransactionId($txIn['previous_transaction_id']);
                 if ($previousTransaction !== null) {
-                    if (!isset($previousTransaction[self::Outputs][(int)$txIn['previous_tx_out_id']])) {
+                    if (!isset($previousTransaction[self::OUTPUTS][(int)$txIn['previous_tx_out_id']])) {
                         return $this->returnValidateError(
                             'previous_tx_out_id: (' . $txIn['previous_tx_out_id'] . ') does not exist'
                         );
                     }
 
                     // add if the value is unspent
-                    $unspent = $previousTransaction[self::Outputs][$txIn['tx_id']];
+                    $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
                     if ((int)$unspent['spent'] === 0) {
                         $totalInputs = bcadd($totalInputs, $unspent['value']);
                     }
@@ -280,13 +353,16 @@ class Transaction
                         return $this->returnValidateError('uncompressed script is larger than the max allowed');
                     }
                 } else {
-                    return $this->returnValidateError('previous transaction_id: (' . $txIn['transaction_id'] . ') is a missing on a spent transaction');
+                    return $this->returnValidateError(
+                        'previous transaction_id: (' . $txIn['transaction_id'] .
+                        ') is a missing on a spent transaction'
+                    );
                 }
             }
         }
 
         $totalOutputs = "0";
-        foreach ($transaction[self::Outputs] as $txOut) {
+        foreach ($transaction[self::OUTPUTS] as $txOut) {
             if (!$address->validateAddress($txOut['address'])) {
                 return $this->returnValidateError('invalid address in unspent: ' . $txOut['address']);
             }
@@ -316,27 +392,31 @@ class Transaction
         }
 
         // non-coinbase - the inputs must be greater or equal to the outputs
-        if (($transaction['version'] !== TransactionVersion::Coinbase) && bccomp($totalInputs, $totalOutputs) < 0) {
+        if (($transaction['version'] !== TransactionVersion::COINBASE) && bccomp($totalInputs, $totalOutputs) < 0) {
             return $this->returnValidateError('the inputs are less than the outputs).');
         }
 
         // coinbase - the inputs must be zero, and the outputs must be > 0
-        if (($transaction['version'] === TransactionVersion::Coinbase) && bccomp($totalInputs, "0") !== 0) {
+        if (($transaction['version'] === TransactionVersion::COINBASE) && bccomp($totalInputs, "0") !== 0) {
             return $this->returnValidateError('the coinbase inputs must be zero.');
         }
 
         // check for an appropriate fee
         $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
         if (bccomp($fee, Config::getMinimumTransactionFee(), 0) < 0) {
-            return $this->returnValidateError('fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . ').');
+            return $this->returnValidateError(
+                'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . ').'
+            );
         }
 
         // check reward - can be less, but not more
-        if ($transaction['version'] === TransactionVersion::Coinbase) {
+        if ($transaction['version'] === TransactionVersion::COINBASE) {
             $block = new Block();
             $reward = $block->getRewardValue($transaction['height']);
             if (bccomp($totalOutputs, $block->getRewardValue($transaction['height']), 0) > 0) {
-                return $this->returnValidateError('Reward ' . $totalOutputs . ' is greater than expected ' . $reward);
+                return $this->returnValidateError(
+                    'Reward ' . $totalOutputs . ' is greater than expected ' . $reward
+                );
             }
         }
 
@@ -351,7 +431,8 @@ class Transaction
         // we must sort the same way every time
         $sorted = [];
         foreach ($transactions as $transaction) {
-            $sorted[$transaction['version'] . $transaction['date_created'] . $transaction['transaction_id']] = $transaction;
+            $sorted[$transaction['version'] . $transaction['date_created'] .
+            $transaction['transaction_id']] = $transaction;
         }
 
         // sort by the new key
@@ -390,15 +471,17 @@ class Transaction
     public function generateSignatureText(array $transaction): string
     {
         $txInData = '';
-        $transaction[self::Inputs] = self::sortTx($transaction[self::Inputs]);
-        foreach ($transaction[self::Inputs] as $txIn) {
-            $txInData .= $txIn['tx_id'] . $txIn['previous_transaction_id'] . $txIn['previous_tx_out_id'] . $txIn['script'];
+        $transaction[self::INPUTS] = self::sortTx($transaction[self::INPUTS]);
+        foreach ($transaction[self::INPUTS] as $txIn) {
+            $txInData .= $txIn['tx_id'] . $txIn['previous_transaction_id'] . $txIn['previous_tx_out_id'] .
+                $txIn['script'];
         }
 
         $txOutData = '';
-        $transaction[self::Outputs] = self::sortTx($transaction[self::Outputs]);
-        foreach ($transaction[self::Outputs] as $txOut) {
-            $txInData .= $txOut['tx_id'] . $txOut['address'] . $txOut['value'] . $txOut['script'] . $txOut['lock_height'];
+        $transaction[self::OUTPUTS] = self::sortTx($transaction[self::OUTPUTS]);
+        foreach ($transaction[self::OUTPUTS] as $txOut) {
+            $txInData .= $txOut['tx_id'] . $txOut['address'] . $txOut['value'] . $txOut['script'] .
+                $txOut['lock_height'];
         }
 
         return $transaction['transaction_id'] . $transaction['date_created'] . $transaction['public_key'] .
@@ -431,5 +514,4 @@ class Transaction
         $script->loadScript($script->decodeScript($input['script']) . $script->decodeScript($output['script']));
         return $script->run(false);
     }
-
 }

@@ -17,7 +17,20 @@ class App
     {
         // check if migration was run
         $tableCount = 0;
-        $requiredTables = ['accounts', 'blocks', 'key_value_store', 'logs', 'mempool_inputs', 'mempool_outputs', 'mempool_transactions', 'peers', 'queue', 'transaction_inputs', 'transaction_outputs', 'transactions'];
+        $requiredTables = [
+            'accounts',
+            'blocks',
+            'key_value_store',
+            'logs',
+            'mempool_inputs',
+            'mempool_outputs',
+            'mempool_transactions',
+            'peers',
+            'queue',
+            'transaction_inputs',
+            'transaction_outputs',
+            'transactions'
+        ];
         foreach ($requiredTables as $requiredTable) {
             $query = 'SELECT name FROM sqlite_master WHERE type=\'table\' AND name=:table_name';
             $stmt = $this->db->prepare($query);

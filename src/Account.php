@@ -6,7 +6,6 @@ use PDO;
 use Exception;
 use RuntimeException;
 
-
 class Account
 {
     private PDO $db;
@@ -22,7 +21,8 @@ class Account
 
     public function get(int $id): ?array
     {
-        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `id` = :id LIMIT 1';
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
+            'WHERE `id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
@@ -31,7 +31,8 @@ class Account
 
     public function getNewestAccount(): ?array
     {
-        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ORDER BY id DESC LIMIT 1';
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
+            'ORDER BY id DESC LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -39,7 +40,8 @@ class Account
 
     public function getByAddress(string $address): ?array
     {
-        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `address` = :address LIMIT 1';
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
+            'WHERE `address` = :address LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT);
         $stmt->execute();
@@ -48,7 +50,8 @@ class Account
 
     public function getByPublicKeyRaw(string $publicKeyRaw): ?array
     {
-        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts WHERE `public_key_raw` = :public_key_raw LIMIT 1';
+        $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
+            ' WHERE `public_key_raw` = :public_key_raw LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'public_key_raw', $publicKeyRaw, DatabaseHelpers::TEXT);
         $stmt->execute();
@@ -65,13 +68,40 @@ class Account
             $dateCreated = time();
 
             // prepare the statement and execute
-            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) VALUES (:public_key,:public_key_raw,:private_key,:address,:date_created)';
+            $query = 'INSERT INTO accounts (`public_key`,`public_key_raw`,`private_key`,`address`,`date_created`) ' .
+                'VALUES (:public_key,:public_key_raw,:private_key,:address,:date_created)';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key', value: $keys['public_key'], pdoType: DatabaseHelpers::TEXT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'public_key_raw', value: $keys['public_key_raw'], pdoType: DatabaseHelpers::TEXT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'private_key', value: $keys['private_key'], pdoType: DatabaseHelpers::TEXT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $address, pdoType: DatabaseHelpers::ALPHA_NUMERIC, maxLength: 40);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: $dateCreated, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'public_key',
+                value: $keys['public_key'],
+                pdoType: DatabaseHelpers::TEXT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'public_key_raw',
+                value: $keys['public_key_raw'],
+                pdoType: DatabaseHelpers::TEXT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'private_key',
+                value: $keys['private_key'],
+                pdoType: DatabaseHelpers::TEXT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'address',
+                value: $address,
+                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+                maxLength: 40
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'date_created',
+                value: $dateCreated,
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             // ensure the block was stored
@@ -98,7 +128,12 @@ class Account
             // delete the block
             $query = 'DELETE FROM accounts WHERE `id` = :id;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'id',
+                value: $id,
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             $this->db->commit();
@@ -120,7 +155,7 @@ class Account
 
         $balance = "0";
         foreach ($unspentTransactions as $unspentTransaction) {
-            $balance = bcadd($balance, $unspentTransaction['value'], 0);
+            $balance = bcadd($balance, $unspentTransaction['value']);
         }
 
         return $balance;
@@ -143,21 +178,9 @@ class Account
             $transactions[$key] = $transaction['value'];
         }
 
-        // get all the mempool transactions for the address
-        $query = 'SELECT `previous_transaction_id`,`previous_tx_out_id` FROM mempool_inputs WHERE `address` = :address';
-        $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
-        $stmt->execute();
-        $spentTxs = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-
-        foreach ($spentTxs as $spent) {
-            $key = $spent['previous_transaction_id'] . '-' . $spent['previous_tx_out_id'];
-            unset($transactions[$key]);
-        }
-
         // add the pending to the balance
         foreach ($transactions as $value) {
-            $balance = bcadd($balance, $value, 0);
+            $balance = bcadd($balance, $value);
         }
 
         return $balance;

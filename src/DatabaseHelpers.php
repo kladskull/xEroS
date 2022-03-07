@@ -16,8 +16,13 @@ class DatabaseHelpers
     {
     }
 
-    public static function filterBind(PDOStatement $stmt, string $fieldName, string|int $value, int $pdoType, int $maxLength = 0): PDOStatement
-    {
+    public static function filterBind(
+        PDOStatement $stmt,
+        string $fieldName,
+        string|int $value,
+        int $pdoType,
+        int $maxLength = 0
+    ): PDOStatement {
         // network id
         switch ($pdoType) {
             case self::ALPHA_NUMERIC:

@@ -26,10 +26,21 @@ class Queue
 
     public function getItems(string $command, int $limit = 100): array
     {
-        $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE command=:command and trys <5 LIMIT :limit;';
+        $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE command=:command and ' .
+            'trys <5 LIMIT :limit;';
         $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'command', $command, DatabaseHelpers::TEXT, 32);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'limit', $limit, DatabaseHelpers::INT);
+        $stmt = DatabaseHelpers::filterBind(
+            $stmt, 'command',
+            $command,
+            DatabaseHelpers::TEXT,
+            32
+        );
+        $stmt = DatabaseHelpers::filterBind(
+            $stmt,
+            'limit',
+            $limit,
+            DatabaseHelpers::INT
+        );
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
@@ -74,12 +85,34 @@ class Queue
             $this->db->beginTransaction();
 
             // prepare the statement and execute
-            $query = 'INSERT INTO queue (`command`,`date_created`,`data`,`trys`) VALUES (:command,:date_created,:data,:trys)';
+            $query = 'INSERT INTO queue (`command`,`date_created`,`data`,`trys`) VALUES ' .
+                '(:command,:date_created,:data,:trys)';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $command, pdoType: DatabaseHelpers::TEXT, maxLength: 32);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'data', value: $data, pdoType: DatabaseHelpers::TEXT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: time(), pdoType: DatabaseHelpers::INT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'trys', value: 0, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'address',
+                value: $command,
+                pdoType: DatabaseHelpers::TEXT,
+                maxLength: 32
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'data',
+                value: $data,
+                pdoType: DatabaseHelpers::TEXT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'date_created',
+                value: time(),
+                pdoType: DatabaseHelpers::INT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'trys',
+                value: 0,
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             // ensure the block was stored
@@ -125,7 +158,12 @@ class Queue
             // delete the block
             $query = 'DELETE FROM queue WHERE `id` = :id;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'id',
+                value: $id,
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             $this->db->commit();

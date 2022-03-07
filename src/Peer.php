@@ -35,7 +35,8 @@ class Peer
 
     public function get(int $id): ?array
     {
-        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE `id` = :id LIMIT 1';
+        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE ' .
+            '`id` = :id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
@@ -44,7 +45,8 @@ class Peer
 
     public function getAll(int $limit = 100): array
     {
-        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE blacklisted=0 and fails <5 LIMIT :limit;';
+        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE ' .
+            'blacklisted=0 and fails <5 LIMIT :limit;';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'limit', $limit, DatabaseHelpers::INT);
         $stmt->execute();
@@ -70,7 +72,8 @@ class Peer
 
     public function getByHostAddress(string $address): ?array
     {
-        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE `address` = :address LIMIT 1';
+        $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers ' .
+            'WHERE `address` = :address LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
         $stmt->execute();
@@ -89,7 +92,13 @@ class Peer
             $this->db->beginTransaction();
             $query = 'UPDATE peers SET fails=fails+1 WHERE address=:address;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
+            $stmt = DatabaseHelpers::filterBind(
+                $stmt,
+                'address',
+                $address,
+                DatabaseHelpers::TEXT,
+                256
+            );
             $stmt->execute();
             $this->db->commit();
             $result = true;
@@ -106,7 +115,12 @@ class Peer
             $this->db->beginTransaction();
             $query = 'UPDATE peers SET fails=0 WHERE address=:address;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
+            $stmt = DatabaseHelpers::filterBind(
+                $stmt, 'address',
+                $address,
+                DatabaseHelpers::TEXT,
+                256
+            );
             $stmt->execute();
             $this->db->commit();
             $result = true;
@@ -123,8 +137,18 @@ class Peer
             $this->db->beginTransaction();
             $query = 'UPDATE peers SET last_ping=:last_ping WHERE address=:address;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'last_ping', time(), DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                $stmt, 'address',
+                $address,
+                DatabaseHelpers::TEXT,
+                256
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                $stmt,
+                'last_ping',
+                time(),
+                DatabaseHelpers::INT
+            );
             $stmt->execute();
             $this->db->commit();
             $result = true;
@@ -169,14 +193,46 @@ class Peer
             }
 
             // prepare the statement and execute
-            $query = 'INSERT OR REPLACE INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created`) VALUES (:address,:reserve,:last_ping,:blacklisted,:fails,:date_created)';
+            $query = 'INSERT OR REPLACE INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,' .
+                '`date_created`) VALUES (:address,:reserve,:last_ping,:blacklisted,:fails,:date_created)';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'address', value: $address, pdoType: DatabaseHelpers::TEXT, maxLength: 256);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'last_ping', value: 0, pdoType: DatabaseHelpers::INT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'blacklisted', value: $blist, pdoType: DatabaseHelpers::INT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'reserve', value: 0, pdoType: DatabaseHelpers::INT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'fails', value: 0, pdoType: DatabaseHelpers::INT);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'date_created', value: time(), pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'address',
+                value: $address,
+                pdoType: DatabaseHelpers::TEXT,
+                maxLength: 256
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'last_ping',
+                value: 0,
+                pdoType: DatabaseHelpers::INT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'blacklisted',
+                value: $blist,
+                pdoType: DatabaseHelpers::INT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'reserve',
+                value: 0,
+                pdoType: DatabaseHelpers::INT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'fails',
+                value: 0,
+                pdoType: DatabaseHelpers::INT
+            );
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'date_created',
+                value: time(),
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             // ensure the block was stored
@@ -203,7 +259,12 @@ class Peer
             // delete the block
             $query = 'DELETE FROM peers WHERE `id` = :id;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'id',
+                value: $id,
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             $this->db->commit();

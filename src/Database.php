@@ -17,7 +17,8 @@ class Database
     {
         if (empty(self::$instance)) {
             try {
-                self::$instance = new PDO('sqlite:' . APP_DIR . strtolower(Config::getProductName()) . '-' . Config::getDbEnvironment() . '.db');
+                self::$instance = new PDO('sqlite:' . APP_DIR . strtolower(Config::getProductName()) .
+                    '-' . Config::getDbEnvironment() . '.db');
                 self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             } catch (PDOException $error) {
                 Console::log($error->getMessage());

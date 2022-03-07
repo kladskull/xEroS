@@ -53,7 +53,10 @@ class TransferEncoding
 
     public function binToHex(string $bin): string
     {
-        return implode('', array_map(static fn($x) => sprintf("%02s", strtolower(dechex(ord($x)))), str_split($bin)));
+        return implode(
+            '',
+            array_map(static fn($x) => sprintf("%02s", strtolower(dechex(ord($x)))), str_split($bin))
+        );
     }
 
     public function hexToBin(string $hex): string

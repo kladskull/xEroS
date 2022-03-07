@@ -80,7 +80,12 @@ class DataStore
             // delete the block
             $query = 'DELETE FROM key_value_store WHERE `id` = :id;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'id', value: $id, pdoType: DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'id',
+                value: $id,
+                pdoType: DatabaseHelpers::INT
+            );
             $stmt->execute();
 
             $this->db->commit();
@@ -101,7 +106,13 @@ class DataStore
             // delete the block
             $query = 'DELETE FROM key_value_store WHERE `key` = :key;';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(stmt: $stmt, fieldName: 'key', value: $key, pdoType: DatabaseHelpers::TEXT, maxLength: 128);
+            $stmt = DatabaseHelpers::filterBind(
+                stmt: $stmt,
+                fieldName: 'key',
+                value: $key,
+                pdoType: DatabaseHelpers::TEXT,
+                maxLength: 128
+            );
             $stmt->execute();
 
             $this->db->commit();

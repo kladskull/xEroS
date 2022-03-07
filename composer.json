@@ -34,7 +34,8 @@
     "drupol/phpmerkle": "^2.2",
     "vlucas/phpdotenv": "^5.4",
     "symfony/yaml": "^6.0",
-    "wp-cli/php-cli-tools": "^0.11.13"
+    "wp-cli/php-cli-tools": "^0.11.13",
+    "ext-pcntl": "*"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",

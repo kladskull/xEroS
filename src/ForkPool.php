@@ -35,7 +35,7 @@ class ForkPool
         if ($pid == -1) {
             // error forking...
             return false;
-        } else if ($pid == 0) {
+        } elseif ($pid == 0) {
             // child
             $this->job($work);
             exit(0);

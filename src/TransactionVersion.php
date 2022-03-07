@@ -4,6 +4,6 @@ namespace Xeros;
 
 class TransactionVersion
 {
-    public const Coinbase = '0';
-    public const Transfer = '1';
+    public const COINBASE = '0';
+    public const TRANSFER = '1';
 }

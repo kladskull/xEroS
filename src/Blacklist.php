@@ -6,12 +6,12 @@ namespace Xeros;
 class Blacklist
 {
     // official blacklisted public keys
-    public const PublicKeys = [
+    public const PUBLIC_KEYS = [
         'key' => 'description'
     ];
 
     // official blacklisted addresses
-    public const Addresses = [
+    public const ADDRESSES = [
         'address' => 'description'
     ];
 
@@ -23,7 +23,7 @@ class Blacklist
      */
     public static function checkPublicKey(string $publicKey): bool
     {
-        return array_key_exists($publicKey, static::PublicKeys);
+        return array_key_exists($publicKey, static::PUBLIC_KEYS);
     }
 
     /**
@@ -34,7 +34,7 @@ class Blacklist
      */
     public static function checkAddress(string $address): bool
     {
-        return array_key_exists($address, static::Addresses);
+        return array_key_exists($address, static::ADDRESSES);
     }
 
 }

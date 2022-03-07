@@ -36,7 +36,9 @@ class TcpIp
     {
         return (
             $ip === filter_var(
-                $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV4
             )
         );
     }
@@ -45,7 +47,9 @@ class TcpIp
     {
         return (
             $ip === filter_var(
-                $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_IPV6
             )
         );
     }
@@ -53,7 +57,9 @@ class TcpIp
     public function isPrivateIpv4(?string $ip): bool
     {
         $result = filter_var(
-            $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
         );
 
         if ($result !== false) {
@@ -65,7 +71,9 @@ class TcpIp
     public function isPrivateIpv6(?string $ip): bool
     {
         $result = filter_var(
-            $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
         );
 
         if ($result !== false) {

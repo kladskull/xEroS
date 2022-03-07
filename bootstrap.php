@@ -65,5 +65,5 @@ if ($block->getCurrentHeight() === 0) {
 $store = new DataStore();
 $state = $store->getKey('state', '');
 if (empty($state)) {
-    $store->add('state', Node::Syncing);
+    $store->add('state', Node::SYNCING);
 }

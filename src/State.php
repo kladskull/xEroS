@@ -4,6 +4,6 @@ namespace Xeros;
 
 class State
 {
-    public const Mine = 'mine';
-    public const Syncing = 'sync';
+    public const MINE = 'mine';
+    public const SYNCING = 'sync';
 }

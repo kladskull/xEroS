@@ -6,9 +6,9 @@ use JetBrains\PhpStorm\ArrayShape;
 
 class Script
 {
-    private const CommandSep = ' ';
-    private const ParamsSep = ',';
-    private const LineSep = ';';
+    private const COMMAND_SEP = ' ';
+    private const PARAM_SEP = ',';
+    private const LINE_SEP = ';';
 
     public string $lastError = '';
 
@@ -134,7 +134,7 @@ class Script
         $fullScript = [];
         $script = str_replace(["\t", "\n", "\r"], '', $script);
 
-        $lines = explode(self::LineSep, $script);
+        $lines = explode(self::LINE_SEP, $script);
         foreach ($lines as $line) {
             if (!empty(trim($line))) {
                 $fullScript[] = $this->parseStatement($line);
@@ -152,13 +152,13 @@ class Script
 
         $params = [];
         $newParams = [];
-        $firstSpace = strpos($line, self::CommandSep);
+        $firstSpace = strpos($line, self::COMMAND_SEP);
         if ($firstSpace > 0) {
             $command = strtolower(substr($line, 0, $firstSpace));
             $paramsStr = substr($line, $firstSpace);
 
             // split the params,
-            $params = explode(self::ParamsSep, $paramsStr);
+            $params = explode(self::PARAM_SEP, $paramsStr);
 
             // replace constants with values, numeric hex with whole numbers
             foreach ($params as $param) {
@@ -182,7 +182,6 @@ class Script
         $op = 0;
         $operations = $this->parseScript($script);
         foreach ($operations as $operation) {
-
             // check the command and params
             $command = $operation['command'];
             $params = $operation['params'];
@@ -228,14 +227,13 @@ class Script
             'false' => '0',
             'true' => '1',
             'time' => time(),
-            default => $value,
+        default => $value,
         };
     }
 
     private function executeStatement(array $statement): void
     {
         switch ($statement['command']) {
-
             case 'abs':
                 $this->scriptFunctions->abs($this->stateMachine, $statement['params'][0]);
                 break;
@@ -365,7 +363,8 @@ class Script
                 break;
 
             case 'vsig':
-                $this->scriptFunctions->vsig($this->stateMachine, $statement['params'][0], $statement['params'][1], $statement['params'][2]);
+                $this->scriptFunctions->vsig(
+                    $this->stateMachine, $statement['params'][0], $statement['params'][1], $statement['params'][2]);
                 break;
 
             case 'vfal':
@@ -376,6 +375,5 @@ class Script
                 $this->scriptFunctions->vtru($this->stateMachine);
                 break;
         }
-
     }
 }

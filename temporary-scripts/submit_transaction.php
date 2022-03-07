@@ -67,7 +67,7 @@ $transactionRecord = [
     'version' => Version::Transfer,
     'height' => $currentHeight + 1,
     'peer' => $peer->getUniquePeerId(),
-    Transaction::Outputs => [
+    Transaction::OUTPUTS => [
         [
             'tx_id' => 0,
             'address' => 'Bc12ZJd4TGoKDhJEJXFJ4geu3dsjjDxonGXs', // address id: 22 (block 5678)
@@ -85,7 +85,7 @@ $transactionRecord = [
             'hash' => Hash::doubleSha256ToBase58($transactionId . '1' . 'Bc1BaWb8V13hNYWRzSDYf6Jwj6ytkqVhQUiC' . '2490000000' . '0'),
         ],
     ],
-    Transaction::Inputs => [
+    Transaction::INPUTS => [
         [
             'tx_id' => 0,
             'previous_transaction_id' => 'Bi6GupYi4g1xGQrkcXnJjf57SAuFFTmn3oFhBVTerXba',

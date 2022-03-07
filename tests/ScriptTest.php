@@ -28,7 +28,7 @@ class ScriptTest extends TestCase
                     'transaction_id' => 'TX_ID',
                     'date_created' => $date,
                     'fee' => "0.5",
-                    'version' => TransactionVersion::Coinbase,
+                    'version' => TransactionVersion::COINBASE,
                     'signature' => "480f0fd1080d84692b6d0371930d5ed40c5a954473d8fbe4ad9b5f774d41d85eaa68868acb88f07e5b484e97d6a3d1513285962829dbd8031984c24a5c9208c51d31fd820cd87741b9d2f614305863261d50036808fdae0685d89a3a41fccaeadd10c689cbe4b8a8d49db2bfc83e01f53650930c212c11292f79a88470991b5c726625a9e8d5af0decb45c9ef7b88e924bfbe51855062b0d5667f2fbdbdc1079dfe0978f341ec6104ea09b65475b767d41ac280ed7e11c6c2ce5c55f3255447ac343d2d87724c8ebed6dbbb4527a51901016e184d2f5d0720db26efae64369464f81c377ad0d378fb1a1a5495a366e956ca2689e20f6a54103d40a761a8472d5",
                     'public_key' => "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAufnOzEGWNt3F8jVB6iH1MWtGSA7J+tczrf0fsA84WUBqtOwzafHVSc6UAylOyHzHXgD5hlOIMThNKDwYz6tGqv486MVuxyj40iZ+9d0hACpJJ1uA4S8PYV4vl5yszBu8zo3ue481b/tKbSqdp4UTmuuWhrGl0xK/erZF6rW634OwUCD/hV9e061hRo/844cAudLfPyFZT02SkrNTaEfdmRiQhZolj3PgbD+Pq5lN54sK7xjUA1NuFzoZdGRjQ6UX/MHAGXsHanEvndR1wS9CZMoZXBHJ4aGD7GH0sYuzYAGcc9ZwHOFYAZ6YGm8nI71fmjHiy0hkW8z1s4m11A+tawIDAQAB",
                     'tx_in' => [
@@ -46,7 +46,7 @@ class ScriptTest extends TestCase
                             'value' => '50',
                             'script' => '',
                             'lock_height' => '51',
-                            'version' => TransactionVersion::Coinbase,
+                            'version' => TransactionVersion::COINBASE,
                         ],
                     ],
                 ],

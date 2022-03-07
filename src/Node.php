@@ -8,20 +8,15 @@ class Node
 {
     private array $connections;
     private string $ip;
-    private int $port;
     private string $externalIp;
 
-    private Account $account;
-    private TcpIp $tcpIp;
     private Peer $peer;
     private Block $block;
-    private Transaction $transaction;
-    private Mempool $mempool;
     private Queue $queue;
     private DataStore $dataStore;
 
-    public const Syncing = 'sync';
-    public const Mining = 'mine';
+    public const SYNCING = 'sync';
+    public const MINING = 'mine';
 
     private array $clientInfoArray = [
         'version' => '0',
@@ -36,12 +31,8 @@ class Node
 
     public function __construct()
     {
-        $this->account = new Account();
-        $this->tcpIp = new TcpIp();
         $this->peer = new Peer();
         $this->block = new Block();
-        $this->transaction = new Transaction();
-        $this->mempool = new Mempool();
         $this->dataStore = new DataStore();
         $this->queue = new Queue();
     }
@@ -91,10 +82,15 @@ class Node
     public function listen(string $address, int $port)
     {
         Console::log('Opening a server socket on address: ' . $address . ' port: ' . $port);
-        $sock = stream_socket_server("tcp://$address:$port", $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN) or die("Cannot create socket.\n");
+        $sock = stream_socket_server(
+            "tcp://$address:$port",
+            $errno,
+            $errstr,
+            STREAM_SERVER_BIND | STREAM_SERVER_LISTEN
+        ) or die("Cannot create socket.\n");
         stream_set_blocking($sock, false);
 
-        $this->port = $port;
+        $port1 = $port;
         $server = $sock;
         $clients = [$sock];
         $clientInfo = [];
@@ -130,7 +126,6 @@ class Node
                 // Handle Input
                 $exceptions = [];
                 foreach ($clients as $key => $client) { // for each client
-
                     if (in_array($client, $read)) {
                         $data = fread($client, 8192);
                         if ($data !== '') {
@@ -140,7 +135,6 @@ class Node
                             $data = json_decode(trim($data), true);
 
                             if (isset($data['type'])) {
-
                                 // only allow uninitialized connections access to these commands
                                 if (isset($clientInfo[$key]['init']) && $clientInfo[$key]['init'] < 2) {
                                     switch ($data['type']) {
@@ -148,7 +142,10 @@ class Node
                                             Console::log('Received handshake');
                                             if (Config::getNetworkIdentifier() !== ($data['network'] ?: '')) {
                                                 Console::log('Incompatible client <net_id>');
-                                                $this->send($client, json_encode(['type' => 'error', 'message' => 'wrong network id']));
+                                                $this->send(
+                                                    $client,
+                                                    json_encode(['type' => 'error', 'message' => 'wrong network id'])
+                                                );
                                                 fclose($client);
                                                 unset($clientInfo[$key]);
                                                 unset($clients[$key]);
@@ -156,7 +153,10 @@ class Node
 
                                             if (bccomp($data['version'] ?: '', Config::getVersion(), 4) < 0) {
                                                 Console::log('Incompatible client <version>');
-                                                $this->send($client, json_encode(['type' => 'error', 'message' => 'incompatible version']));
+                                                $this->send($client, json_encode([
+                                                    'type' => 'error',
+                                                    'message' => 'incompatible version'
+                                                ]));
                                                 fclose($client);
                                                 unset($clientInfo[$key]);
                                                 unset($clients[$key]);
@@ -179,11 +179,11 @@ class Node
                                                 'type' => 'peer_list_req'
                                             ]));
 
-                                            //  send our peer details (IP doesn't matter, as other peer gets the real address)
+                                            //  send our peer details
                                             $this->send($client, json_encode([
                                                 'type' => 'peer_invite_req',
                                                 'address' => "127.0.0.1",
-                                                'port' => $this->port
+                                                'port' => $port1
                                             ]));
 
                                             // complete the handshake process
@@ -203,7 +203,10 @@ class Node
                                             break;
 
                                         default:
-                                            $this->send($client, json_encode(['type' => 'error', 'message' => 'expected handshake']));
+                                            $this->send(
+                                                $client,
+                                                json_encode(['type' => 'error', 'message' => 'expected handshake'])
+                                            );
                                             fclose($client);
                                             unset($clientInfo[$key]);
                                             unset($clients[$key]);
@@ -229,7 +232,9 @@ class Node
 
                                             // invalid or duplicate? if so, ignore...
                                             $id = 0;
-                                            if (empty($block) || $this->block->getByBlockId($block['block_id']) !== null) {
+                                            if (
+                                                empty($block) || $this->block->getByBlockId($block['block_id']) !== null
+                                            ) {
                                                 // we will not be forwarding this block
                                                 $this->send($client, json_encode([
                                                     'type' => 'block_resp',
@@ -240,7 +245,6 @@ class Node
                                                 $validate = $block->validateFullBlock($block);
                                                 if ($validate['validated']) {
                                                     if ($block['height'] > 1) {
-
                                                         // check to current block
                                                         $localHeight = $this->block->getCurrentHeight();
                                                         $remoteHeight = (int)$block['height'];
@@ -256,26 +260,37 @@ class Node
                                                             $id = $this->block->add($block, false, true);
 
                                                             // choose the block based on features
-                                                            $selectedBlock = $this->block->blockSelector($currBlock, $block);
-                                                            $this->block->acceptBlock($selectedBlock['block_id'], $selectedBlock['height']);
-                                                        } else if ($remoteHeight > $localHeight) {
-                                                            /**
-                                                             * New Block Received!
-                                                             */
-                                                            $id = $this->block->add($block, false);
-                                                            $this->block->acceptBlock($block['block_id'], $block['height']);
-
-                                                            // check if we are behind
-                                                            if ($this->block->isCurrentHeightOrphan()) {
-                                                                $this->queue->add('new_block', $block['block_id']);
-                                                            }
+                                                            $selectedBlock = $this->block->blockSelector(
+                                                                $currBlock,
+                                                                $block
+                                                            );
+                                                            $this->block->acceptBlock(
+                                                                $selectedBlock['block_id'],
+                                                                $selectedBlock['height']
+                                                            );
                                                         } else {
-                                                            /**
-                                                             * Got an older block... just add it
-                                                             */
-                                                            // we have an older block...
-                                                            $id = $this->block->add($block, false, false, false);
-                                                            $this->queue->add('height_test', $block['height']);
+                                                            if ($remoteHeight > $localHeight) {
+                                                                /**
+                                                                 * New Block Received!
+                                                                 */
+                                                                $id = $this->block->add($block, false);
+                                                                $this->block->acceptBlock(
+                                                                    $block['block_id'],
+                                                                    $block['height']
+                                                                );
+
+                                                                // check if we are behind
+                                                                if ($this->block->isCurrentHeightOrphan()) {
+                                                                    $this->queue->add('new_block', $block['block_id']);
+                                                                }
+                                                            } else {
+                                                                /**
+                                                                 * Got an older block... just add it
+                                                                 */
+                                                                // we have an older block...
+                                                                $id = $this->block->add($block, false, false, false);
+                                                                $this->queue->add('height_test', $block['height']);
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -299,7 +314,6 @@ class Node
                                                             'block' => $block,
                                                         ]));
                                                     }
-
                                                 } else {
                                                     // new block is invalid...
                                                     $this->send($client, json_encode([
@@ -307,7 +321,6 @@ class Node
                                                         'result' => 'nok'
                                                     ]));
                                                 }
-
                                             }
                                             break;
 
@@ -320,18 +333,20 @@ class Node
                                                     'type' => 'block',
                                                     'block' => $this->block->assembleFullBlock($blockId['block_id'])
                                                 ]));
-                                            } else if ($height !== 0) {
-                                                $block = $this->block->getByHeight((int)$height);
-                                                $this->send($client, json_encode([
-                                                    'type' => 'block',
-                                                    'block' => $this->block->assembleFullBlock($block['block_id'])
-                                                ]));
                                             } else {
-                                                $block = $this->block->getCurrent();
-                                                $this->send($client, json_encode([
-                                                    'type' => 'block',
-                                                    'block' => $this->block->assembleFullBlock($block['block_id'])
-                                                ]));
+                                                if ($height !== 0) {
+                                                    $block = $this->block->getByHeight((int)$height);
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'block',
+                                                        'block' => $this->block->assembleFullBlock($block['block_id'])
+                                                    ]));
+                                                } else {
+                                                    $block = $this->block->getCurrent();
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'block',
+                                                        'block' => $this->block->assembleFullBlock($block['block_id'])
+                                                    ]));
+                                                }
                                             }
                                             break;
 
@@ -393,7 +408,7 @@ class Node
                                             if ($currentBlock !== null) {
                                                 $state = $this->dataStore->getKey('state');
                                                 if (empty($state)) {
-                                                    $this->dataStore->add('state', Node::Syncing);
+                                                    $this->dataStore->add('state', Node::SYNCING);
                                                 }
 
                                                 $this->send($client, json_encode([
@@ -467,7 +482,11 @@ class Node
                                             socket_getpeername($client, $peerAddress);
                                             $peerPort = (int)$data['port'] ?: null;
                                             if (!empty($peerAddress) && !empty($peerPort)) {
-                                                if (filter_var($peerAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && $peerPort > 0 && $peerPort <= 65535) {
+                                                if (filter_var(
+                                                    $peerAddress,
+                                                    FILTER_VALIDATE_IP,
+                                                    FILTER_FLAG_IPV4
+                                                ) && $peerPort > 0 && $peerPort <= 65535) {
                                                     $hostAddress = $peerAddress . ':' . $port;
                                                     if ($this->peer->getByHostAddress($hostAddress) === null) {
                                                         $this->peer->add($hostAddress);
@@ -511,11 +530,8 @@ class Node
 
                                         default:
                                             break;
-
                                     }
                                 }
-
-
                             } else {
                                 Console::log('Unknown command received: ' . $key);
                                 $this->send($client, json_encode(['type' => 'error', 'message' => 'unknown command']));
