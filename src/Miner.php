@@ -61,6 +61,7 @@ class Miner
                 if ($i === ($bytes - 1)) {
                     $bit = 8 - ($difficulty % 8);
 
+                    // the breaks were left out intentionally
                     switch ($bit) {
                         case 7:
                             $byte &= ~64;
@@ -128,7 +129,6 @@ class Miner
                     ];
                 }
             }
-
         }
 
         $elapsed = time() - $start;
@@ -139,51 +139,5 @@ class Miner
             'elapsed_time' => $elapsed,
             'result' => true,
         ];
-    }
-
-    #[ArrayShape([
-        'network_id' => "string",
-        'block_id' => "int|mixed",
-        'hash' => "mixed|string",
-        'height' => "int",
-        'difficulty' => "int"
-    ])]
-    public function getMiningInfo(): array
-    {
-        $block = new Block();
-
-        $blockId = 0;
-        $hash = '';
-        $currentBlock = $block->getCurrent();
-        if ($currentBlock !== null) {
-            $blockId = $currentBlock['block_id'];
-            $hash = $currentBlock['hash'];
-        }
-
-        return [
-            'network_id' => Config::getNetworkIdentifier(),
-            'block_id' => $blockId,
-            'hash' => $hash,
-            'height' => $block->getCurrentHeight(),
-            'difficulty' => $block->getDifficulty(),
-        ];
-    }
-
-    public function getMiningWork(): array
-    {
-        $mempool = new Mempool();
-        $work = false;
-        try {
-            $work = $mempool->getAllTransactions();
-        } catch (Exception) {
-        }
-
-        $block = new Block();
-        $currentBlock = $block->getCurrent();
-        $response = [];
-        $response['transactions'] = $work;
-        $response['last_block'] = $block->assembleFullBlock($currentBlock['block_id']);
-
-        return $response;
     }
 }

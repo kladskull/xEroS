@@ -108,8 +108,8 @@ class Transaction
         $transaction = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         if ($transaction !== null) {
-            $txIns = $this->getTransactionInputs($transactionId);
-            $txOuts = $this->getTransactionOutputs($transactionId);
+            $txIns = $this->getTransactionInputs($blockId, $transactionId);
+            $txOuts = $this->getTransactionOutputs($blockId, $transactionId);
 
             // attach the details
             $transaction[self::INPUTS] = $txIns;
@@ -230,7 +230,10 @@ class Transaction
         $totalInputs = "0";
         if (isset($transaction[self::INPUTS])) {
             foreach ($transaction[self::INPUTS] as $txIn) {
-                $previousTransaction = $this->getByTransactionId($txIn['previous_transaction_id']);
+                $previousTransaction = $this->getByTransactionId(
+                    $transaction['block_id'],
+                    $txIn['previous_transaction_id']
+                );
                 if ($previousTransaction !== null) {
                     // add if the value is unspent
                     $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
@@ -253,11 +256,8 @@ class Transaction
         return BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
     }
 
-    /**
-     * @throws Exception
-     */
     #[ArrayShape(['validated' => "false", 'reason' => "string"])]
-    public function validate(array $transaction): array
+    public function validate(array $transaction): array|bool
     {
         $result = true;
         $reason = '';
@@ -349,7 +349,10 @@ class Transaction
                     $result = false;
                 }
 
-                $previousTransaction = $this->getByTransactionId($txIn['previous_transaction_id']);
+                $previousTransaction = $this->getByTransactionId(
+                    $transaction['block_id'],
+                    $txIn['previous_transaction_id']
+                );
                 if ($previousTransaction !== null) {
                     if (!isset($previousTransaction[self::OUTPUTS][(int)$txIn['previous_tx_out_id']])) {
                         $reason .= 'previous_tx_out_id: (' . $txIn['previous_tx_out_id'] . ') does not exist,';
@@ -466,22 +469,20 @@ class Transaction
         return $sortedTransactions;
     }
 
-    public static function sortTx(?array $txs): array
+    public static function sortTx(array $txs): array
     {
         $sorted = [];
         $sortedTx = [];
-        if ($txs !== null) {
-            foreach ($txs as $tx) {
-                $sorted[str_pad((string)(int)$tx['tx_id'], 6, '0', STR_PAD_LEFT)] = $tx;
-            }
+        foreach ($txs as $tx) {
+            $sorted[str_pad((string)(int)$tx['tx_id'], 6, '0', STR_PAD_LEFT)] = $tx;
+        }
 
-            // sort by the new key
-            ksort($sorted);
+        // sort by the new key
+        ksort($sorted);
 
-            // reassemble the array from the sorted data
-            foreach ($sorted as $txIn) {
-                $sortedTx[] = $txIn;
-            }
+        // reassemble the array from the sorted data
+        foreach ($sorted as $txIn) {
+            $sortedTx[] = $txIn;
         }
 
         return $sortedTx;

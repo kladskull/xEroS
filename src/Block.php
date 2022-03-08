@@ -10,7 +10,7 @@ use RuntimeException;
 
 class Block
 {
-    public const maxLifeTimeBlocks = 9999999999999;
+    public const MAX_LIFETIME_BLOCKS = 9999999999999;
 
     private Address $address;
     private Mempool $mempool;
@@ -39,7 +39,7 @@ class Block
 
     public static function filterBlockHeight(int $height): int
     {
-        if ($height <= 0 || $height > self::maxLifeTimeBlocks) {
+        if ($height <= 0 || $height > self::MAX_LIFETIME_BLOCKS) {
             $height = 1;
         }
         return $height;
@@ -73,7 +73,7 @@ class Block
         $nonce = '1192faa7';
 
         // create a block ID
-        $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height, $merkleRoot);
+        $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
 
         // transaction details
         $amount = $this->getRewardValue(1);
@@ -210,15 +210,12 @@ class Block
 
         $validTransactions = [];
         foreach ($transactions as $tx) {
-            try {
-                $result = $this->transaction->validate($tx);
-                if ($result['validated'] === true) {
-                    $validTransactions[] = $tx;
-                } else {
-                    print_r($result);
-                    exit(0);
-                }
-            } catch (Exception) {
+            $result = $this->transaction->validate($tx);
+            if ($result['validated'] === true) {
+                $validTransactions[] = $tx;
+            } else {
+                Console::log('Invalid transaction found (tx_id): ' . $transactionId);
+                return [];
             }
         }
 
@@ -259,10 +256,10 @@ class Block
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
 
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function getByBlockId(string $blockId): ?array
+    public function getByBlockId(string $blockId): array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
             '`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE ' .
@@ -276,10 +273,10 @@ class Block
             64
         );
         $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function getByPreviousBlockId(string $previousBlockId): ?array
+    public function getByPreviousBlockId(string $previousBlockId): array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
             '`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks ' .
@@ -293,7 +290,7 @@ class Block
             64
         );
         $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getCurrentHeight(): int
@@ -312,7 +309,7 @@ class Block
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'height', $height, DatabaseHelpers::INT);
         $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getCurrent(): ?array
@@ -321,7 +318,7 @@ class Block
             '`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE ' .
             '`orphan`=0 ORDER BY height DESC LIMIT 1';
         $stmt = $this->db->query($query);
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function assembleFullBlock(string $blockId, bool $previousBlockId = false): array
@@ -567,7 +564,7 @@ class Block
 
             // resolve
             $selectedBlock = $this->blockSelector($block1, $block2);
-            if ($selectedBlock != null) {
+            if (!empty($selectedBlock)) {
                 $block = $selectedBlock;
             } else {
                 $block = $block1;
@@ -595,7 +592,7 @@ class Block
      * @param array $block2
      * @return array|null
      */
-    public function blockSelector(array $block1, array $block2): ?array
+    public function blockSelector(array $block1, array $block2): array
     {
         $block = null;
         if ($this->isFork($block1, $block2)) {
@@ -757,6 +754,7 @@ class Block
         if ($validate) {
             try {
                 $result = $this->validateFullBlock($block);
+
             } catch (Exception|RuntimeException $ex) {
                 Console::log('Exception thrown validating block: ' . $ex->getMessage());
                 return false;
@@ -1431,26 +1429,28 @@ class Block
                     'UPDATE transaction_outputs SET spent=0 WHERE block_id=:block_id AND ' .
                     'transaction_id=:transaction_id AND tx_id=:tx_id;'
                 );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'block_id',
-                    value: $txIn['block_id'],
-                    pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                    maxLength: 64
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'transaction_id',
-                    value: $txIn['previous_transaction_id'],
-                    pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                    maxLength: 64
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'tx_id',
-                    value: $txIn['previous_tx_out_id'],
-                    pdoType: DatabaseHelpers::INT
-                );
+                $fields = [
+                    [
+                        'name' => 'block_id',
+                        'value' => $txIn['block_id'],
+                        'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                        'max_length' => 64,
+                    ],
+                    [
+                        'name' => 'transaction_id',
+                        'value' => $txIn['transaction_id'],
+                        'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                        'max_length' => 64,
+                    ],
+                    [
+                        'name' => 'previous_tx_out_id',
+                        'value' => $txIn['previous_tx_out_id'],
+                        'type' => DatabaseHelpers::INT,
+                        'max_length' => 20,
+                    ]
+                ];
+                $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
+
                 $stmt->execute();
             }
 

@@ -6,13 +6,10 @@ use JetBrains\PhpStorm\NoReturn;
 
 class Node
 {
-    private array $connections;
-    private string $ip;
-    private string $externalIp;
-
     private Peer $peer;
     private Block $block;
     private Queue $queue;
+    private Mempool $mempool;
     private DataStore $dataStore;
 
     public const SYNCING = 'sync';
@@ -33,6 +30,7 @@ class Node
     {
         $this->peer = new Peer();
         $this->block = new Block();
+        $this->mempool = new Mempool();
         $this->dataStore = new DataStore();
         $this->queue = new Queue();
     }
@@ -43,7 +41,9 @@ class Node
         Console::log('SEND: ' . trim($data));
         $data = trim($data) . "\n";
         if (is_resource($client)) {
-            @fwrite($client, $data, strlen($data));
+            if (fwrite($client, $data, strlen($data)) === false) {
+                Console::log('Cannot write to socket');
+            }
         }
     }
 
@@ -122,9 +122,7 @@ class Node
 
                 // do some work/get local state
 
-
                 // Handle Input
-                $exceptions = [];
                 foreach ($clients as $key => $client) { // for each client
                     if (in_array($client, $read)) {
                         $data = fread($client, 8192);
@@ -232,8 +230,7 @@ class Node
 
                                             // invalid or duplicate? if so, ignore...
                                             $id = 0;
-                                            if (
-                                                empty($block) || $this->block->getByBlockId($block['block_id']) !== null
+                                            if (empty($block) || $this->block->getByBlockId($block['block_id']) !== null
                                             ) {
                                                 // we will not be forwarding this block
                                                 $this->send($client, json_encode([
@@ -288,7 +285,7 @@ class Node
                                                                  * Got an older block... just add it
                                                                  */
                                                                 // we have an older block...
-                                                                $id = $this->block->add($block, false, false, false);
+                                                                $id = $this->block->add($block, false);
                                                                 $this->queue->add('height_test', $block['height']);
                                                             }
                                                         }
@@ -369,9 +366,10 @@ class Node
                                          */
                                         case 'mempool_size_req':
                                             Console::log('Received a mempool size request from: ' . $key);
+                                            $currentHeight = $this->block->getCurrentHeight();
                                             $this->send($client, json_encode([
                                                 'type' => 'mempool_size',
-                                                'height' => 11
+                                                'height' => $this->mempool->getMempoolCount($currentHeight)
                                             ]));
                                             break;
 
@@ -391,9 +389,10 @@ class Node
                                                 }
 
                                                 // new block is invalid...
+                                                $blockId = $data['block_id'] ?: null;
                                                 $this->send($c, json_encode([
                                                     'type' => 'block',
-                                                    'block' => $block,
+                                                    'block' => $this->block->assembleFullBlock($blockId['block_id']),
                                                 ]));
                                             }
 
@@ -483,10 +482,10 @@ class Node
                                             $peerPort = (int)$data['port'] ?: null;
                                             if (!empty($peerAddress) && !empty($peerPort)) {
                                                 if (filter_var(
-                                                    $peerAddress,
-                                                    FILTER_VALIDATE_IP,
-                                                    FILTER_FLAG_IPV4
-                                                ) && $peerPort > 0 && $peerPort <= 65535) {
+                                                        $peerAddress,
+                                                        FILTER_VALIDATE_IP,
+                                                        FILTER_FLAG_IPV4
+                                                    ) && $peerPort > 0 && $peerPort <= 65535) {
                                                     $hostAddress = $peerAddress . ':' . $port;
                                                     if ($this->peer->getByHostAddress($hostAddress) === null) {
                                                         $this->peer->add($hostAddress);
