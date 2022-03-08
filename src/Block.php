@@ -426,11 +426,9 @@ class Block
             if ($transaction['version'] === TransactionVersion::COINBASE) {
                 $coinbaseRecords++;
             }
-            try {
-                $reason = $t->validate($transaction);
-            } catch (Exception) {
-            }
-            if (!$reason) {
+
+            $reason = $t->validate($transaction);
+            if (!$reason['validated']) {
                 return $reason;
             }
         }

@@ -257,7 +257,7 @@ class Transaction
     }
 
     #[ArrayShape(['validated' => "false", 'reason' => "string"])]
-    public function validate(array $transaction): array|bool
+    public function validate(array $transaction): array
     {
         $result = true;
         $reason = '';
