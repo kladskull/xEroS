@@ -20,6 +20,7 @@ class DatabaseHelpers
     {
         foreach ($fields as $field) {
             $stmt = self::filterBind(
+                $stmt,
                 $field['name'],
                 $field['value'],
                 $field['type'],
