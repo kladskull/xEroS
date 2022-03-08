@@ -22,9 +22,9 @@ project.
 
 ## Install
 ```
-apt update && apt upgrade
-apt install software-properties-common
-add-apt-repository ppa:ondrej/php
+apt update -y && apt upgrade -y
+apt install -y software-properties-common
+add-apt-repository -y ppa:ondrej/php
 apt update
 apt install -y unzip curl 
 apt install -y php8.1 php8.1-common php8.1-sqlite3 php8.1-xml php8.1-xmlrpc php8.1-curl php8.1-cli php8.1-mbstring php8.1-bcmath php8.1-zip
