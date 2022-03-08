@@ -894,8 +894,8 @@ class Block
                         'max_length' => 64,
                     ],
                     [
-                        'name' => 'previous_block_id',
-                        'value' => $transaction['previous_block_id'],
+                        'name' => 'transaction_id',
+                        'value' => $transaction['transaction_id'],
                         'type' => DatabaseHelpers::ALPHA_NUMERIC,
                         'max_length' => 64,
                     ],
