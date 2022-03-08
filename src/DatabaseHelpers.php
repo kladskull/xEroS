@@ -16,6 +16,20 @@ class DatabaseHelpers
     {
     }
 
+    public static function filterBindAll(PDOStatement $stmt, array $fields): PDOStatement
+    {
+        foreach ($fields as $field) {
+            $stmt = self::filterBind(
+                $field['name'],
+                $field['value'],
+                $field['type'],
+                $field['max_length']
+            );
+        }
+
+        return $stmt;
+    }
+
     public static function filterBind(
         PDOStatement $stmt,
         string $fieldName,

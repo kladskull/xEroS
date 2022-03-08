@@ -50,7 +50,7 @@ class Transaction
 
     public function existStrict(string $blockId, string $transactionId): bool
     {
-        $query = 'SELECT `id` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = '.
+        $query = 'SELECT `id` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = ' .
             ':transaction_id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind(
@@ -259,54 +259,68 @@ class Transaction
     #[ArrayShape(['validated' => "false", 'reason' => "string"])]
     public function validate(array $transaction): array
     {
+        $result = true;
+        $reason = '';
+
         $address = new Address();
         $openSsl = new OpenSsl();
 
         if (!isset($transaction['date_created'])) {
-            return $this->returnValidateError('"date_created" is a missing');
+            $reason .= '"date_created" is a missing,';
+            $result = false;
         }
 
         if (!isset($transaction['public_key'])) {
-            return $this->returnValidateError('"public_key_raw" is a missing.');
+            $reason .= '"public_key_raw" is a missing,';
+            $result = false;
         }
 
         if (!isset($transaction['signature'])) {
-            return $this->returnValidateError('signature is missing.');
+            $reason .= 'signature is missing,';
+            $result = false;
         }
 
         if (!isset($transaction['transaction_id'])) {
-            return $this->returnValidateError('transaction_id is a missing.');
+            $reason .= 'transaction_id is a missing,';
+            $result = false;
         }
 
         // must have at least one unspent output
         if (!isset($transaction[self::OUTPUTS])) {
-            return $this->returnValidateError('unspent output transactions are a missing.');
+            $reason .= 'unspent output transactions are a missing,';
+            $result = false;
         }
 
         if (count($transaction[self::INPUTS]) > Config::getMaxSpentTransactionCount()) {
-            return $this->returnValidateError(self::INPUTS . ' > max input transaction unspent size.');
+            $reason .= self::INPUTS . ' > max input transaction unspent size,';
+            $result = false;
         }
 
         if (count($transaction[self::OUTPUTS]) > Config::getMaxUnspentTransactionCount()) {
-            return $this->returnValidateError(self::OUTPUTS . ' > max output transaction spent size.');
+            $reason .= self::OUTPUTS . ' > max output transaction spent size,';
+            $result = false;
         }
 
         if (!isset($transaction['version'])) {
-            return $this->returnValidateError('missing version in the transaction');
+            $reason .= 'missing version in the transaction,';
+            $result = false;
         }
 
         if (!isset($transaction['height'])) {
-            return $this->returnValidateError('missing height in the transaction');
+            $reason .= 'missing height in the transaction,';
+            $result = false;
         }
 
         if (strlen($transaction['peer']) > 40) {
-            return $this->returnValidateError('"peer" is too long, must be 40 or less');
+            $reason .= '"peer" is too long, must be 40 or less,';
+            $result = false;
         }
 
         // no transactions before the genesis
         if ($transaction['date_created'] < Config::getGenesisDate()) {
-            return $this->returnValidateError('date created is before genesis block ' .
-                $transaction['date_created'] . ' < ' . Config::getGenesisDate());
+            $reason .= 'date created is before genesis block ' .
+                $transaction['date_created'] . ' < ' . Config::getGenesisDate() . ',';
+            $result = false;
         }
 
         // validate signature
@@ -316,31 +330,30 @@ class Transaction
             $transaction['signature'],
             $openSsl->formatPem($transaction['public_key'], false)
         )) {
-            return $this->returnValidateError('Invalid signature');
+            $reason .= 'Invalid signature,';
+            $result = false;
         }
 
         $totalInputs = "0";
         if (isset($transaction[self::INPUTS])) {
             foreach ($transaction[self::INPUTS] as $txIn) {
                 if (!isset($txIn['previous_transaction_id'])) {
-                    return $this->returnValidateError(
-                        'transaction_id: (' . $transaction['transaction_id'] . ') is a missing an unspent transaction'
-                    );
+                    $reason .= 'transaction_id: (' . $transaction['transaction_id'] .
+                        ') is a missing an unspent transaction,';
+                    $result = false;
                 }
 
                 if (!isset($txIn['previous_tx_out_id'])) {
-                    return $this->returnValidateError(
-                        'transaction_id: (' . $transaction['transaction_id'] .
-                        ') is a missing an unspent transaction index'
-                    );
+                    $reason .= 'transaction_id: (' . $transaction['transaction_id'] .
+                        ') is a missing an unspent transaction index,';
+                    $result = false;
                 }
 
                 $previousTransaction = $this->getByTransactionId($txIn['previous_transaction_id']);
                 if ($previousTransaction !== null) {
                     if (!isset($previousTransaction[self::OUTPUTS][(int)$txIn['previous_tx_out_id']])) {
-                        return $this->returnValidateError(
-                            'previous_tx_out_id: (' . $txIn['previous_tx_out_id'] . ') does not exist'
-                        );
+                        $reason .= 'previous_tx_out_id: (' . $txIn['previous_tx_out_id'] . ') does not exist,';
+                        $result = false;
                     }
 
                     // add if the value is unspent
@@ -350,13 +363,13 @@ class Transaction
                     }
 
                     if (strlen($txIn['script']) > Config::getMaxScriptLength()) {
-                        return $this->returnValidateError('uncompressed script is larger than the max allowed');
+                        $reason .= 'uncompressed script is larger than the max allowed,';
+                        $result = false;
                     }
                 } else {
-                    return $this->returnValidateError(
-                        'previous transaction_id: (' . $txIn['transaction_id'] .
-                        ') is a missing on a spent transaction'
-                    );
+                    $reason .= 'previous transaction_id: (' . $txIn['transaction_id'] .
+                        ') is a missing on a spent transaction,';
+                    $result = false;
                 }
             }
         }
@@ -364,27 +377,33 @@ class Transaction
         $totalOutputs = "0";
         foreach ($transaction[self::OUTPUTS] as $txOut) {
             if (!$address->validateAddress($txOut['address'])) {
-                return $this->returnValidateError('invalid address in unspent: ' . $txOut['address']);
+                $reason .= 'invalid address in unspent: ' . $txOut['address'] . ',';
+                $result = false;
             }
 
             if (!isset($txOut['tx_id'])) {
-                return $this->returnValidateError('missing tx_id in unspent');
+                $reason .= 'missing tx_id in unspent,';
+                $result = false;
             }
 
             if (strlen($txOut['script']) > Config::getMaxScriptLength()) {
-                return $this->returnValidateError('uncompressed script is larger than the max allowed');
+                $reason .= 'uncompressed script is larger than the max allowed,';
+                $result = false;
             }
 
             if ((int)$txOut['lock_height'] < 0) {
-                return $this->returnValidateError('Invalid lock_height value');
+                $reason .= 'Invalid lock_height value,';
+                $result = false;
             }
 
             if ((int)$txOut['lock_height'] === 0 && ((int)$txOut['lock_height'] > (int)$transaction['height'])) {
-                return $this->returnValidateError('Height is greater than the lock height value');
+                $reason .= 'Height is greater than the lock height value,';
+                $result = false;
             }
 
             if (bccomp($txOut['value'], "0") <= 0) {
-                return $this->returnValidateError('value of unspent is less than or equal to 0');
+                $reason .= 'value of unspent is less than or equal to 0,';
+                $result = false;
             }
 
             // add values
@@ -393,20 +412,21 @@ class Transaction
 
         // non-coinbase - the inputs must be greater or equal to the outputs
         if (($transaction['version'] !== TransactionVersion::COINBASE) && bccomp($totalInputs, $totalOutputs) < 0) {
-            return $this->returnValidateError('the inputs are less than the outputs).');
+            $reason .= 'the inputs are less than the outputs),';
+            $result = false;
         }
 
         // coinbase - the inputs must be zero, and the outputs must be > 0
         if (($transaction['version'] === TransactionVersion::COINBASE) && bccomp($totalInputs, "0") !== 0) {
-            return $this->returnValidateError('the coinbase inputs must be zero.');
+            $reason .= 'the coinbase inputs must be zero,';
+            $result = false;
         }
 
         // check for an appropriate fee
         $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
         if (bccomp($fee, Config::getMinimumTransactionFee(), 0) < 0) {
-            return $this->returnValidateError(
-                'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . ').'
-            );
+            $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
+            $result = false;
         }
 
         // check reward - can be less, but not more
@@ -414,15 +434,14 @@ class Transaction
             $block = new Block();
             $reward = $block->getRewardValue($transaction['height']);
             if (bccomp($totalOutputs, $block->getRewardValue($transaction['height']), 0) > 0) {
-                return $this->returnValidateError(
-                    'Reward ' . $totalOutputs . ' is greater than expected ' . $reward
-                );
+                $reason .= 'Reward ' . $totalOutputs . ' is greater than expected ' . $reward . ',';
+                $result = false;
             }
         }
 
         return [
-            'validated' => true,
-            'reason' => '',
+            'validated' => $reason,
+            'reason' => $result,
         ];
     }
 

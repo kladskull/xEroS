@@ -269,7 +269,11 @@ class Block
             '`block_id` = :block_id LIMIT 1';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind(
-            $stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64
+            $stmt,
+            'block_id',
+            $blockId,
+            DatabaseHelpers::ALPHA_NUMERIC,
+            64
         );
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -339,10 +343,8 @@ class Block
             $currBlock['transactions'] = $transaction->stripInternalFields(
                 $transaction->getTransactionsByBlockId($blockId)
             );
-        } else {
-            $currBlock = [];
         }
-        return $currBlock;
+        return $currBlock ?: [];
     }
 
     public function stripInternalFields(array $block): array
@@ -373,40 +375,50 @@ class Block
 
     public function validate(array $block, array $transactions, int $transactionCount): array
     {
+        $reason = '';
+        $result = true;
+
         if ($block['network_id'] !== Config::getNetworkIdentifier()) {
-            return $this->returnValidateResult('networkId mismatch', false);
+            $reason .= 'networkId mismatch,';
+            $result = false;
         }
 
         // ensure a sane time
         if ($block['date_created'] > time() + 60) {
-            return $this->returnValidateResult('block from the future', false);
+            $reason .= 'block from the future,';
+            $result = false;
         }
 
         // no transactions before the genesis
         if ($block['date_created'] < Config::getGenesisDate()) {
-            return $this->returnValidateResult('block precedes genesis block', false);
+            $reason .= 'block precedes genesis block,';
+            $result = false;
         }
 
         // check difficulty
         if ($this->getDifficulty((int)$block['height']) !== (int)$block['difficulty']) {
-            return $this->returnValidateResult('difficulty difference', false);
+            $reason .= 'difficulty difference,';
+            $result = false;
         }
 
         // check the proof of work
         $pow = new Pow();
         if (!$pow->verifyPow($block['hash'], $this->generateBlockHeader($block), $block['nonce'])) {
-            return $this->returnValidateResult("Proof of work fail", false);
+            $reason .= 'Proof of work fail,';
+            $result = false;
         }
 
         // we must have all the transactions
         $transactions = Transaction::sort($transactions);
         if ($transactionCount !== count($transactions)) {
-            return $this->returnValidateResult("transaction count mismatch", false);
+            $reason .= 'transaction count mismatch,';
+            $result = false;
         }
 
         // check for a valid height
         if ($block['height'] < 1) {
-            return $this->returnValidateResult("invalid height", false);
+            $reason .= 'invalid height,';
+            $result = false;
         }
 
         // check the transactions
@@ -417,23 +429,28 @@ class Block
             if ($transaction['version'] === TransactionVersion::COINBASE) {
                 $coinbaseRecords++;
             }
-            $reason = $t->validate($transaction);
+            try {
+                $reason = $t->validate($transaction);
+            } catch (Exception) {
+            }
             if (!$reason) {
                 return $reason;
             }
         }
 
         if ($coinbaseRecords !== 1) {
-            return $this->returnValidateResult("blocks must have exactly 1 coinbase record.", false);
+            $reason .= 'blocks must have exactly 1 coinbase record,';
+            $result = false;
         }
 
         // test the merkle root
         $merkle = new Merkle();
         if ($block['merkle_root'] !== $merkle->computeMerkleHash($transactions)) {
-            return $this->returnValidateResult("merkle root issue", false);
+            $reason .= 'merkle root issue,';
+            $result = false;
         }
 
-        return $this->returnValidateResult("ok", true);
+        return $this->returnValidateResult($reason, $result);
     }
 
     /**
@@ -459,26 +476,28 @@ class Block
      */
     private function isFork(?array $block1, ?array $block2): bool
     {
+        $result = true;
+
         if ($block1 == null || $block2 == null) {
-            return false;
+            $result = false;
         }
 
         // same block?
         if ($block1['block_id'] == $block2['block_id']) {
-            return false;
+            $result = false;
         }
 
         // not the same height?
         if ((int)$block1['height'] != (int)$block2['height']) {
-            return false;
+            $result = false;
         }
 
         // is this a fork? If not, get out
         if ($block1['previous_block_id'] != $block2['previous_block_id']) {
-            return false;
+            $result = false;
         }
 
-        return true;
+        return $result;
     }
 
     /**
@@ -509,7 +528,7 @@ class Block
 
                 // let's not kill the CPU
                 if ($counter++ % 100 === 0) {
-                    usleep(5000);
+                    usleep(1);
                 }
             }
         }
@@ -740,11 +759,11 @@ class Block
                 $result = $this->validateFullBlock($block);
             } catch (Exception|RuntimeException $ex) {
                 Console::log('Exception thrown validating block: ' . $ex->getMessage());
-                exit(0);
+                return false;
             }
             if (!$result['validated']) {
                 Console::log('Invalid block: ' . $result['reason']);
-                exit(0);
+                return false;
             }
         }
 
@@ -767,90 +786,88 @@ class Block
             $this->db->beginTransaction();
 
             // prepare the statement and execute
+            $fields = [];
             $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`' .
                 ',`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan`) VALUES ' .
                 '(:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,' .
                 ':transaction_count,:previous_hash,:hash,:orphan)';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'network_id',
-                value: $block['network_id'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 4
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'block_id',
-                value: $block['block_id'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'previous_block_id',
-                value: $block['previous_block_id'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'date_created',
-                value: $block['date_created'],
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'height',
-                value: $block['height'],
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'nonce',
-                value: $block['nonce'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 16
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'difficulty',
-                value: $block['difficulty'],
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'merkle_root',
-                value: $block['merkle_root'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'transaction_count',
-                value: $block['transaction_count'],
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'hash',
-                value: $block['hash'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'previous_hash',
-                value: $block['previous_hash'],
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'orphan',
-                value: $orphanVal,
-                pdoType: DatabaseHelpers::INT
-            );
+
+            $fields = [
+                [
+                    'name' => 'network_id',
+                    'value' => $block['network_id'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 4,
+                ],
+                [
+                    'name' => 'block_id',
+                    'value' => $block['block_id'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 64,
+                ],
+                [
+                    'name' => 'previous_block_id',
+                    'value' => $block['previous_block_id'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 64,
+                ],
+                [
+                    'name' => 'date_created',
+                    'value' => $block['date_created'],
+                    'type' => DatabaseHelpers::INT,
+                    'max_length' => 20,
+                ],
+                [
+                    'name' => 'height',
+                    'value' => $block['height'],
+                    'type' => DatabaseHelpers::INT,
+                    'max_length' => 20,
+                ],
+                [
+                    'name' => 'nonce',
+                    'value' => $block['nonce'],
+                    'type' => DatabaseHelpers::INT,
+                    'max_length' => 20,
+                ],
+                [
+                    'name' => 'difficulty',
+                    'value' => $block['difficulty'],
+                    'type' => DatabaseHelpers::INT,
+                    'max_length' => 20,
+                ],
+                [
+                    'name' => 'merkle_root',
+                    'value' => $block['merkle_root'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 64,
+                ],
+                [
+                    'name' => 'transaction_count',
+                    'value' => $block['transaction_count'],
+                    'type' => DatabaseHelpers::INT,
+                    'max_length' => 20,
+                ],
+                [
+                    'name' => 'hash',
+                    'value' => $block['hash'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 64,
+                ],
+                [
+                    'name' => 'previous_hash',
+                    'value' => $block['previous_hash'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 64,
+                ],
+                [
+                    'name' => 'orphan',
+                    'value' => $orphanVal,
+                    'type' => DatabaseHelpers::INT,
+                    'max_length' => 20,
+                ]
+            ];
+            $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
             $stmt->execute();
 
             // ensure the block was stored
@@ -873,58 +890,59 @@ class Block
                     '`version`,`signature`,`public_key`) VALUES (:block_id,:transaction_id,:date_created,:peer,' .
                     ':height,:version,:signature,:public_key)';
                 $stmt = $this->db->prepare($query);
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'block_id',
-                    value: $transaction['block_id'],
-                    pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                    maxLength: 64
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'transaction_id',
-                    value: $transaction['transaction_id'],
-                    pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                    maxLength: 64
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'date_created',
-                    value: $transaction['date_created'],
-                    pdoType: DatabaseHelpers::INT
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'peer',
-                    value: $transaction['peer'],
-                    pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                    maxLength: 64
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'height',
-                    value: $transaction['height'],
-                    pdoType: DatabaseHelpers::INT
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'version',
-                    value: $transaction['version'],
-                    pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                    maxLength: 2
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'signature',
-                    value: $transaction['signature'],
-                    pdoType: DatabaseHelpers::TEXT
-                );
-                $stmt = DatabaseHelpers::filterBind(
-                    stmt: $stmt,
-                    fieldName: 'public_key',
-                    value: $transaction['public_key'],
-                    pdoType: DatabaseHelpers::TEXT
-                );
+
+                $fields = [
+                    [
+                        'name' => 'block_id',
+                        'value' => $transaction['block_id'],
+                        'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                        'max_length' => 64,
+                    ],
+                    [
+                        'name' => 'previous_block_id',
+                        'value' => $transaction['previous_block_id'],
+                        'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                        'max_length' => 64,
+                    ],
+                    [
+                        'name' => 'date_created',
+                        'value' => $transaction['date_created'],
+                        'type' => DatabaseHelpers::INT,
+                        'max_length' => 20,
+                    ],
+                    [
+                        'name' => 'peer',
+                        'value' => $transaction['peer'],
+                        'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                        'max_length' => 64,
+                    ],
+                    [
+                        'name' => 'height',
+                        'value' => $transaction['height'],
+                        'type' => DatabaseHelpers::INT,
+                        'max_length' => 20,
+                    ],
+                    [
+                        'name' => 'version',
+                        'value' => $transaction['version'],
+                        'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                        'max_length' => 2,
+                    ],
+                    [
+                        'name' => 'signature',
+                        'value' => $transaction['signature'],
+                        'type' => DatabaseHelpers::TEXT,
+                        'max_length' => 8192,
+                    ],
+                    [
+                        'name' => 'public_key',
+                        'value' => $transaction['public_key'],
+                        'type' => DatabaseHelpers::TEXT,
+                        'max_length' => 8192,
+                    ]
+                ];
+
+                $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                 $stmt->execute();
 
                 $transactionId = (int)$this->db->lastInsertId();
@@ -945,25 +963,28 @@ class Block
                         '`hash` FROM transaction_outputs WHERE spent=0 AND transaction_id=:transaction_id AND ' .
                         'tx_id=:tx_id';
                     $stmt = $this->db->prepare($query);
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'previous_transaction_id',
-                        value: $txIn['previous_transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'previous_tx_out_id',
-                        value: $txIn['previous_tx_out_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
+                    $fields = [
+                        [
+                            'name' => 'previous_transaction_id',
+                            'value' => $txIn['previous_tx_out_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'transaction_id',
+                            'value' => $txIn['previous_tx_out_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ]
+                    ];
+
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                     $stmt->execute();
+
                     $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     if (count($txOut) <= 0) {
                         throw new RuntimeException('failed to get unspent transaction for: ' .
-                            $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']
-                        );
+                            $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']);
                     }
 
                     // run script
@@ -977,46 +998,47 @@ class Block
                         '`previous_transaction_id`,`previous_tx_out_id`,`script`) VALUES (:block_id,:transaction_id' .
                         ',:tx_id,:previous_transaction_id,:previous_tx_out_id,:script)';
                     $stmt = $this->db->prepare($query);
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'block_id',
-                        value: $transaction['block_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'transaction_id',
-                        value: $txIn['transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'tx_id',
-                        value: $txIn['tx_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'previous_transaction_id',
-                        value: $txIn['previous_transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'previous_tx_out_id',
-                        value: $txIn['previous_tx_out_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'script',
-                        value: $txIn['script'],
-                        pdoType: DatabaseHelpers::TEXT
-                    );
+                    $fields = [
+                        [
+                            'name' => 'block_id',
+                            'value' => $transaction['block_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'transaction_id',
+                            'value' => $txIn['transaction_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'tx_id',
+                            'value' => $txIn['tx_id'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                        [
+                            'name' => 'previous_transaction_id',
+                            'value' => $txIn['previous_transaction_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'previous_tx_out_id',
+                            'value' => $txIn['previous_tx_out_id'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                        [
+                            'name' => 'script',
+                            'value' => $txIn['script'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 16384,
+                        ]
+                    ];
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                     $stmt->execute();
+
                     $transactionTxId = (int)$this->db->lastInsertId();
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException('failed to add a new transaction tx: ' .
@@ -1035,64 +1057,64 @@ class Block
                         ',`script`,`lock_height`,`spent`,`hash`) VALUES (:block_id,:transaction_id,:tx_id,:address,' .
                         ':value,:script,:lock_height,:spent,:hash)';
                     $stmt = $this->db->prepare($query);
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'block_id',
-                        value: $transaction['block_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'transaction_id',
-                        value: $txOut['transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'tx_id',
-                        value: $txOut['tx_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'address',
-                        value: $txOut['address'] ?: '',
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 40
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'value',
-                        value: $txOut['value'],
-                        pdoType: DatabaseHelpers::INT
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'script',
-                        value: $txOut['script'],
-                        pdoType: DatabaseHelpers::TEXT
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'lock_height',
-                        value: $txOut['lock_height'],
-                        pdoType: DatabaseHelpers::INT
-                    );
-                    // any new block added is NOT spent
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'spent',
-                        value: 0,
-                        pdoType: DatabaseHelpers::INT
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'hash',
-                        value: $txOut['hash'],
-                        pdoType: DatabaseHelpers::TEXT
-                    );
+                    $fields = [
+                        [
+                            'name' => 'block_id',
+                            'value' => $transaction['block_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'transaction_id',
+                            'value' => $txOut['transaction_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'tx_id',
+                            'value' => $txOut['tx_id'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                        [
+                            'name' => 'address',
+                            'value' => $txOut['address'] ?: '',
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'value',
+                            'value' => $txOut['value'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                        [
+                            'name' => 'script',
+                            'value' => $txOut['script'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 16384,
+                        ],
+                        [
+                            'name' => 'lock_height',
+                            'value' => $txOut['lock_height'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                        [
+                            'name' => 'spent',
+                            'value' => 0,
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                        [
+                            'name' => 'hash',
+                            'value' => $transaction['hash'],
+                            'type' => DatabaseHelpers::TEXT,
+                            'max_length' => 8192,
+                        ]
+                    ];
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
+
                     $stmt->execute();
                     $transactionTxId = (int)$this->db->lastInsertId();
                     if ($transactionTxId <= 0) {
@@ -1174,20 +1196,23 @@ class Block
                         '`lock_height`,`hash` FROM transaction_outputs WHERE spent=0 AND ' .
                         'transaction_id=:transaction_id AND tx_id=:tx_id';
                     $stmt = $this->db->prepare($query);
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'previous_transaction_id',
-                        value: $txIn['previous_transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'previous_tx_out_id',
-                        value: $txIn['previous_tx_out_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
+                    $fields = [
+                        [
+                            'name' => 'previous_transaction_id',
+                            'value' => $txIn['previous_transaction_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'previous_tx_out_id',
+                            'value' => $txIn['previous_tx_out_id'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ],
+                    ];
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                     $stmt->execute();
+
                     $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     if (count($txOut) <= 0) {
                         throw new RuntimeException('failed to get unspent transaction for: ' .
@@ -1204,20 +1229,23 @@ class Block
                     $stmt = $this->db->prepare(
                         'UPDATE transaction_outputs SET spent=1 WHERE transaction_id=:transaction_id AND tx_id=:tx_id;'
                     );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'transaction_id',
-                        value: $txIn['transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'tx_id',
-                        value: $txIn['previous_tx_out_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
+                    $fields = [
+                        [
+                            'name' => 'transaction_id',
+                            'value' => $txIn['transaction_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'tx_id',
+                            'value' => $txIn['tx_id'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ]
+                    ];
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                     $stmt->execute();
+
                     $transactionTxId = (int)$this->db->lastInsertId();
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException(
@@ -1230,19 +1258,7 @@ class Block
                     $stmt = $this->db->prepare(
                         'DELETE from mempool_inputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id'
                     );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'transaction_id',
-                        value: $txIn['transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'tx_id',
-                        value: $txIn['tx_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                     $stmt->execute();
                 }
 
@@ -1256,19 +1272,21 @@ class Block
                     $stmt = $this->db->prepare(
                         'DELETE from mempool_outputs WHERE transaction_id=:transaction_id AND tx_id=:tx_id'
                     );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'transaction_id',
-                        value: $txOut['transaction_id'],
-                        pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                        maxLength: 64
-                    );
-                    $stmt = DatabaseHelpers::filterBind(
-                        stmt: $stmt,
-                        fieldName: 'tx_id',
-                        value: $txOut['tx_id'],
-                        pdoType: DatabaseHelpers::INT
-                    );
+                    $fields = [
+                        [
+                            'name' => 'transaction_id',
+                            'value' => $txOut['transaction_id'],
+                            'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                            'max_length' => 64,
+                        ],
+                        [
+                            'name' => 'tx_id',
+                            'value' => $txOut['tx_id'],
+                            'type' => DatabaseHelpers::INT,
+                            'max_length' => 20,
+                        ]
+                    ];
+                    $stmt = DatabaseHelpers::filterBindAll($stmt, $fields);
                     $stmt->execute();
                 }
             }
@@ -1287,7 +1305,6 @@ class Block
      * reverseBlock() with delete flag set to true.
      *
      * @param string $blockId
-     * @param bool $restoreMempool
      * @return bool
      */
     public function delete(string $blockId): bool
