@@ -417,10 +417,12 @@ class Transaction
         }
 
         // check for an appropriate fee
-        $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
-        if (bccomp($fee, Config::getMinimumTransactionFee(), 0) < 0) {
-            $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
-            $result = false;
+        if ($transaction['version'] !== TransactionVersion::COINBASE) {
+            $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
+            if (bccomp($fee, Config::getMinimumTransactionFee(), 0) < 0) {
+                $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
+                $result = false;
+            }
         }
 
         // check reward - can be less, but not more
@@ -434,8 +436,8 @@ class Transaction
         }
 
         return [
-            'validated' => $reason,
-            'reason' => $result,
+            'validated' => $result,
+            'reason' => $reason,
         ];
     }
 

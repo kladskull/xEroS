@@ -79,7 +79,7 @@ while (1) {
     // inner loop, only exit on an event
     while (1) {
         // assembled the block, now find a hash
-        $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], $height, $nonce, true);
+        $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], $height, $nonce);
 
         // something changed
         if ($result['result'] === false && empty($result['nonce'])) {
