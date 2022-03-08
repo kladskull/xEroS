@@ -1103,7 +1103,7 @@ class Block
                         ],
                         [
                             'name' => 'hash',
-                            'value' => $transaction['hash'],
+                            'value' => $txOut['hash'],
                             'type' => DatabaseHelpers::TEXT,
                             'max_length' => 8192,
                         ]
