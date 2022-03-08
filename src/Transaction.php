@@ -216,15 +216,6 @@ class Transaction
         return $transaction;
     }
 
-    #[ArrayShape(['validated' => "", 'reason' => ""])]
-    private function returnValidateError(string $reason): array
-    {
-        return [
-            'validated' => false,
-            'reason' => $reason
-        ];
-    }
-
     public function calculateMinerFee(array $transaction): string
     {
         $totalInputs = "0";
