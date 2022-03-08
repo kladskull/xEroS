@@ -134,7 +134,7 @@ class Miner
         $elapsed = time() - $start;
         return [
             'nonce' => $nonce,
-            'hash' => bin2hex($hash),
+            'hash' => bin2hex($hash) ?: null,
             'hashes' => $hashes,
             'elapsed_time' => $elapsed,
             'result' => true,

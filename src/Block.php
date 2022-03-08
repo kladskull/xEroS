@@ -782,7 +782,6 @@ class Block
             $this->db->beginTransaction();
 
             // prepare the statement and execute
-            $fields = [];
             $query = 'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`' .
                 ',`nonce`,`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan`) VALUES ' .
                 '(:network_id,:block_id,:previous_block_id,:date_created,:height,:nonce,:difficulty,:merkle_root,' .
