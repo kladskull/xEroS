@@ -354,6 +354,7 @@ class Block
     /**
      * @throws Exception
      */
+    #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
     public function validateFullBlock(array $block): array
     {
         $transactions = $block['transactions'];
@@ -370,6 +371,7 @@ class Block
         ];
     }
 
+    #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
     public function validate(array $block, array $transactions, int $transactionCount): array
     {
         $reason = '';
@@ -429,7 +431,8 @@ class Block
 
             $reason = $t->validate($transaction);
             if (!$reason['validated']) {
-                return $reason;
+                $reason .= 'transaction validate failed,';
+                $result = false;
             }
         }
 
