@@ -101,7 +101,7 @@ class Miner
             ++$hashes;
 
             // report
-            if ($hashes % 250000 === 0) {
+            if ($hashes % 10000000 === 0) {
                 $elapsed = max((time() - $start), 1);
                 $hashesPerSecond = $hashes / $elapsed;
                 $nonceHex = dechex($nonce);
