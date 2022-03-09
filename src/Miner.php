@@ -48,6 +48,11 @@ class Miner
         $elapsed = 0;
         $hashes = 0;
 
+        $displayFreq = 1000000;
+        if ($_ENV['ENVIRONMENT'] != 'live') {
+            $displayFreq = 25000;
+        }
+
         while (1) {
             // create work
             $bytesSet = 0;
@@ -101,7 +106,7 @@ class Miner
             ++$hashes;
 
             // report
-            if ($hashes % 1000000 === 0) {
+            if ($hashes % $displayFreq === 0) {
                 $elapsed = max((time() - $start), 1);
                 $hashesPerSecond = $hashes / $elapsed;
                 $nonceHex = dechex($nonce);
