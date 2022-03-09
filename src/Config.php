@@ -26,11 +26,13 @@ class Config
     private const MINIMUM_FEE = "10000000"; // 0.1 xc
     private const ADDRESS_HEADER = 'Xa'; // Xa = live / xa = testnet
     private const CHAIN_VERSION = '00'; // 00 = live, 01 = testnet
-    private const DEFAULT_DIFFICULTY = 28;
     private const MAX_CURRENCY_SUPPLY = "21000000000000000"; // Satoshi's per coin x 210,000,000
     private const MAX_TRANSACTION_SIZE = 100;
 
     // mining
+    private const DEFAULT_LIVE_DIFFICULTY = 28;
+    private const DEFAULT_TEST_DIFFICULTY = 24;
+    private const DEFAULT_DEV_DIFFICULTY = 16;
     private const LOCK_HEIGHT = 144; // 144 blocks ~ 1 day
 
     // Scripting
@@ -88,24 +90,34 @@ class Config
 
     public static function getDefaultDifficulty(): int
     {
-        return self::DEFAULT_DIFFICULTY;
+        $env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
+
+        return match ($env) {
+            'dev' => self::DEFAULT_DEV_DIFFICULTY,
+            'test' => self::DEFAULT_TEST_DIFFICULTY,
+        default => self::DEFAULT_LIVE_DIFFICULTY,
+        };
     }
 
     public static function getDbEnvironment(): string
     {
         $return = '';
-
         $env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
         switch ($env) {
+            case 'live':
+                $return = 'live';
+                break;
+
             case 'dev':
                 $return = 'dev';
                 break;
+
             case 'test':
                 $return = 'test';
                 break;
+
             default:
                 break;
-
         }
         return $return;
     }
@@ -214,5 +226,4 @@ class Config
     {
         return self::VERSION;
     }
-
 }

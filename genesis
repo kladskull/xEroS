@@ -12,7 +12,25 @@ $miner = new Miner();
 $pow = new Pow();
 $nonce = 0;
 
-$candidateBlock = $block->genesis();
+echo PHP_EOL, Config::getProductName(), ' Genesis Miner ', PHP_EOL;
+echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
+
+$env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
+Console::log('Working on chain: ' . $env);
+
+
+// use the newest key pair
+$account = new Account();
+$acct = $account->getNewestAccount();
+if ($acct === null) {
+    // do we need to create a new key pair?
+    $id = $account->create();
+    $acct = $account->get($id);
+}
+$publicKey = $acct['public_key'];
+$privateKey = $acct['private_key'];
+
+$candidateBlock = $block->genesis($env, $publicKey, $privateKey);
 $blockHeader = $block->generateBlockHeader($candidateBlock);
 
 while (1) {

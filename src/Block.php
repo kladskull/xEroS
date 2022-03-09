@@ -48,105 +48,291 @@ class Block
     /**
      * @throws Exception
      */
-    public function genesis(): array
+    public function genesis(string $environment, string $publicKey, string $privateKey): array
     {
-        // block details
+        $environment = trim($environment);
+
         $height = 1;
-        $date = 1644364863;
         $previousBlockId = '';
+        $gBlock = [];
 
-        //$publicKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
-        //$privateKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
+        $publicKeyRaw = $this->openSsl->stripPem($publicKey);
+        $privateKeyRaw = $this->openSsl->stripPem($privateKey);
 
-        $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJ' .
-            'hr6WB94TDhrAMjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJct' .
-            'LcaWmy0gI2YjsrrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hE' .
-            'FlYVtIF6g+wh59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB';
-        $hash = '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67';
-        $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
-        $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd' .
-            '7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da' .
-            '5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77' .
-            'e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018a' .
-            'e618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c' .
-            '2369ddc6c69295c476414';
-        $nonce = '1192faa7';
+        switch ($environment) {
+            case 'live':
+                // block details
+                $date = 1644364863;
 
-        // create a block ID
-        $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+                $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrAMjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2YjsrrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB';
+                $hash = '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67';
+                $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
+                $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c69295c476414';
+                $nonce = '1192faa7';
 
-        // transaction details
-        $amount = $this->getRewardValue(1);
+                // create a block ID
+                $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
 
-        // prepare script
-        $address = new Address();
-        $transferEncoding = new TransferEncoding();
-        $script = new Script([]);
-        $partialAddress = $transferEncoding->binToHex(
-            $address->createPartial(
-                $this->openSsl->formatPem(
-                    $publicKeyRaw,
-                    false
-                )
-            )
-        );
-        $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
-            'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
-            '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
-        $txId = 0;
-        $lockHeight = $height + Config::getLockHeight();
-        $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
+                // transaction details
+                $amount = $this->getRewardValue(1);
 
-        $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
-        $transactionRecord = [
-            'id' => 1,
-            'block_id' => $blockId,
-            'transaction_id' => $transactionId,
-            'date_created' => $date,
-            'public_key' => $publicKeyRaw,
-            'peer' => 'genesis',
-            'version' => TransactionVersion::COINBASE,
-            'height' => 1,
-            Transaction::INPUTS => [],
-            Transaction::OUTPUTS => [
-                [
+                // prepare script
+                $address = new Address();
+                $transferEncoding = new TransferEncoding();
+                $script = new Script([]);
+                $partialAddress = $transferEncoding->binToHex(
+                    $address->createPartial(
+                        $this->openSsl->formatPem(
+                            $publicKeyRaw,
+                            false
+                        )
+                    )
+                );
+                $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
+                    'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
+                    '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
+                $txId = 0;
+                $lockHeight = $height + Config::getLockHeight();
+                $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
+
+                $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
+                $transactionRecord = [
+                    'id' => 1,
                     'block_id' => $blockId,
-                    'tx_id' => $txId,
-                    'address' => $toAddress,
-                    'value' => $amount,
-                    'script' => $script->encodeScript($scriptText),
-                    'lock_height' => $lockHeight,
-                    'hash' => bin2hex(
-                        $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
-                    ),
-                ]
-            ],
-        ];
+                    'transaction_id' => $transactionId,
+                    'date_created' => $date,
+                    'public_key' => $publicKeyRaw,
+                    'peer' => 'genesis',
+                    'version' => TransactionVersion::COINBASE,
+                    'height' => 1,
+                    Transaction::INPUTS => [],
+                    Transaction::OUTPUTS => [
+                        [
+                            'block_id' => $blockId,
+                            'tx_id' => $txId,
+                            'address' => $toAddress,
+                            'value' => $amount,
+                            'script' => $script->encodeScript($scriptText),
+                            'lock_height' => $lockHeight,
+                            'hash' => bin2hex(
+                                $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
+                            ),
+                        ]
+                    ],
+                ];
 
-        // sign
-        $transactionRecord['signature'] = $signature;
-        /*
-        $transactionRecord['signature'] = $transaction->signTransaction(
-            $transactionRecord, $openSsl->formatPem($publicKeyRaw, false), $openSsl->formatPem($privateKeyRaw, true)
-        );
-        */
+                // sign
+                $transactionRecord['signature'] = $signature;
+                /*
+                $transactionRecord['signature'] = $transaction->signTransaction(
+                    $transactionRecord, $openSsl->formatPem($publicKeyRaw, false), $openSsl->formatPem($privateKeyRaw, true)
+                );
+                */
 
-        return [
-            'network_id' => Config::getNetworkIdentifier(),
-            'block_id' => $blockId,
-            'previous_block_id' => '',
-            'date_created' => $date,
-            'height' => $height,
-            'difficulty' => Config::getDefaultDifficulty(),
-            'merkle_root' => $merkleRoot,
-            'transactions' => [
-                $transactionRecord
-            ],
-            'transaction_count' => 1,
-            'previous_hash' => '',
-            'hash' => $hash,
-            'nonce' => $nonce
-        ];
+                $gBlock = [
+                    'network_id' => Config::getNetworkIdentifier(),
+                    'block_id' => $blockId,
+                    'previous_block_id' => '',
+                    'date_created' => $date,
+                    'height' => $height,
+                    'difficulty' => Config::getDefaultDifficulty(),
+                    'merkle_root' => $merkleRoot,
+                    'transactions' => [$transactionRecord],
+                    'transaction_count' => 1,
+                    'previous_hash' => '',
+                    'hash' => $hash,
+                    'nonce' => $nonce
+                ];
+                break;
+
+            case 'test':
+                // block details
+                $date = 1644364863;
+
+                //$publicKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
+                //$privateKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
+
+                $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJ' .
+                    'hr6WB94TDhrAMjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJct' .
+                    'LcaWmy0gI2YjsrrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hE' .
+                    'FlYVtIF6g+wh59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB';
+                $hash = '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67';
+                $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
+                $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd' .
+                    '7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da' .
+                    '5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77' .
+                    'e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018a' .
+                    'e618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c' .
+                    '2369ddc6c69295c476414';
+                $nonce = '1192faa7';
+
+                // create a block ID
+                $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+
+                // transaction details
+                $amount = $this->getRewardValue(1);
+
+                // prepare script
+                $address = new Address();
+                $transferEncoding = new TransferEncoding();
+                $script = new Script([]);
+                $partialAddress = $transferEncoding->binToHex(
+                    $address->createPartial(
+                        $this->openSsl->formatPem(
+                            $publicKeyRaw,
+                            false
+                        )
+                    )
+                );
+                $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
+                    'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
+                    '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
+                $txId = 0;
+                $lockHeight = $height + Config::getLockHeight();
+                $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
+
+                $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
+                $transactionRecord = [
+                    'id' => 1,
+                    'block_id' => $blockId,
+                    'transaction_id' => $transactionId,
+                    'date_created' => $date,
+                    'public_key' => $publicKeyRaw,
+                    'peer' => 'genesis',
+                    'version' => TransactionVersion::COINBASE,
+                    'height' => 1,
+                    Transaction::INPUTS => [],
+                    Transaction::OUTPUTS => [
+                        [
+                            'block_id' => $blockId,
+                            'tx_id' => $txId,
+                            'address' => $toAddress,
+                            'value' => $amount,
+                            'script' => $script->encodeScript($scriptText),
+                            'lock_height' => $lockHeight,
+                            'hash' => bin2hex(
+                                $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
+                            ),
+                        ]
+                    ],
+                ];
+
+                // sign
+                $transactionRecord['signature'] = $signature;
+                /*
+                $transactionRecord['signature'] = $transaction->signTransaction(
+                    $transactionRecord, $openSsl->formatPem($publicKeyRaw, false), $openSsl->formatPem($privateKeyRaw, true)
+                );
+                */
+
+                $gBlock = [
+                    'network_id' => Config::getNetworkIdentifier(),
+                    'block_id' => $blockId,
+                    'previous_block_id' => '',
+                    'date_created' => $date,
+                    'height' => $height,
+                    'difficulty' => Config::getDefaultDifficulty(),
+                    'merkle_root' => $merkleRoot,
+                    'transactions' => [$transactionRecord],
+                    'transaction_count' => 1,
+                    'previous_hash' => '',
+                    'hash' => $hash,
+                    'nonce' => $nonce
+                ];
+                break;
+
+            case 'dev':
+                // block details
+                $date = 1646786361;
+
+                $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxsUPQdLF5QPyqFUmCWqiSVFLjf+pYHwOpPdHf/bZZuGDzu/nNp7EXT9tsMIdEdgNzhMEkpD+JcMaXwfBZm6u7ThrAwDl8QOldHiSA+j87O3zk3CSeR5edeRjUgj36zFJzsrvqFQkCmEzl25WAyKDhU68nqOdNuEBBp4sq7yMSMkWw2uiPUW5+hkBi0x3kXM7yl0hld9n4qVfjY3/JI+8RnIeIQMLANbO2Ms+E0wPmBhLVTaLMM8uH5bLd4dM+KGrLeEqKN23V5mziFM/JS5z7AMy2DDHqYr7JXyiuhyt8QQxmLZPC/24Z9nCxZ5VWYRmrpUEYh9IwzNnqYMCJ2YlRwIDAQAB';
+                $hash = '0000b97b1fada4f3b8c88093d2b724d7c723a1532550daf0ec08f5f66a19cb87';
+                $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
+                $signature = '983de74a65334f1273bf72a9957ce5877c01ff93a34259aaeb470ce2ce35ae138f9c2e9bbd400c41f6f4479750f88e5f56c28940d5461fa7bbdc4104abaa6c711fdead8cf900147524036a44c23fe18cc898cba9d19a35a5e3bc13c827eb0cec546b63741a730f189c30996f6ee4561fb259eeac71032f4d8007e234ad5b93145786270f0a818aee52cd666e77ac0031c3b2772e26f856f2177769fe3b26321aabc2c21968e3d81ae4db6dd7698d04195a6d8b2954b4b28c5407eb8dc83cd86d572adc2d167f2dc0345dd509382219b01d55d5914d8233a9622d4dc0f67b525c9535e159d43def2fac8ecf418bdaa0f1594165ff2b80547356a895bcdb3eb525';
+                $nonce = '93e4';
+
+                // create a block ID
+                $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+
+                // transaction details
+                $amount = $this->getRewardValue(1);
+
+                // prepare script
+                $address = new Address();
+                $transferEncoding = new TransferEncoding();
+                $script = new Script([]);
+                $partialAddress = $transferEncoding->binToHex(
+                    $address->createPartial(
+                        $this->openSsl->formatPem(
+                            $publicKeyRaw,
+                            false
+                        )
+                    )
+                );
+                $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
+                    'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
+                    '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
+                $txId = 0;
+                $lockHeight = $height + Config::getLockHeight();
+                $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
+
+                $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
+                $transactionRecord = [
+                    'id' => 1,
+                    'block_id' => $blockId,
+                    'transaction_id' => $transactionId,
+                    'date_created' => $date,
+                    'public_key' => $publicKeyRaw,
+                    'peer' => 'genesis',
+                    'version' => TransactionVersion::COINBASE,
+                    'height' => 1,
+                    Transaction::INPUTS => [],
+                    Transaction::OUTPUTS => [
+                        [
+                            'block_id' => $blockId,
+                            'tx_id' => $txId,
+                            'address' => $toAddress,
+                            'value' => $amount,
+                            'script' => $script->encodeScript($scriptText),
+                            'lock_height' => $lockHeight,
+                            'hash' => bin2hex(
+                                $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
+                            ),
+                        ]
+                    ],
+                ];
+
+                // sign
+                $transactionRecord['signature'] = $signature;
+                /**
+                 * used for creating the signature
+                 *
+                $transactionRecord['signature'] = $this->transaction->signTransaction(
+                    $transactionRecord,
+                    $this->openSsl->formatPem($publicKeyRaw, false),
+                    $this->openSsl->formatPem($privateKeyRaw, true)
+                );
+                */
+
+
+                $gBlock = [
+                    'network_id' => Config::getNetworkIdentifier(),
+                    'block_id' => $blockId,
+                    'previous_block_id' => '',
+                    'date_created' => $date,
+                    'height' => $height,
+                    'difficulty' => Config::getDefaultDifficulty(),
+                    'merkle_root' => $merkleRoot,
+                    'transactions' => [$transactionRecord],
+                    'transaction_count' => 1,
+                    'previous_hash' => '',
+                    'hash' => $hash,
+                    'nonce' => $nonce
+                ];
+                break;
+        }
+
+        return $gBlock;
     }
 
     public function getCandidateBlock($height, $publicKey, $privateKey): array
@@ -429,9 +615,9 @@ class Block
                 $coinbaseRecords++;
             }
 
-            $reason = $t->validate($transaction);
-            if (!$reason['validated']) {
-                $reason .= 'transaction validate failed,';
+            $transactionReason = $t->validate($transaction);
+            if (!$transactionReason['validated']) {
+                $reason .= 'transaction validate failed: ' . $transactionReason['reason'] . ', ';
                 $result = false;
             }
         }
@@ -755,7 +941,6 @@ class Block
         if ($validate) {
             try {
                 $result = $this->validateFullBlock($block);
-
             } catch (Exception|RuntimeException $ex) {
                 Console::log('Exception thrown validating block: ' . $ex->getMessage());
                 return false;
@@ -1171,18 +1356,7 @@ class Block
                 $this->reverseBlock($block['block_id'], $block['height']);
             }
 
-            // get all transactions associated with this block
-            $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'block_id',
-                value: $blockId,
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt->execute();
-            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $transactions = $this->transaction->getTransactionsByBlockId($blockId);
             foreach ($transactions as $transaction) {
                 // add txIn
                 foreach ($transaction[Transaction::INPUTS] as $txIn) {

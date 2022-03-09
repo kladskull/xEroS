@@ -90,16 +90,17 @@ class Queue
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(
                 stmt: $stmt,
-                fieldName: 'address',
+                fieldName: 'command',
                 value: $command,
-                pdoType: DatabaseHelpers::TEXT,
-                maxLength: 32
+                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+                maxLength: 64
             );
             $stmt = DatabaseHelpers::filterBind(
                 stmt: $stmt,
                 fieldName: 'data',
                 value: $data,
-                pdoType: DatabaseHelpers::TEXT
+                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+                maxLength: 1048576
             );
             $stmt = DatabaseHelpers::filterBind(
                 stmt: $stmt,

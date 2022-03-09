@@ -15,6 +15,9 @@ $pow = new Pow();
 $miner = new Miner();
 $queue = new Queue();
 
+echo PHP_EOL, Config::getProductName(), ' Miner ', PHP_EOL;
+echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
+
 // command line args
 $strict = in_array('--strict', $_SERVER['argv']);
 $arguments = new Arguments(compact('strict'));
@@ -69,6 +72,9 @@ if ($state !== 'mine' && $forceMining === false) {
     Console::log('Synchronization is required before mining may begin.');
     exit(0);
 }
+
+$env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
+Console::log('Working on chain: ' . $env);
 
 while (1) {
     $nonce = 0;

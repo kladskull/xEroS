@@ -43,14 +43,6 @@ if (!file_exists(APP_DIR . '.env')) {
 $dotenv = Dotenv::createImmutable(APP_DIR);
 $dotenv->load();
 
-// display a header
-$program = 'Node';
-if (defined('PROGRAM')) {
-    $program = PROGRAM;
-}
-echo PHP_EOL, Config::getProductName(), ' ', $program, PHP_EOL;
-echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
-
 // check if migration was run
 $app = new App();
 $app->checkMigrations();
@@ -58,7 +50,7 @@ $app->checkMigrations();
 // bootstrap from Genesis?
 $block = new Block();
 if ($block->getCurrentHeight() === 0) {
-    $block->add($block->genesis(), false);
+    $block->add($block->genesis($_ENV['ENVIRONMENT'], '', ''), false);
 }
 
 // if there is no state, we're likely needing to sync from the network

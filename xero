@@ -5,6 +5,9 @@ namespace Xeros;
 
 include 'bootstrap.php';
 
+echo PHP_EOL, Config::getProductName(), ' Node ', PHP_EOL;
+echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
+
 // get address and port to use
 $listenIp = Config::getListenAddress();
 $listenPort = Config::getListenPort();
