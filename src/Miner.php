@@ -101,12 +101,12 @@ class Miner
             ++$hashes;
 
             // report
-            if ($hashes % 100000 === 0) {
+            if ($hashes % 250000 === 0) {
                 $elapsed = max((time() - $start), 1);
                 $hashesPerSecond = $hashes / $elapsed;
                 $nonceHex = dechex($nonce);
                 Console::log(
-                    "Height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) .
+                    "Mining for height: " . $height . "  Hash rate: " . $this->hashOutput($hashesPerSecond) .
                     "  difficulty: {$difficulty}  nonce: {$nonceHex}  elapsed: {$elapsed}s"
                 );
                 usleep(1);
