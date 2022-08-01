@@ -29,17 +29,16 @@
     "ext-sockets": "*",
     "ext-zlib": "*",
     "ext-openssl": "*",
-    "robmorgan/phinx": "^0.12.10",
-    "stephenhill/base58": "^1.1",
-    "drupol/phpmerkle": "^2.2",
-    "vlucas/phpdotenv": "^5.4",
-    "symfony/yaml": "^6.0",
-    "wp-cli/php-cli-tools": "^0.11.13",
+    "robmorgan/phinx": "*",
+    "stephenhill/base58": "*",
+    "drupol/phpmerkle": "*",
+    "vlucas/phpdotenv": "*",
+    "symfony/yaml": "*",
     "ext-pcntl": "*"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
-    "phpunit/phpunit": "^9.5"
+    "phpunit/phpunit": "*"
   },
   "autoload": {
     "psr-4": {

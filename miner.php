@@ -1,9 +1,7 @@
-#!/usr/bin/php
 <?php declare(strict_types=1);
 
 namespace Xeros;
 
-use cli\Arguments;
 use Exception;
 
 define('PROGRAM', 'Miner');
@@ -18,49 +16,47 @@ $queue = new Queue();
 echo PHP_EOL, Config::getProductName(), ' Miner ', PHP_EOL;
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
-// command line args
-$strict = in_array('--strict', $_SERVER['argv']);
-$arguments = new Arguments(compact('strict'));
-
-// set args
-$arguments->addFlag(['version', 'v'], 'Display the version');
-$arguments->addFlag(['help', 'h'], 'Show this help screen');
-$arguments->addFlag(['create-keypair', 'c'], [
-    'description' => 'Creates a new rsa keypair, and uses it to mine. Default behaviour is to just use the latest keypair created.'
-]);
-$arguments->addFlag(['developer'], [
-    'description' => 'This is a destructive command, never use it.',
-]);
-
-// parse the arguments
-$arguments->parse();
-
-if ($arguments['help']) {
-    echo $arguments->getHelpScreen();
-    exit(0);
-}
-
-if ($arguments['version']) {
-    echo 'Version: ', Config::getVersion(), PHP_EOL;
-    exit(0);
-}
-
+$createKeypair = false;
 $forceMining = false;
-if ($arguments['developer']) {
-    Console::log('********************************************************************************************');
-    Console::log('* ');
-    Console::log('* WARNING!!! Forcing the miner to just use local data without a completed blockchain sync...');
-    Console::log('* ');
-    Console::log('********************************************************************************************');
-    $forceMining = true;
+foreach ($argv as $arg) {
+    $arg = strtolower(trim($arg));
+    switch ($arg) {
+        case '-d':
+        case '--developer':
+            Console::log('********************************************************************************************');
+            Console::log('* ');
+            Console::log('* WARNING!!! Forcing the miner to just use local data without a completed blockchain sync...');
+            Console::log('* ');
+            Console::log('********************************************************************************************');
+            $forceMining = true;
+            break;
+        case '-c':
+        case '--create-keypair':
+            $createKeypair = true;
+            break;
+
+        case '-v':
+        case '--version':
+            echo 'Version: ', Config::getVersion(), PHP_EOL;
+            exit(0);
+        case '-h':
+        case '--help':
+            echo "-c --create-keypair   :   create and use a new keypair\n";
+            echo "-d --developer        :   used for mining from the genesis block (never should be\n";
+            echo "                      :   needed outside of development)\n";
+            echo "-v --version          :   get app version\n";
+            echo "-h --help             :   show this help\n";
+            exit(0);
+    }
 }
 
 // use the newest key pair
 $acct = $account->getNewestAccount();
-if ($acct === null || $arguments['create-keypair']) {
+if ($acct === null || $createKeypair) {
     // do we need to create a new key pair?
     $id = $account->create();
     $acct = $account->get($id);
+    Console::log('new key pair created');
 }
 $publicKey = $acct['public_key'];
 $privateKey = $acct['private_key'];
@@ -69,11 +65,11 @@ $privateKey = $acct['private_key'];
 $store = new DataStore();
 $state = $store->getKey('state', '');
 if ($state !== 'mine' && $forceMining === false) {
-    Console::log('Synchronization is required before mining may begin.');
+    Console::log('Synchronization is required before mining may begin');
     exit(0);
 }
 
-$env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
+$env = $_ENV['ENVIRONMENT'] ?? 'dev';
 Console::log('Working on chain: ' . $env);
 
 while (1) {

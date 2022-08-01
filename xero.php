@@ -8,6 +8,8 @@ include 'bootstrap.php';
 echo PHP_EOL, Config::getProductName(), ' Node ', PHP_EOL;
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
+Console::log('ip and port can be passed into the app: e.g. php xero.php 1.2.3.4 7747');
+
 // get address and port to use
 $listenIp = Config::getListenAddress();
 $listenPort = Config::getListenPort();
