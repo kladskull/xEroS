@@ -1,4 +1,3 @@
-#!/usr/bin/php
 <?php declare(strict_types=1);
 
 namespace Xeros;
@@ -15,9 +14,8 @@ $nonce = 0;
 echo PHP_EOL, Config::getProductName(), ' Genesis Miner ', PHP_EOL;
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
-$env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
+$env = $_ENV['ENVIRONMENT'] ?? 'dev';
 Console::log('Working on chain: ' . $env);
-
 
 // use the newest key pair
 $account = new Account();
@@ -26,6 +24,7 @@ if ($acct === null) {
     // do we need to create a new key pair?
     $id = $account->create();
     $acct = $account->get($id);
+    Console::log('new key pair created');
 }
 $publicKey = $acct['public_key'];
 $privateKey = $acct['private_key'];

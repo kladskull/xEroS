@@ -18,5 +18,4 @@ class Merkle
         // compute the merkle root
         return $tree->hash();
     }
-
 }

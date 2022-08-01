@@ -6,7 +6,7 @@ class Config
 {
     // Project
     private const PRODUCT_NAME = 'Xero';
-    private const PRODUCT_COPYRIGHT = 'Copyright (c)2021,2022 by Kladskull <kladskull@protonmail.com>';
+    private const PRODUCT_COPYRIGHT = 'Copyright (c)2021,2022 by Kladskull <mike@currazy.com>';
     private const VERSION = '0.0001';
     private const NETWORK_IDENTIFIER = "xv01";
     private const ENVIRONMENT = "prod";

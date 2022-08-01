@@ -307,12 +307,12 @@ class Block
                 /**
                  * used for creating the signature
                  *
-                $transactionRecord['signature'] = $this->transaction->signTransaction(
-                    $transactionRecord,
-                    $this->openSsl->formatPem($publicKeyRaw, false),
-                    $this->openSsl->formatPem($privateKeyRaw, true)
-                );
-                */
+                 * $transactionRecord['signature'] = $this->transaction->signTransaction(
+                 * $transactionRecord,
+                 * $this->openSsl->formatPem($publicKeyRaw, false),
+                 * $this->openSsl->formatPem($privateKeyRaw, true)
+                 * );
+                 */
 
 
                 $gBlock = [
@@ -516,7 +516,7 @@ class Block
             $currBlock = $this->getByPreviousBlockId($blockId);
         }
 
-        if ($currBlock !== null) {
+        if (!empty($currBlock)) {
             // remove internal fields
             $currBlock = $this->stripInternalFields($currBlock);
 
@@ -1577,7 +1577,7 @@ class Block
         return $result;
     }
 
-    private function reverseTransactions(string $blockId, bool $delete = false)
+    private function reverseTransactions(string $blockId, bool $delete = false): void
     {
         // get all transactions associated with this block
         $query = 'SELECT transaction_id FROM transactions WHERE `block_id` = :block_id;';

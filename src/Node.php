@@ -57,7 +57,7 @@ class Node
         return $data;
     }
 
-    public function sendHandshake($client)
+    public function sendHandshake($client): void
     {
         Console::log('Sending handshake request to peer');
         $packet = [
@@ -79,7 +79,7 @@ class Node
     }
 
     #[NoReturn]
-    public function listen(string $address, int $port)
+    public function listen(string $address, int $port): void
     {
         Console::log('Opening a server socket on address: ' . $address . ' port: ' . $port);
         $sock = stream_socket_server(
@@ -94,7 +94,6 @@ class Node
         $server = $sock;
         $clients = [$sock];
         $clientInfo = [];
-        $currentRequest = [];
 
         while (1) {
             $read = $clients;

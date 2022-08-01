@@ -51,6 +51,9 @@ class Peer
         $stmt = DatabaseHelpers::filterBind($stmt, 'limit', $limit, DatabaseHelpers::INT);
         $stmt->execute();
         $peers = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if ($peers === false) {
+            $peers = [];
+        }
 
         $seeds = Config::getInitialPeers();
         foreach ($seeds as $seed) {

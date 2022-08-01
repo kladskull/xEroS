@@ -232,7 +232,7 @@ class ScriptFunctions
     // no-op
     public function nop(StateMachine $stateMachine): void
     {
-        ;
+        usleep(0);
     }
 
     // remark

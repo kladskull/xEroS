@@ -8,7 +8,7 @@ class ForkPool
     protected array $pid = [];
     protected int $max_workers = 10;
 
-    public function addWork($job)
+    public function addWork($job): void
     {
         $this->jobs[] = $job;
     }
@@ -24,7 +24,7 @@ class ForkPool
         return $work;
     }
 
-    protected function job($work)
+    protected function job($work): void
     {
         // your work here...
     }
@@ -45,7 +45,7 @@ class ForkPool
         return $pid;
     }
 
-    public function run()
+    public function run(): void
     {
         // loop until all work is distributed...
         while (true) {

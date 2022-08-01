@@ -2,9 +2,6 @@
 
 namespace Xeros;
 
-use Exception;
-use JetBrains\PhpStorm\ArrayShape;
-
 class Miner
 {
     protected Block $block;

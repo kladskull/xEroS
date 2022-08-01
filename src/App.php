@@ -13,7 +13,7 @@ class App
         $this->db = Database::getInstance();
     }
 
-    public function checkMigrations()
+    public function checkMigrations(): void
     {
         // check if migration was run
         $tableCount = 0;
