@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Xeros;
+namespace Blockchain;
 
 use Exception;
 
@@ -60,6 +60,8 @@ if ($acct === null || $createKeypair) {
 }
 $publicKey = $acct['public_key'];
 $privateKey = $acct['private_key'];
+
+Console::log('detected ' . PHP_OS . ' as the OS');
 
 // if there is no state, we're likely needing to sync from the network
 $store = new DataStore();

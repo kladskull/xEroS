@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Xeros;
+namespace Blockchain;
 
 // todo: add this to the database, no hard coded values in code
 class Blacklist

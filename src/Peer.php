@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Xeros;
+namespace Blockchain;
 
 use Exception;
 use PDO;
@@ -21,10 +21,16 @@ class Peer
     {
         $data = $this->store->getKey('peer_id', '');
         if (empty($data)) {
-            // append whatever we can get from the commands below to add salt to the IP
-            $data = trim(file_get_contents('/etc/machine-id'));
-            $data .= trim(file_get_contents('/var/lib/dbus/machine-id'));
-            $data .= exec('whoami');
+            $data = '';
+            if (PHP_OS == 'Linux') {
+                // append whatever we can get from the commands below to add salt to the IP
+                $data = trim(file_get_contents('/etc/machine-id'));
+                $data .= trim(file_get_contents('/var/lib/dbus/machine-id'));
+            }
+
+            if (PHP_OS == 'Darwin' || PHP_OS == 'Linux') {
+                $data .= exec('whoami');
+            }
 
             // tie it to an IP address
             $data = hash('ripemd160', hash('ripemd160', $data));

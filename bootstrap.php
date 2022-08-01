@@ -1,6 +1,6 @@
 <?php
 
-namespace Xeros;
+namespace Blockchain;
 
 use Dotenv\Dotenv;
 

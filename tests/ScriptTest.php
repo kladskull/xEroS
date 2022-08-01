@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 
-namespace Xeros;
+namespace Blockchain;
 
 use PHPUnit\Framework\TestCase;
-use Xeros\Script;
-use Xeros\TransactionVersion;
+use Blockchain\Script;
+use Blockchain\TransactionVersion;
 
 class ScriptTest extends TestCase
 {

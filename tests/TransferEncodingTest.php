@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Xeros;
+namespace Blockchain;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;

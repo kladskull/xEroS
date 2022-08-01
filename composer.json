@@ -42,12 +42,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Xeros\\": "src/"
+      "Blockchain\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Xeros\\": "tests/"
+      "Blockchain\\": "tests/"
     }
   },
   "scripts": {
@@ -60,8 +60,5 @@
     "stan": "phpstan analyse src/",
     "stan-setup": "cp composer.json composer.backup && composer require --dev phpstan/phpstan:^0.12 && mv composer.backup composer.json",
     "test": "phpunit --colors=always"
-  },
-  "bin": [
-    "bin/xero"
-  ]
+  }
 }
