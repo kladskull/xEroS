@@ -4,7 +4,6 @@
 ![Discord](https://img.shields.io/discord/948379180393984062?style=flat)
 [![Build Status](https://app.travis-ci.com/kladskull/xeros.svg?branch=main)](https://app.travis-ci.com/kladskull/xeros)
 [![Code Intelligence Status](https://scrutinizer-ci.com/g/kladskull/xeros/badges/code-intelligence.svg?b=main)](https://scrutinizer-ci.com/code-intelligence)
-![GitHub Sponsors](https://img.shields.io/github/sponsors/kladskull?style=flat)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
 and mostly follows the technical design of Bitcoin. Xeros uses P2P technology to operate with no central server. 
@@ -13,7 +12,7 @@ There are many differences to Bitcoin, such as the scripting language which is "
 version of assembler - one thing I'd like to do is offer easier scripting languages that "compile" down to the XeroASM.
 
 ## Contact
-You can join the [Xeros Discord server](https://discord.gg/mvacfndPXt), or email me: kladskull@protonmail.com.
+You can join the [Xeros Discord server](https://discord.gg/mvacfndPXt), or email me: xeros@currazy.com.
 
 ## Status of the Project (Yes it's active!)
 Currently, the blockchain has not launched - it is however close to its first release version. I plan on launching it
@@ -41,13 +40,6 @@ composer install
 
 ## Change log
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Xeros Sponsors
-### Bronze Supporters
-- [Travis](https://www.travis-ci.com/) 
-- [Scrutinizer](https://scrutinizer-ci.com/)
-
-If you are looking to sponsor, fund or donate, please see the Support & Funding section below.
 
 ## Contributing
 The codebase is maintained using the "contributor workflow" where everyone without exception contributes patch proposals using "pull requests" (PRs). This facilitates social contribution, easy testing and peer review.
@@ -108,11 +100,8 @@ Minor features that are fully backward compatible with the current release may b
 
 Major new features should always be sent to the master branch, which contains the upcoming release.
 
-If you are unsure if your feature qualifies as a major or minor, please ask Kladskull in the #development channel 
-of the [Xeros Discord server](https://discord.gg/mvacfndPXt). We are sending most git activity to this discord.
-
 ### Security Vulnerabilities
-If you discover a security vulnerability within Xeros, please send an email to Kladskull at kladskull@protonmail.com. 
+If you discover a security vulnerability within Xeros, please send an email to Kladskull at xeros@currazy.com. 
 All security vulnerabilities will be promptly addressed.
 
 ### Coding Style
@@ -123,7 +112,7 @@ Kladskull will update the credits section. Credits is for long term consistant c
 will not be credited.
 
 ## Credits
-- Kladskull <kladskull@protonmail.com>
+- Kladskull <xeros@currazy.com>
 
 ## Support & Funding
 I wanted to learn how blockchains worked, and the only way was to actually sit down, research and finally - just start.
