@@ -1,7 +1,6 @@
 # Xeros
 
 ![GitHub](https://img.shields.io/github/license/kladskull/xeros?style=flat)
-![Discord](https://img.shields.io/discord/948379180393984062?style=flat)
 [![Build Status](https://app.travis-ci.com/kladskull/xeros.svg?branch=main)](https://app.travis-ci.com/kladskull/xeros)
 [![Code Intelligence Status](https://scrutinizer-ci.com/g/kladskull/xeros/badges/code-intelligence.svg?b=main)](https://scrutinizer-ci.com/code-intelligence)
 
@@ -12,7 +11,7 @@ There are many differences to Bitcoin, such as the scripting language which is "
 version of assembler - one thing I'd like to do is offer easier scripting languages that "compile" down to the XeroASM.
 
 ## Contact
-You can join the [Xeros Discord server](https://discord.gg/mvacfndPXt), or email me: xeros@currazy.com.
+You can email me: xeros@currazy.com.
 
 ## Status of the Project (Yes it's active!)
 Currently, the blockchain has not launched - it is however close to its first release version. I plan on launching it
