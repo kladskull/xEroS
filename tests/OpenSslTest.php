@@ -26,9 +26,7 @@ class OpenSslTest extends TestCase
         $this->assertStringContainsString('-----END PUBLIC KEY-----', $keys['public_key']);
         $this->assertStringContainsString('-----BEGIN PRIVATE KEY-----', $keys['private_key']);
         $this->assertStringContainsString('-----END PRIVATE KEY-----', $keys['private_key']);
-
         $this->assertNotEmpty($keys['public_key_raw']);
-
         $this->assertGreaterThanOrEqual(450, strlen($keys['public_key']), "public key is not as big as it should be");
         $this->assertGreaterThanOrEqual(1700, strlen($keys['private_key']), "public key is not as big as it should be");
     }
@@ -56,7 +54,6 @@ class OpenSslTest extends TestCase
     public function testRawToPem(): void
     {
         $keys = $this->openssl->createRsaKeyPair();
-
         $public_key = $keys['public_key'];
         $private_key = $keys['private_key'];
 
@@ -74,7 +71,7 @@ class OpenSslTest extends TestCase
      * @dataProvider textDataProvider
      * @throws Exception
      */
-    public function testSignAndVerifyData($text): void
+    public function testSignAndVerifyData(string $text): void
     {
         $keys = $this->openssl->createRsaKeyPair();
 

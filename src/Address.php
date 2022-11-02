@@ -2,6 +2,12 @@
 
 namespace Blockchain;
 
+use function hash;
+use function hex2bin;
+use function rtrim;
+use function str_starts_with;
+use function substr;
+
 class Address
 {
     private TransferEncoding $transferEncoding;
@@ -13,21 +19,21 @@ class Address
         $this->openssl = new OpenSsl();
     }
 
-    public function getAddressChecksum($addressRaw): string
+    public function getAddressChecksum(string $addressRaw): string
     {
         return substr(hash('sha256', $addressRaw), 0, 4);
     }
 
     public function create(string $publicKey): string
     {
-        if (!str_starts_with($publicKey, OpenSsl::BEGIN_PUBLIC_KEY) && !str_ends_with(
-            rtrim($publicKey),
-            OpenSsl::END_PUBLIC_KEY
-        )) {
+        if (!str_starts_with($publicKey, OpenSsl::BEGIN_PUBLIC_KEY)
+            && !str_ends_with(rtrim($publicKey), OpenSsl::END_PUBLIC_KEY)
+        ) {
             $publicKey = $this->openssl->formatPem($publicKey, false);
         }
 
         $sha256hash = $this->createPartial($publicKey);
+
         return $this->createAddressFromPartial($sha256hash);
     }
 

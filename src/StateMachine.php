@@ -2,6 +2,11 @@
 
 namespace Blockchain;
 
+use JetBrains\PhpStorm\NoReturn;
+use function array_pop;
+use function count;
+use function str_pad;
+
 class StateMachine
 {
     private array $script = [];
@@ -19,54 +24,43 @@ class StateMachine
     private int $registers_sx; // evaluated at end as completion state (only assignable internally)
 
     private array $container;
-
     // the stack
     private array $stack = [];
 
+    #[NoReturn]
     public function setContainer(array $container): void
     {
         $this->container = $container;
     }
 
+    #[NoReturn]
     protected function resetStateMachine(): void
     {
         $this->precision = 0;
         $this->scriptCounter = 0;
         $this->executableOperations = 0;
-
         $this->script = [];
-
         // for function operations & storage
         $this->registers_ax = '';
         $this->registers_bx = '';
         $this->registers_cx = '';
         $this->registers_dx = -2; // set to something it cannot be
         $this->registers_ex = false;
-
         // boolean state only, used for evaluations, evaluated at end as completion state
         $this->registers_sx = -2;
-
         // the stack
         $this->stack = [];
     }
 
     private function showBool(int $value): string
     {
-        if ($value === 1) {
-            $result = "true";
-        } else {
-            $result = "false";
-        }
-        return $result;
+        return $value === 1 ? 'true' : 'false';
     }
 
+    #[NoReturn]
     public function dumpState(bool $finalState = false): void
     {
-        if ($finalState) {
-            echo "Final State\n";
-        } else {
-            echo "State\n";
-        }
+        echo $finalState ? "Final State\n" : "State\n";
         echo "+----------------+\n";
         echo "| script counter : `$this->scriptCounter`\n";
         echo "| max executions : `$this->executableOperations`\n";
@@ -78,35 +72,40 @@ class StateMachine
         echo "| Register ex    : " . $this->showBool((int)$this->registers_ex) . "\n";
         echo "| Register sx    : " . $this->showBool($this->registers_sx) . "\n";
         echo "+----------------+\n";
+
         foreach ($this->container as $key => $item) {
             echo "| Container-> $key : " . $item . "\n";
         }
+
         if (count($this->stack)) {
             echo "+----------------+\n";
+
             foreach ($this->stack as $s) {
                 echo "| Stack          : `$s`\n";
             }
         }
+
         echo "+----------------+\n";
         echo "| Script         :\n";
         $lsc = 0;
+
         foreach ($this->script as $line) {
             $this->dumpScriptLine($line, ($lsc++ === $this->scriptCounter));
         }
+
         echo "-----------------+\n\n";
     }
 
+    #[NoReturn]
     private function dumpScriptLine($line, $current = false): void
     {
-        if ($current) {
-            echo "  -> ";
-        } else {
-            echo "     ";
-        }
-        echo str_pad($line['command'], 10, ' ', STR_PAD_RIGHT) . ' ';
+        echo $current ? "  -> " : "     ";
+        echo str_pad($line['command'], 10) . ' ';
+
         foreach ($line['params'] as $param) {
             echo "  " . $param . ' ';
         }
+
         echo "\n";
     }
 
@@ -120,6 +119,7 @@ class StateMachine
         return $this->scriptCounter;
     }
 
+    #[NoReturn]
     public function incScriptCounter(): void
     {
         $this->scriptCounter++;
@@ -130,6 +130,7 @@ class StateMachine
         return $this->precision;
     }
 
+    #[NoReturn]
     public function setPrecision(int $precision): void
     {
         if ($precision < 0) {
@@ -149,6 +150,7 @@ class StateMachine
         return $this->script;
     }
 
+    #[NoReturn]
     public function setScript(array $script): void
     {
         // set up the state machine
@@ -171,27 +173,23 @@ class StateMachine
     {
         $found = false;
         $value = $register;
+
         if ($register === 'ax') {
             $value = $this->registers_ax;
             $found = true;
-        }
-        if ($register === 'bx') {
+        } elseif ($register === 'bx') {
             $value = $this->registers_bx;
             $found = true;
-        }
-        if ($register === 'cx') {
+        } elseif ($register === 'cx') {
             $value = $this->registers_cx;
             $found = true;
-        }
-        if ($register === 'dx') {
+        } elseif ($register === 'dx') {
             $value = $this->registers_dx;
             $found = true;
-        }
-        if ($register === 'ex') {
+        } elseif ($register === 'ex') {
             $value = $this->registers_ex;
             $found = true;
-        }
-        if ($register === 'sx') {
+        } elseif ($register === 'sx') {
             $value = $this->registers_sx;
             $found = true;
         }
@@ -205,26 +203,24 @@ class StateMachine
     }
 
     // if it's not a register, we will throw it on the stack
+    #[NoReturn]
     public function setRegister(string $register, string|int|bool $value, bool $system = false): void
     {
         if ($this->isRegister($register)) {
             if ($register === 'ax') {
                 $this->registers_ax = $value;
-            }
-            if ($register === 'bx') {
+            } elseif ($register === 'bx') {
                 $this->registers_bx = $value;
-            }
-            if ($register === 'cx') {
+            } elseif ($register === 'cx') {
                 $this->registers_cx = $value;
             }
+
             if ($system) {
                 if ($register === 'dx') {
                     $this->registers_dx = $value; // not assignable by interpreter
-                }
-                if ($register === 'ex') {
+                } elseif ($register === 'ex') {
                     $this->registers_ex = $value; // not assignable by interpreter
-                }
-                if ($register === 'sx') {
+                } elseif ($register === 'sx') {
                     $this->registers_sx = $value; // not assignable by interpreter
                 }
             }
@@ -233,6 +229,7 @@ class StateMachine
         }
     }
 
+    #[NoReturn]
     public function pushStack(string $value): void
     {
         $this->stack[] = $value;
@@ -240,10 +237,6 @@ class StateMachine
 
     public function popStack(): string
     {
-        $value = array_pop($this->stack);
-        if ($value === null) {
-            $value = '';
-        }
-        return $value;
+        return array_pop($this->stack) ?? '';
     }
 }

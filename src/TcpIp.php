@@ -3,6 +3,10 @@
 namespace Blockchain;
 
 use JetBrains\PhpStorm\Pure;
+use function filter_var;
+use function socket_close;
+use function socket_create_listen;
+use function socket_getsockname;
 
 class TcpIp
 {
@@ -65,6 +69,7 @@ class TcpIp
         if ($result !== false) {
             $result = true;
         }
+
         return $result;
     }
 
@@ -79,6 +84,7 @@ class TcpIp
         if ($result !== false) {
             $result = true;
         }
+
         return $result;
     }
 
@@ -94,6 +100,7 @@ class TcpIp
         $sock = socket_create_listen(0);
         socket_getsockname($sock, $address, $port);
         socket_close($sock);
+
         return (string)$port;
     }
 }

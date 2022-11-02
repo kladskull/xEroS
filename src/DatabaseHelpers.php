@@ -5,6 +5,8 @@ namespace Blockchain;
 use PDO;
 use PDOStatement;
 use RuntimeException;
+use function filter_var;
+use function preg_replace;
 
 class DatabaseHelpers
 {
@@ -36,7 +38,7 @@ class DatabaseHelpers
         string $fieldName,
         string|int $value,
         int $pdoType,
-        int $maxLength = 0
+        int $maxLength = 0,
     ): PDOStatement {
         // network id
         switch ($pdoType) {
@@ -47,6 +49,7 @@ class DatabaseHelpers
 
             case self::TEXT:
                 $value = trim($value);
+
                 if ($maxLength === 0) {
                     $stmt->bindParam(param: ':' . $fieldName, var: $value);
                 } else {

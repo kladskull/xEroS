@@ -2,6 +2,8 @@
 
 namespace Blockchain;
 
+use function array_key_exists;
+
 // todo: add this to the database, no hard coded values in code
 class Blacklist
 {
@@ -17,9 +19,6 @@ class Blacklist
 
     /**
      * Check if a public key is blacklisted
-     *
-     * @param string $publicKey
-     * @return bool
      */
     public static function checkPublicKey(string $publicKey): bool
     {
@@ -28,9 +27,6 @@ class Blacklist
 
     /**
      * Check if an address is blacklisted
-     *
-     * @param string $address
-     * @return bool
      */
     public static function checkAddress(string $address): bool
     {

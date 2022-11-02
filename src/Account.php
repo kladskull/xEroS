@@ -2,21 +2,23 @@
 
 namespace Blockchain;
 
-use PDO;
 use Exception;
+use PDO;
 use RuntimeException;
+use function bcadd;
+use function time;
 
 class Account
 {
     private PDO $db;
-    private OpenSsl $openSsl;
     private Address $address;
+    private OpenSsl $openSsl;
 
     public function __construct()
     {
         $this->db = Database::getInstance();
-        $this->openSsl = new OpenSsl();
         $this->address = new Address();
+        $this->openSsl = new OpenSsl();
     }
 
     public function get(int $id): ?array
@@ -26,6 +28,7 @@ class Account
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -33,8 +36,8 @@ class Account
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
             'ORDER BY id DESC LIMIT 1';
-        $stmt = $this->db->prepare($query);
-        $stmt->execute();
+        $stmt = $this->db->query($query);
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -45,6 +48,7 @@ class Account
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -55,6 +59,7 @@ class Account
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'public_key_raw', $publicKeyRaw, DatabaseHelpers::TEXT);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -106,13 +111,15 @@ class Account
 
             // ensure the block was stored
             $id = (int)$this->db->lastInsertId();
+
             if ($id <= 0) {
                 throw new RuntimeException("failed to add account to the database");
             }
+
             $this->db->commit();
-        } catch (Exception $ex) {
+        } catch (Exception $e) {
             $id = 0;
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
 
@@ -138,22 +145,23 @@ class Account
 
             $this->db->commit();
             $result = true;
-        } catch (Exception|RuntimeException $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception|RuntimeException $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 
     public function getBalance(string $address): string
     {
+        $balance = "0";
         $query = 'SELECT `value` FROM transaction_outputs WHERE `address` = :address';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
         $stmt->execute();
         $unspentTransactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $balance = "0";
         foreach ($unspentTransactions as $unspentTransaction) {
             $balance = bcadd($balance, $unspentTransaction['value']);
         }

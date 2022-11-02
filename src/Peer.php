@@ -5,6 +5,15 @@ namespace Blockchain;
 use Exception;
 use PDO;
 use RuntimeException;
+use function count;
+use function exec;
+use function explode;
+use function file_get_contents;
+use function filter_var;
+use function hash;
+use function shuffle;
+use function time;
+use function trim;
 
 class Peer
 {
@@ -20,15 +29,17 @@ class Peer
     public function getUniquePeerId(): string
     {
         $data = $this->store->getKey('peer_id', '');
+
         if (empty($data)) {
             $data = '';
-            if (PHP_OS == 'Linux') {
+
+            if (PHP_OS === 'Linux') {
                 // append whatever we can get from the commands below to add salt to the IP
                 $data = trim(file_get_contents('/etc/machine-id'));
                 $data .= trim(file_get_contents('/var/lib/dbus/machine-id'));
             }
 
-            if (PHP_OS == 'Darwin' || PHP_OS == 'Linux') {
+            if (PHP_OS === 'Darwin' || PHP_OS === 'Linux') {
                 $data .= exec('whoami');
             }
 
@@ -36,6 +47,7 @@ class Peer
             $data = hash('ripemd160', hash('ripemd160', $data));
             $this->store->add('peer_id', $data);
         }
+
         return $data;
     }
 
@@ -46,6 +58,7 @@ class Peer
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -57,11 +70,13 @@ class Peer
         $stmt = DatabaseHelpers::filterBind($stmt, 'limit', $limit, DatabaseHelpers::INT);
         $stmt->execute();
         $peers = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $seeds = Config::getInitialPeers();
+        $tempPeers = [];
+
         if ($peers === false) {
             $peers = [];
         }
 
-        $seeds = Config::getInitialPeers();
         foreach ($seeds as $seed) {
             $peers[] = [
                 'address' => $seed,
@@ -69,10 +84,10 @@ class Peer
         }
 
         // remove duplicates
-        $tempPeers = [];
         foreach ($peers as $p) {
             $tempPeers[$p['address']] = $p;
         }
+
         $peers = $tempPeers;
         shuffle($peers);
 
@@ -86,6 +101,7 @@ class Peer
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT, 256);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -114,6 +130,7 @@ class Peer
         } catch (Exception) {
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -136,6 +153,7 @@ class Peer
         } catch (Exception) {
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -164,6 +182,7 @@ class Peer
         } catch (Exception) {
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -171,13 +190,12 @@ class Peer
     {
         $valid = false;
         $host = explode(':', $address);
-        if (count($host) === 2) {
-            if (filter_var($host[0], FILTER_VALIDATE_IP)) {
-                if ((int)$host[1] > 0 && (int)$host[1] <= 65535) {
-                    $valid = true;
-                }
-            }
+
+        if ((count($host) === 2) && filter_var($host[0], FILTER_VALIDATE_IP) 
+            && (int)$host[1] > 0 && (int)$host[1] <= 65535) {
+            $valid = true;
         }
+
         return $valid;
     }
 
@@ -185,21 +203,19 @@ class Peer
     {
         if (!$this->isValidAddress($address)) {
             Console::log('failed to add peer to the database - junk address: ' . $address);
+
             return 0;
         }
 
         if ($this->getByHostAddress($address) !== null) {
             Console::log('duplicate peer address, not adding: ' . $address);
+
             return 0;
         }
 
         try {
+            $blist = $blacklisted ? 1 : 0;
             $this->db->beginTransaction();
-
-            $blist = 0;
-            if ($blacklisted) {
-                $blist = 1;
-            }
 
             // prepare the statement and execute
             $query = 'INSERT OR REPLACE INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,' .
@@ -246,13 +262,15 @@ class Peer
 
             // ensure the block was stored
             $id = (int)$this->db->lastInsertId();
+
             if ($id <= 0) {
                 throw new RuntimeException('failed to add peer to the database: ' . $address);
             }
+
             $this->db->commit();
-        } catch (Exception $ex) {
+        } catch (Exception $e) {
             $id = 0;
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
 
@@ -264,7 +282,6 @@ class Peer
         $result = false;
         try {
             $this->db->beginTransaction();
-
             // delete the block
             $query = 'DELETE FROM peers WHERE `id` = :id;';
             $stmt = $this->db->prepare($query);
@@ -275,13 +292,14 @@ class Peer
                 pdoType: DatabaseHelpers::INT
             );
             $stmt->execute();
-
             $this->db->commit();
+
             $result = true;
-        } catch (Exception|RuntimeException $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception|RuntimeException $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 }

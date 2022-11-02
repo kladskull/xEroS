@@ -4,6 +4,16 @@ namespace Blockchain;
 
 use Exception;
 use StephenHill\Base58;
+use function array_map;
+use function chr;
+use function dechex;
+use function hexdec;
+use function implode;
+use function ord;
+use function sprintf;
+use function str_split;
+use function strlen;
+use function strtolower;
 
 class TransferEncoding
 {
@@ -62,9 +72,11 @@ class TransferEncoding
     public function hexToBin(string $hex): string
     {
         $string = '';
+
         for ($i = 0; $i < strlen($hex) - 1; $i += 2) {
             $string .= chr(hexdec($hex[$i] . $hex[$i + 1]));
         }
+
         return $string;
     }
 }

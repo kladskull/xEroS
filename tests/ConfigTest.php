@@ -33,8 +33,7 @@ final class ConfigTest extends TestCase
         return [
             [-1, 1, 0],
             [-1, -1, -2],
-            [1, -1, 0]
-
+            [1, -1, 0],
         ];
     }
 
@@ -42,5 +41,4 @@ final class ConfigTest extends TestCase
     {
         $this->assertEquals('0.0001', Config::getVersion());
     }
-
 }

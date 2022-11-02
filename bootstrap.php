@@ -28,6 +28,7 @@ require APP_DIR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
 // get the interpreter version
 $phpVersion = ((PHP_MAJOR_VERSION * 10000) + (PHP_MINOR_VERSION * 1000) + PHP_RELEASE_VERSION);
+
 if ($phpVersion < 81001) {
     Console::log('Error: The minimum version of PHP must be 8.1');
     exit(1);
@@ -49,6 +50,7 @@ $app->checkMigrations();
 
 // bootstrap from Genesis?
 $block = new Block();
+
 if ($block->getCurrentHeight() === 0) {
     $block->add($block->genesis($_ENV['ENVIRONMENT'], '', ''), false);
 }
@@ -56,6 +58,7 @@ if ($block->getCurrentHeight() === 0) {
 // if there is no state, we're likely needing to sync from the network
 $store = new DataStore();
 $state = $store->getKey('state', '');
+
 if (empty($state)) {
     $store->add('state', Node::SYNCING);
 }

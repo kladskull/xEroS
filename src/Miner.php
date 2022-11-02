@@ -2,6 +2,16 @@
 
 namespace Blockchain;
 
+use function bin2hex;
+use function ceil;
+use function dechex;
+use function log;
+use function max;
+use function ord;
+use function sprintf;
+use function time;
+
+
 class Miner
 {
     protected Block $block;
@@ -21,6 +31,7 @@ class Miner
         $c = (($c >> 2) & 0x33333333) + ($c & 0x33333333);
         $c = (($c >> 4) + $c) & 0x0F0F0F0F;
         $c = (($c >> 8) + $c) & 0x00FF00FF;
+
         return (($c >> 16) + $c) & 0x0000FFFF;
     }
 
@@ -46,7 +57,8 @@ class Miner
         $hashes = 0;
 
         $displayFreq = 1000000;
-        if ($_ENV['ENVIRONMENT'] != 'live') {
+
+        if ($_ENV['ENVIRONMENT'] !== 'live') {
             $displayFreq = 25000;
         }
 
@@ -134,6 +146,7 @@ class Miner
         }
 
         $elapsed = time() - $start;
+
         return [
             'nonce' => $nonce,
             'hash' => bin2hex($hash) ?: null,

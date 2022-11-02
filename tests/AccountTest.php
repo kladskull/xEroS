@@ -3,6 +3,7 @@
 namespace Blockchain;
 
 use PHPUnit\Framework\TestCase;
+use function time;
 
 class AccountTest extends TestCase
 {
@@ -50,7 +51,6 @@ class AccountTest extends TestCase
     public function testLoadByPublicKeyBase58(): void
     {
         $openSsl = new OpenSsl();
-        $transferEncoding = new TransferEncoding();
 
         $start_time = time();
         $id = $this->account->create();
@@ -69,7 +69,6 @@ class AccountTest extends TestCase
 
         // store to clean-up
         $this->createdIds[] = $id;
-
     }
 
     public function testDestroyAccount(): void
@@ -83,6 +82,5 @@ class AccountTest extends TestCase
         $this->assertTrue(
             $this->account->delete((int)$account['id'])
         );
-
     }
 }

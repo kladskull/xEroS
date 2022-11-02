@@ -2,10 +2,13 @@
 
 namespace Blockchain;
 
+use function date;
+use function sprintf;
+
 class Console
 {
     public static function log(string $message): void
     {
-        echo '[', date('Y-m-d H:i:s'), ']:  ', $message, PHP_EOL;
+        echo sprintf('[%s]:  %s %s', date('Y-m-d H:i:s'), $message, PHP_EOL);
     }
 }

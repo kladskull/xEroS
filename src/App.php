@@ -1,8 +1,10 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Blockchain;
 
 use PDO;
+use function count;
+use function in_array;
 
 class App
 {
@@ -31,16 +33,19 @@ class App
             'transaction_outputs',
             'transactions'
         ];
+
         foreach ($requiredTables as $requiredTable) {
             $query = 'SELECT name FROM sqlite_master WHERE type=\'table\' AND name=:table_name';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind($stmt, 'table_name', $requiredTable, DatabaseHelpers::TEXT);
             $stmt->execute();
             $tableExists = $stmt->fetchColumn();
-            if (in_array($tableExists, $requiredTables)) {
+
+            if (in_array($tableExists, $requiredTables, true)) {
                 $tableCount++;
             }
         }
+
         if (count($requiredTables) !== $tableCount) {
             Console::log('Error: Before you run ' . Config::getProductName() . ' you must run ./phinx migrate');
             exit(0);

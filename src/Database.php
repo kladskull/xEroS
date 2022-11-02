@@ -20,10 +20,9 @@ class Database
                 self::$instance = new PDO('sqlite:' . APP_DIR . strtolower(Config::getProductName()) .
                     '-' . Config::getDbEnvironment() . '.db');
                 self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            } catch (PDOException $error) {
-                Console::log($error->getMessage());
+            } catch (PDOException $e) {
+                Console::log($e->getMessage());
             }
-
         }
 
         return self::$instance;
