@@ -6,11 +6,18 @@ use Exception;
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Pure;
 use PDO;
+use function bcadd;
+use function bccomp;
+use function bin2hex;
+use function count;
+use function ksort;
+use function str_pad;
+use function strlen;
 
 class Transaction
 {
     private PDO $db;
-    protected Pow $pow;
+    private Pow $pow;
 
     public const INPUTS = 'txIn';
     public const OUTPUTS = 'txOut';
@@ -22,7 +29,7 @@ class Transaction
     }
 
     #[Pure]
-    public function generateId($date, $blockId, $publicKeyRaw): string
+    public function generateId(int $date, string $blockId, string $publicKeyRaw): string
     {
         return bin2hex(
             $this->pow->doubleSha256(
@@ -45,6 +52,7 @@ class Transaction
         $stmt->execute();
 
         $id = $stmt->fetchColumn() ?: null;
+
         return ($id !== null && $id > 0);
     }
 
@@ -70,6 +78,7 @@ class Transaction
         $stmt->execute();
 
         $id = $stmt->fetchColumn() ?: null;
+
         return ($id !== null && $id > 0);
     }
 
@@ -110,7 +119,6 @@ class Transaction
         if ($transaction !== null) {
             $txIns = $this->getTransactionInputs($blockId, $transactionId);
             $txOuts = $this->getTransactionOutputs($blockId, $transactionId);
-
             // attach the details
             $transaction[self::INPUTS] = $txIns;
             $transaction[self::OUTPUTS] = $txOuts;
@@ -183,6 +191,7 @@ class Transaction
         $stmt->execute();
 
         $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: null;
+
         foreach ($transactions as $transaction) {
             // attach the details
             $transaction[self::INPUTS] = $this->getTransactionInputs($blockId, $transaction['transaction_id']) ?: [];
@@ -195,22 +204,24 @@ class Transaction
 
     public function stripInternalFields(array $transaction): array
     {
+        $inputs = [];
         // remove internal columns
         unset($transaction['id'], $transaction['block_id']);
 
         // remove internal columns
-        $inputs = [];
         foreach ($transaction[self::INPUTS] as $in) {
             unset($in['id'], $in['block_id'], $in['transaction_id']);
             $inputs[] = $in;
         }
-        $transaction[self::INPUTS] = $inputs;
 
+        $transaction[self::INPUTS] = $inputs;
         $outputs = [];
+
         foreach ($transaction[self::OUTPUTS] as $out) {
             unset($out['id'], $out['block_id'], $out['transaction_id'], $out['spent']);
             $outputs[] = $out;
         }
+
         $transaction[self::OUTPUTS] = $outputs;
 
         return $transaction;
@@ -219,15 +230,18 @@ class Transaction
     public function calculateMinerFee(array $transaction): string
     {
         $totalInputs = "0";
+
         if (isset($transaction[self::INPUTS])) {
             foreach ($transaction[self::INPUTS] as $txIn) {
                 $previousTransaction = $this->getByTransactionId(
                     $transaction['block_id'],
                     $txIn['previous_transaction_id']
                 );
+
                 if ($previousTransaction !== null) {
                     // add if the value is unspent
                     $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
+
                     if ((int)$unspent['spent'] === 0) {
                         $totalInputs = bcadd($totalInputs, $unspent['value']);
                     }
@@ -236,6 +250,7 @@ class Transaction
         }
 
         $totalOutputs = "0";
+
         if (isset($transaction[self::OUTPUTS])) {
             foreach ($transaction[self::OUTPUTS] as $txOut) {
                 // add values
@@ -247,12 +262,14 @@ class Transaction
         return BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
     }
 
+    /**
+     * @throws Exception
+     */
     #[ArrayShape(['validated' => "false", 'reason' => "string"])]
     public function validate(array $transaction): array
     {
         $result = true;
         $reason = '';
-
         $address = new Address();
         $openSsl = new OpenSsl();
 
@@ -316,6 +333,7 @@ class Transaction
 
         // validate signature
         $signatureText = $this->generateSignatureText($transaction);
+
         if (!$openSsl->verifySignature(
             $signatureText,
             $transaction['signature'],
@@ -326,6 +344,7 @@ class Transaction
         }
 
         $totalInputs = "0";
+
         if (isset($transaction[self::INPUTS])) {
             foreach ($transaction[self::INPUTS] as $txIn) {
                 if (!isset($txIn['previous_transaction_id'])) {
@@ -344,6 +363,7 @@ class Transaction
                     $transaction['block_id'],
                     $txIn['previous_transaction_id']
                 );
+
                 if ($previousTransaction !== null) {
                     if (!isset($previousTransaction[self::OUTPUTS][(int)$txIn['previous_tx_out_id']])) {
                         $reason .= 'previous_tx_out_id: (' . $txIn['previous_tx_out_id'] . ') does not exist,';
@@ -352,6 +372,7 @@ class Transaction
 
                     // add if the value is unspent
                     $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
+
                     if ((int)$unspent['spent'] === 0) {
                         $totalInputs = bcadd($totalInputs, $unspent['value']);
                     }
@@ -369,6 +390,7 @@ class Transaction
         }
 
         $totalOutputs = "0";
+
         foreach ($transaction[self::OUTPUTS] as $txOut) {
             if (!$address->validateAddress($txOut['address'])) {
                 $reason .= 'invalid address in unspent: ' . $txOut['address'] . ',';
@@ -419,6 +441,7 @@ class Transaction
         // check for an appropriate fee
         if ($transaction['version'] !== TransactionVersion::COINBASE) {
             $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
+
             if (bccomp($fee, Config::getMinimumTransactionFee(), 0) < 0) {
                 $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
                 $result = false;
@@ -429,6 +452,7 @@ class Transaction
         if ($transaction['version'] === TransactionVersion::COINBASE) {
             $block = new Block();
             $reward = $block->getRewardValue($transaction['height']);
+
             if (bccomp($totalOutputs, $block->getRewardValue($transaction['height']), 0) > 0) {
                 $reason .= 'Reward ' . $totalOutputs . ' is greater than expected ' . $reward . ',';
                 $result = false;
@@ -445,6 +469,7 @@ class Transaction
     {
         // we must sort the same way every time
         $sorted = [];
+
         foreach ($transactions as $transaction) {
             $sorted[$transaction['version'] . $transaction['date_created'] .
             $transaction['transaction_id']] = $transaction;
@@ -455,6 +480,7 @@ class Transaction
 
         // reassemble the array from the sorted data
         $sortedTransactions = [];
+
         foreach ($sorted as $transaction) {
             $sortedTransactions[] = $transaction;
         }
@@ -466,6 +492,7 @@ class Transaction
     {
         $sorted = [];
         $sortedTx = [];
+
         foreach ($txs as $tx) {
             $sorted[str_pad((string)(int)$tx['tx_id'], 6, '0', STR_PAD_LEFT)] = $tx;
         }
@@ -485,6 +512,7 @@ class Transaction
     {
         $txInData = '';
         $transaction[self::INPUTS] = self::sortTx($transaction[self::INPUTS]);
+
         foreach ($transaction[self::INPUTS] as $txIn) {
             $txInData .= $txIn['tx_id'] . $txIn['previous_transaction_id'] . $txIn['previous_tx_out_id'] .
                 $txIn['script'];
@@ -492,6 +520,7 @@ class Transaction
 
         $txOutData = '';
         $transaction[self::OUTPUTS] = self::sortTx($transaction[self::OUTPUTS]);
+
         foreach ($transaction[self::OUTPUTS] as $txOut) {
             $txInData .= $txOut['tx_id'] . $txOut['address'] . $txOut['value'] . $txOut['script'] .
                 $txOut['lock_height'];
@@ -525,6 +554,7 @@ class Transaction
 
         $script = new Script($container);
         $script->loadScript($script->decodeScript($input['script']) . $script->decodeScript($output['script']));
+
         return $script->run(false);
     }
 }

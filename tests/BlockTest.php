@@ -50,14 +50,22 @@ class BlockTest extends TestCase
     {
         $id = $this->account->create();
         $this->createdIds[] = $id;
+
         return $this->account->get($id);
     }
 
     /**
      * @throws Exception
      */
-    private function createBlock(int $height, int $date, string $nonce, array $generatorAccount, array $previousBlock, array $transactions, string $hash): array
-    {
+    private function createBlock(
+        int $height,
+        int $date,
+        string $nonce,
+        array $generatorAccount,
+        array $previousBlock,
+        array $transactions,
+        string $hash,
+    ): array {
         return [];
     }
 
@@ -65,8 +73,16 @@ class BlockTest extends TestCase
      * No longer works
      * @throws Exception
      */
-    private function createTransaction(int $date, string $blockId, int $height, array $destinationAccount, array $sourceAccount, string $amount, string $fee, string $message): array
-    {
+    private function createTransaction(
+        int $date,
+        string $blockId,
+        int $height,
+        array $destinationAccount,
+        array $sourceAccount,
+        string $amount,
+        string $fee,
+        string $message,
+    ): array {
         return [];
     }
 
@@ -83,10 +99,8 @@ class BlockTest extends TestCase
     {
         // perfect block time over 2 weeks
         $this->assertEquals(0, 600 - $this->block->getBlockTime(1639526400, 1638316800, 2016));
-
         // too difficult, didn't create enough blocks
         $this->assertEquals(-32, 600 - $this->block->getBlockTime(1639526400, 1638316800, 1916));
-
         // too easy, created too many
         $this->assertEquals(28, 600 - $this->block->getBlockTime(1639526400, 1638316800, 2116));
     }

@@ -59,9 +59,7 @@ class ScriptTest extends TestCase
     }
 
     protected function tearDown(): void
-    {
-
-    }
+    {}
 
     public function testBlankScriptLoading(): void
     {
@@ -73,16 +71,15 @@ class ScriptTest extends TestCase
     public function testScriptLoading(): void
     {
         $program = 'mov 10,ax;';
-
         $script = new Script([]);
         $result = $script->loadScript($program);
+
         $this->assertTrue($result);
     }
 
     public function testMov(): void
     {
         $program = 'mov 10,ax;';
-
         $script = new Script([]);
         $script->loadScript($program);
         $script->run(false);

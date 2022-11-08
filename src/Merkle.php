@@ -11,6 +11,7 @@ class Merkle
 
         // calculate the merkle root
         $tree = new \drupol\phpmerkle\Merkle();
+
         foreach ($transactions as $tx) {
             $tree[] = $tx['transaction_id'];
         }

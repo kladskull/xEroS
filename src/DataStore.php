@@ -20,6 +20,7 @@ class DataStore
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
@@ -32,20 +33,24 @@ class DataStore
 
         $retVal = null;
         $record = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
         if ($record !== null) {
-            $expiry = $record['expires'];
-            if ($expiry === 0) {
+            $epiry = $record['expires'];
+
+            if ($epiry === 0) {
                 $retVal = $record['data'];
-            } elseif (time() < $expiry) {
+            } elseif (time() < $epiry) {
                 $retVal = $record['data'];
             }
+
         } else {
             $retVal = $default;
         }
+
         return $retVal;
     }
 
-    public function add(string $key, mixed $value, int $expires = 0): int
+    public function add(string $key, mixed $value, int $epires = 0): int
     {
         if (strlen($key) > 128) {
             return 0;
@@ -58,16 +63,17 @@ class DataStore
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind($stmt, 'key', $key, DatabaseHelpers::TEXT, 128);
             $stmt = DatabaseHelpers::filterBind($stmt, 'data', $value, DatabaseHelpers::TEXT);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'expires', $expires, DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'expires', $epires, DatabaseHelpers::INT);
             $stmt->execute();
             $id = (int)$this->db->lastInsertId();
 
             $this->db->commit();
-        } catch (Exception $ex) {
-            Console::log('Error storing key: ' . $ex->getMessage());
+        } catch (Exception $e) {
+            Console::log('Error storing key: ' . $e->getMessage());
             $id = 0;
             $this->db->rollback();
         }
+
         return $id;
     }
 
@@ -90,10 +96,11 @@ class DataStore
 
             $this->db->commit();
             $result = true;
-        } catch (Exception $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -117,10 +124,11 @@ class DataStore
 
             $this->db->commit();
             $result = true;
-        } catch (Exception $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 }

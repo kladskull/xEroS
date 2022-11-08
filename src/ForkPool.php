@@ -1,6 +1,10 @@
 <?php declare(strict_types=1);
 
 namespace Blockchain;
+use function count;
+use function key;
+use function pcntl_fork;
+use function pcntl_wait;
 
 class ForkPool
 {
@@ -32,10 +36,13 @@ class ForkPool
     private function doJob($work)
     {
         $pid = pcntl_fork();
-        if ($pid == -1) {
+
+        if ($pid === -1) {
             // error forking...
             return false;
-        } elseif ($pid == 0) {
+        }
+
+        if ($pid === 0) {
             // child
             $this->job($work);
             exit(0);
@@ -49,26 +56,30 @@ class ForkPool
     {
         // loop until all work is distributed...
         while (true) {
+
             if (count($this->pid) < $this->max_workers) {
                 // fetch work
                 $work = $this->getWork();
+
                 if ($work === null) {
                     break;
+                }
+
+                // start the job...
+                $worker = $this->doJob($work);
+
+                if ($worker !== false) {
+                    $this->pid[$worker] = true;
                 } else {
-                    // start the job...
-                    $worker = $this->doJob($work);
-                    if ($worker !== false) {
-                        $this->pid[$worker] = true;
-                    } else {
-                        // error forking
-                        echo 'Failed to fork...', PHP_EOL;
-                        exit(1);
-                    }
+                    // error forking
+                    echo 'Failed to fork...', PHP_EOL;
+                    exit(1);
                 }
             } else {
                 // wait until a process completes...
                 $child_pid = pcntl_wait($status);
-                if ($child_pid != -1) {
+
+                if ($child_pid !== -1) {
                     unset($this->pid[$child_pid]);
                 }
             }
@@ -78,7 +89,8 @@ class ForkPool
         while (true) {
             // wait for each process to exit
             $child_pid = pcntl_wait($status);
-            if ($child_pid != -1) {
+
+            if ($child_pid !== -1) {
                 unset($this->pid[$child_pid]);
             }
 

@@ -23,7 +23,7 @@ $publicKey = file_get_contents(__DIR__ . '/../../public.key');
 $privateKey = file_get_contents(__DIR__ . '/../../private.key');
 
 $miningData = $http->get($miningUrl . 'mining_info.php');
-$data = json_decode($miningData, true);
+$data = json_decode($miningData, true, 512, JSON_THROW_ON_ERROR);
 $currentHeight = $data['height'];
 
 // prepare script variables - we're going to use PayToPublicKeyHash to hide the public key
@@ -105,5 +105,5 @@ $packet = [
     'data' => $transactionRecord,
 ];
 
-$post = json_encode($packet);
+$post = json_encode($packet, JSON_THROW_ON_ERROR);
 print_r($http->post($miningUrl . 'mempool.php', $post));

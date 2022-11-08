@@ -26,11 +26,13 @@ class Mempool
 
         try {
             $validationResult = $this->transaction->validate($transaction);
+
             if ($validationResult['validated'] === false) {
                 return false;
             }
-        } catch (Exception $ex) {
-            Console::log('Error ' . $ex->getMessage());
+        } catch (Exception $e) {
+            Console::log('Error ' . $e->getMessage());
+
             return false;
         }
 
@@ -98,6 +100,7 @@ class Mempool
             $stmt->execute();
 
             $transactionId = (int)$this->db->lastInsertId();
+
             if ($transactionId <= 0) {
                 throw new RuntimeException('failed to add transaction to the database: ' .
                     $transaction['block_id'] . ' - ' . $transaction['transaction_id']);
@@ -126,6 +129,7 @@ class Mempool
                 );
                 $stmt->execute();
                 $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
                 if (count($txOut) <= 0) {
                     throw new RuntimeException('Cannot double spent transaction for: ' .
                         $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']);
@@ -133,6 +137,7 @@ class Mempool
 
                 // run script
                 $scriptResult = $this->transaction->unlockTransaction($txIn, $txOut);
+
                 if (!$scriptResult) {
                     throw new RuntimeException("Cannot unlock script for: " . $txIn['transaction_id']);
                 }
@@ -176,6 +181,7 @@ class Mempool
                 );
                 $stmt->execute();
                 $transactionTxId = (int)$this->db->lastInsertId();
+
                 if ($transactionTxId <= 0) {
                     throw new RuntimeException('failed to add a new transaction tx: ' .
                         $txIn['transaction_id'] . ' - ' . $txIn['$txIn']);
@@ -243,6 +249,7 @@ class Mempool
                 );
                 $stmt->execute();
                 $transactionTxId = (int)$this->db->lastInsertId();
+
                 if ($transactionTxId <= 0) {
                     throw new RuntimeException(
                         'failed to add a new transaction tx as unspent in the database: ' .
@@ -253,8 +260,8 @@ class Mempool
             // unlock tables and commit
             $this->db->commit();
             $result = true;
-        } catch (Exception $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
 
@@ -403,6 +410,7 @@ class Mempool
             pdoType: DatabaseHelpers::INT
         );
         $stmt->execute();
+
         return $stmt->fetchColumn() ?: 0;
     }
 }

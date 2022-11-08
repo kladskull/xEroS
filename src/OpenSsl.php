@@ -3,8 +3,22 @@
 namespace Blockchain;
 
 use Exception;
-use RuntimeException;
 use JetBrains\PhpStorm\ArrayShape;
+use RuntimeException;
+use function base64_decode;
+use function base64_encode;
+use function bin2hex;
+use function hex2bin;
+use function implode;
+use function openssl_pkey_export;
+use function openssl_pkey_get_details;
+use function openssl_pkey_new;
+use function openssl_sign;
+use function openssl_verify;
+use function random_bytes;
+use function str_replace;
+use function str_split;
+use function str_starts_with;
 
 // todo: reduce the size of the signature (dechex, and base58?)
 
@@ -110,6 +124,7 @@ class OpenSsl
 
         //verify signature
         $result = openssl_verify($textToSign, hex2bin($signature), $publicPemKey, "sha256WithRSAEncryption");
+
         if ($result === -1) {
             return false;
         }
@@ -122,7 +137,7 @@ class OpenSsl
      * @throws Exception
      */
     #[ArrayShape(['bytes' => "string", 'strong' => ""])]
-    public function getRandomBytesBinary($byteCount = 32): string
+    public function getRandomBytesBinary(int $byteCount = 32): string
     {
         return random_bytes($byteCount);
     }

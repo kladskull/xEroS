@@ -3,10 +3,12 @@
 namespace Blockchain;
 
 use JetBrains\PhpStorm\Pure;
+use function bin2hex;
+use function hash;
 
 class Pow
 {
-    public function doubleSha256(string $data): bool|string
+    public function doubleSha256(string $data): string
     {
         return hash(
             algo: 'sha256',

@@ -31,13 +31,11 @@ class AddressTest extends TestCase
 
         $account = $this->account->get($id);
         $address = $this->address->create($account['public_key']);
-        $this->assertNotEmpty($address);
-
         $address2 = $this->address->create($account['public_key']);
+
+        $this->assertNotEmpty($address);
         $this->assertNotEmpty($address2);
-
         $this->assertEquals($address, $address2);
-
         $this->assertEquals(Config::getAddressHeader(), substr($address, 0, 2));
     }
 

@@ -2,10 +2,10 @@
 
 namespace Blockchain;
 
-use PDO;
 use Exception;
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Pure;
+use PDO;
 use RuntimeException;
 
 class Block
@@ -42,16 +42,13 @@ class Block
         if ($height <= 0 || $height > self::MAX_LIFETIME_BLOCKS) {
             $height = 1;
         }
+
         return $height;
     }
 
-    /**
-     * @throws Exception
-     */
     public function genesis(string $environment, string $publicKey, string $privateKey): array
     {
         $environment = trim($environment);
-
         $height = 1;
         $previousBlockId = '';
         $gBlock = [];
@@ -70,79 +67,11 @@ class Block
                 $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c69295c476414';
                 $nonce = '1192faa7';
 
-                // create a block ID
-                $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+                $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
+                $gBlock['merkle_root'] = $merkleRoot;
+                $gBlock['hash'] = $hash;
+                $gBlock['nonce'] = $nonce;
 
-                // transaction details
-                $amount = $this->getRewardValue(1);
-
-                // prepare script
-                $address = new Address();
-                $transferEncoding = new TransferEncoding();
-                $script = new Script([]);
-                $partialAddress = $transferEncoding->binToHex(
-                    $address->createPartial(
-                        $this->openSsl->formatPem(
-                            $publicKeyRaw,
-                            false
-                        )
-                    )
-                );
-                $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
-                    'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
-                    '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
-                $txId = 0;
-                $lockHeight = $height + Config::getLockHeight();
-                $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
-
-                $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
-                $transactionRecord = [
-                    'id' => 1,
-                    'block_id' => $blockId,
-                    'transaction_id' => $transactionId,
-                    'date_created' => $date,
-                    'public_key' => $publicKeyRaw,
-                    'peer' => 'genesis',
-                    'version' => TransactionVersion::COINBASE,
-                    'height' => 1,
-                    Transaction::INPUTS => [],
-                    Transaction::OUTPUTS => [
-                        [
-                            'block_id' => $blockId,
-                            'tx_id' => $txId,
-                            'address' => $toAddress,
-                            'value' => $amount,
-                            'script' => $script->encodeScript($scriptText),
-                            'lock_height' => $lockHeight,
-                            'hash' => bin2hex(
-                                $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
-                            ),
-                        ]
-                    ],
-                ];
-
-                // sign
-                $transactionRecord['signature'] = $signature;
-                /*
-                $transactionRecord['signature'] = $transaction->signTransaction(
-                    $transactionRecord, $openSsl->formatPem($publicKeyRaw, false), $openSsl->formatPem($privateKeyRaw, true)
-                );
-                */
-
-                $gBlock = [
-                    'network_id' => Config::getNetworkIdentifier(),
-                    'block_id' => $blockId,
-                    'previous_block_id' => '',
-                    'date_created' => $date,
-                    'height' => $height,
-                    'difficulty' => Config::getDefaultDifficulty(),
-                    'merkle_root' => $merkleRoot,
-                    'transactions' => [$transactionRecord],
-                    'transaction_count' => 1,
-                    'previous_hash' => '',
-                    'hash' => $hash,
-                    'nonce' => $nonce
-                ];
                 break;
 
             case 'test':
@@ -166,79 +95,11 @@ class Block
                     '2369ddc6c69295c476414';
                 $nonce = '1192faa7';
 
-                // create a block ID
-                $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+                $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
+                $gBlock['merkle_root'] = $merkleRoot;
+                $gBlock['hash'] = $hash;
+                $gBlock['nonce'] = $nonce;
 
-                // transaction details
-                $amount = $this->getRewardValue(1);
-
-                // prepare script
-                $address = new Address();
-                $transferEncoding = new TransferEncoding();
-                $script = new Script([]);
-                $partialAddress = $transferEncoding->binToHex(
-                    $address->createPartial(
-                        $this->openSsl->formatPem(
-                            $publicKeyRaw,
-                            false
-                        )
-                    )
-                );
-                $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
-                    'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
-                    '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
-                $txId = 0;
-                $lockHeight = $height + Config::getLockHeight();
-                $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
-
-                $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
-                $transactionRecord = [
-                    'id' => 1,
-                    'block_id' => $blockId,
-                    'transaction_id' => $transactionId,
-                    'date_created' => $date,
-                    'public_key' => $publicKeyRaw,
-                    'peer' => 'genesis',
-                    'version' => TransactionVersion::COINBASE,
-                    'height' => 1,
-                    Transaction::INPUTS => [],
-                    Transaction::OUTPUTS => [
-                        [
-                            'block_id' => $blockId,
-                            'tx_id' => $txId,
-                            'address' => $toAddress,
-                            'value' => $amount,
-                            'script' => $script->encodeScript($scriptText),
-                            'lock_height' => $lockHeight,
-                            'hash' => bin2hex(
-                                $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
-                            ),
-                        ]
-                    ],
-                ];
-
-                // sign
-                $transactionRecord['signature'] = $signature;
-                /*
-                $transactionRecord['signature'] = $transaction->signTransaction(
-                    $transactionRecord, $openSsl->formatPem($publicKeyRaw, false), $openSsl->formatPem($privateKeyRaw, true)
-                );
-                */
-
-                $gBlock = [
-                    'network_id' => Config::getNetworkIdentifier(),
-                    'block_id' => $blockId,
-                    'previous_block_id' => '',
-                    'date_created' => $date,
-                    'height' => $height,
-                    'difficulty' => Config::getDefaultDifficulty(),
-                    'merkle_root' => $merkleRoot,
-                    'transactions' => [$transactionRecord],
-                    'transaction_count' => 1,
-                    'previous_hash' => '',
-                    'hash' => $hash,
-                    'nonce' => $nonce
-                ];
                 break;
 
             case 'dev':
@@ -251,91 +112,18 @@ class Block
                 $signature = '983de74a65334f1273bf72a9957ce5877c01ff93a34259aaeb470ce2ce35ae138f9c2e9bbd400c41f6f4479750f88e5f56c28940d5461fa7bbdc4104abaa6c711fdead8cf900147524036a44c23fe18cc898cba9d19a35a5e3bc13c827eb0cec546b63741a730f189c30996f6ee4561fb259eeac71032f4d8007e234ad5b93145786270f0a818aee52cd666e77ac0031c3b2772e26f856f2177769fe3b26321aabc2c21968e3d81ae4db6dd7698d04195a6d8b2954b4b28c5407eb8dc83cd86d572adc2d167f2dc0345dd509382219b01d55d5914d8233a9622d4dc0f67b525c9535e159d43def2fac8ecf418bdaa0f1594165ff2b80547356a895bcdb3eb525';
                 $nonce = '93e4';
 
-                // create a block ID
-                $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+                $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
+                $gBlock['merkle_root'] = $merkleRoot;
+                $gBlock['hash'] = $hash;
+                $gBlock['nonce'] = $nonce;
 
-                // transaction details
-                $amount = $this->getRewardValue(1);
-
-                // prepare script
-                $address = new Address();
-                $transferEncoding = new TransferEncoding();
-                $script = new Script([]);
-                $partialAddress = $transferEncoding->binToHex(
-                    $address->createPartial(
-                        $this->openSsl->formatPem(
-                            $publicKeyRaw,
-                            false
-                        )
-                    )
-                );
-                $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
-                    'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
-                    '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
-                $txId = 0;
-                $lockHeight = $height + Config::getLockHeight();
-                $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
-
-                $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
-                $transactionRecord = [
-                    'id' => 1,
-                    'block_id' => $blockId,
-                    'transaction_id' => $transactionId,
-                    'date_created' => $date,
-                    'public_key' => $publicKeyRaw,
-                    'peer' => 'genesis',
-                    'version' => TransactionVersion::COINBASE,
-                    'height' => 1,
-                    Transaction::INPUTS => [],
-                    Transaction::OUTPUTS => [
-                        [
-                            'block_id' => $blockId,
-                            'tx_id' => $txId,
-                            'address' => $toAddress,
-                            'value' => $amount,
-                            'script' => $script->encodeScript($scriptText),
-                            'lock_height' => $lockHeight,
-                            'hash' => bin2hex(
-                                $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
-                            ),
-                        ]
-                    ],
-                ];
-
-                // sign
-                $transactionRecord['signature'] = $signature;
-                /**
-                 * used for creating the signature
-                 *
-                 * $transactionRecord['signature'] = $this->transaction->signTransaction(
-                 * $transactionRecord,
-                 * $this->openSsl->formatPem($publicKeyRaw, false),
-                 * $this->openSsl->formatPem($privateKeyRaw, true)
-                 * );
-                 */
-
-
-                $gBlock = [
-                    'network_id' => Config::getNetworkIdentifier(),
-                    'block_id' => $blockId,
-                    'previous_block_id' => '',
-                    'date_created' => $date,
-                    'height' => $height,
-                    'difficulty' => Config::getDefaultDifficulty(),
-                    'merkle_root' => $merkleRoot,
-                    'transactions' => [$transactionRecord],
-                    'transaction_count' => 1,
-                    'previous_hash' => '',
-                    'hash' => $hash,
-                    'nonce' => $nonce
-                ];
                 break;
         }
 
         return $gBlock;
     }
 
-    public function getCandidateBlock($height, $publicKey, $privateKey): array
+    public function getCandidateBlock(int $height, string $publicKey, string $privateKey): array
     {
         $difficulty = $this->getDifficulty($height);
         $prevBlock = $this->getByHeight($height - 1);
@@ -383,12 +171,9 @@ class Block
         ];
 
         try {
-            $coinbase['signature'] = $this->transaction->signTransaction(
-                $coinbase,
-                $publicKey,
-                $privateKey
-            );
-        } catch (Exception) {
+            $coinbase['signature'] = $this->transaction->signTransaction($coinbase, $publicKey, $privateKey);
+        } catch (Exception|RuntimeException $e) {
+            Console::log($e->getMessage());
         }
 
         // put the coinbase as the first transaction
@@ -397,6 +182,7 @@ class Block
         $validTransactions = [];
         foreach ($transactions as $tx) {
             $result = $this->transaction->validate($tx);
+
             if ($result['validated'] === true) {
                 $validTransactions[] = $tx;
             } else {
@@ -459,6 +245,7 @@ class Block
             64
         );
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -476,6 +263,7 @@ class Block
             64
         );
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -483,6 +271,7 @@ class Block
     {
         $query = 'SELECT `height` FROM blocks WHERE `orphan`=0 ORDER BY `height` DESC LIMIT 1';
         $stmt = $this->db->query($query);
+
         return $stmt->fetchColumn() ?: 0;
     }
 
@@ -495,6 +284,7 @@ class Block
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'height', $height, DatabaseHelpers::INT);
         $stmt->execute();
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -504,17 +294,14 @@ class Block
             '`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan` FROM blocks WHERE ' .
             '`orphan`=0 ORDER BY height DESC LIMIT 1';
         $stmt = $this->db->query($query);
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function assembleFullBlock(string $blockId, bool $previousBlockId = false): array
     {
         $transaction = new Transaction();
-        if (!$previousBlockId) {
-            $currBlock = $this->getByBlockId($blockId);
-        } else {
-            $currBlock = $this->getByPreviousBlockId($blockId);
-        }
+        $currBlock = !$previousBlockId ? $this->getByBlockId($blockId) : $this->getByPreviousBlockId($blockId);
 
         if (!empty($currBlock)) {
             // remove internal fields
@@ -527,6 +314,7 @@ class Block
                 $transaction->getTransactionsByBlockId($blockId)
             );
         }
+
         return $currBlock ?: [];
     }
 
@@ -534,17 +322,16 @@ class Block
     {
         // remove internal columns
         unset($block['id'], $block['orphan']);
+
         return $block;
     }
 
-    /**
-     * @throws Exception
-     */
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
     public function validateFullBlock(array $block): array
     {
         $transactions = $block['transactions'];
         unset($block['transactions']);
+
         return $this->validate($block, $transactions, $block['transaction_count']);
     }
 
@@ -588,6 +375,7 @@ class Block
 
         // check the proof of work
         $pow = new Pow();
+
         if (!$pow->verifyPow($block['hash'], $this->generateBlockHeader($block), $block['nonce'])) {
             $reason .= 'Proof of work fail,';
             $result = false;
@@ -595,6 +383,7 @@ class Block
 
         // we must have all the transactions
         $transactions = Transaction::sort($transactions);
+
         if ($transactionCount !== count($transactions)) {
             $reason .= 'transaction count mismatch,';
             $result = false;
@@ -616,6 +405,7 @@ class Block
             }
 
             $transactionReason = $t->validate($transaction);
+
             if (!$transactionReason['validated']) {
                 $reason .= 'transaction validate failed: ' . $transactionReason['reason'] . ', ';
                 $result = false;
@@ -629,6 +419,7 @@ class Block
 
         // test the merkle root
         $merkle = new Merkle();
+
         if ($block['merkle_root'] !== $merkle->computeMerkleHash($transactions)) {
             $reason .= 'merkle root issue,';
             $result = false;
@@ -662,22 +453,22 @@ class Block
     {
         $result = true;
 
-        if ($block1 == null || $block2 == null) {
+        if ($block1 === null || $block2 === null) {
             $result = false;
         }
 
         // same block?
-        if ($block1['block_id'] == $block2['block_id']) {
+        if ($block1['block_id'] === $block2['block_id']) {
             $result = false;
         }
 
         // not the same height?
-        if ((int)$block1['height'] != (int)$block2['height']) {
+        if ((int)$block1['height'] !== (int)$block2['height']) {
             $result = false;
         }
 
         // is this a fork? If not, get out
-        if ($block1['previous_block_id'] != $block2['previous_block_id']) {
+        if ($block1['previous_block_id'] !== $block2['previous_block_id']) {
             $result = false;
         }
 
@@ -697,6 +488,7 @@ class Block
          */
         // get top 2 blocks by height
         $height = $this->getCurrentHeight();
+
         if ($height > 1) {
 
             /**
@@ -707,6 +499,7 @@ class Block
             $stmt = $this->db->query($query);
             $rows = $stmt->fetchAll();
             $counter = 0;
+
             foreach ($rows as $row) {
                 $this->delete($row['block_id']);
 
@@ -727,6 +520,7 @@ class Block
     {
         $query = 'SELECT `orphan` FROM blocks ORDER BY `height` DESC LIMIT 1';
         $stmt = $this->db->query($query);
+
         return (bool)$stmt->fetchColumn();
     }
 
@@ -744,18 +538,15 @@ class Block
         $stmt = $this->db->query($query);
         $rows = $stmt->fetchAll();
 
-        if ($rows != null) {
+        if ($rows !== false) {
             // check to see if there are two competing blocks at the same height
             $block1 = $this->getByBlockId($rows[0]['block_id']);
             $block2 = $this->getByBlockId($rows[1]['block_id']);
 
             // resolve
             $selectedBlock = $this->blockSelector($block1, $block2);
-            if (!empty($selectedBlock)) {
-                $block = $selectedBlock;
-            } else {
-                $block = $block1;
-            }
+
+            $block = !empty($selectedBlock) ? $selectedBlock : $block1;
 
             /**
              * iterate from the highest to the lowest (or lowest save)
@@ -777,11 +568,12 @@ class Block
      *
      * @param array $block1
      * @param array $block2
-     * @return array|null
+     * @return array
      */
     public function blockSelector(array $block1, array $block2): array
     {
         $block = null;
+
         if ($this->isFork($block1, $block2)) {
             // two valid blocks, get the better one and adjust the chain
             $strength = bccomp(
@@ -796,6 +588,7 @@ class Block
                 $block = $block2;
             }
         }
+
         return $block;
     }
 
@@ -819,18 +612,20 @@ class Block
         if ($nHeight <= 0) {
             $nHeight = 1;
         }
+
         $strHeight = (string)$nHeight;
 
         $targetModulus = (3600 / Config::getDesiredBlockTime()) * 24 * 365;
         $reductions = bcdiv($strHeight, (string)$targetModulus, 0);
-
         $nSubsidy = Config::getDefaultBlockReward(); // 100 coins
 
         if (bccomp($reductions, "0") === 1) {
             $reductions = (int)$reductions;
+
             for ($i = 0; $i < $reductions; $i++) {
                 $reduction = bcmul($nSubsidy, "0.04");
                 $nSubsidy = bcsub($nSubsidy, $reduction, 0);
+
                 if (bccomp($nSubsidy, '100000000') <= 0) {
                     break;
                 }
@@ -840,7 +635,7 @@ class Block
         return $nSubsidy;
     }
 
-    public function getBlockTime($currentTimeSeconds, $previousTimeSeconds, $blocksCreated): float
+    public function getBlockTime(int $currentTimeSeconds, int $previousTimeSeconds, int $blocksCreated): float
     {
         return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
     }
@@ -869,12 +664,14 @@ class Block
         // if less than 144 use the genesis difficulty
         if ($height < $blocksPerPeriod) {
             $genesisBlock = $this->getByHeight(1);
+
             return (int)$genesisBlock['difficulty'];
         }
 
         // get the desired block height and get the current difficulty
         if (empty($latestBlock)) {
             $latestBlock = $this->getByHeight($height);
+
             if (empty($latestBlock)) {
                 $latestBlock = $this->getByHeight($this->getCurrentHeight());
             }
@@ -908,6 +705,7 @@ class Block
 
         // never go less than the initial difficulty
         $minimumDifficulty = Config::getDefaultDifficulty();
+
         if ($difficulty < $minimumDifficulty) {
             $difficulty = $minimumDifficulty;
         }
@@ -932,8 +730,8 @@ class Block
     public function add(array $block, bool $validate = true, bool $orphan = false): bool
     {
         $result = false;
-
         $orphanVal = 0;
+
         if ($orphan) {
             $orphanVal = 1;
         }
@@ -941,12 +739,15 @@ class Block
         if ($validate) {
             try {
                 $result = $this->validateFullBlock($block);
-            } catch (Exception|RuntimeException $ex) {
-                Console::log('Exception thrown validating block: ' . $ex->getMessage());
+            } catch (Exception|RuntimeException $e) {
+                Console::log('Exception thrown validating block: ' . $e->getMessage());
+
                 return false;
             }
+
             if (!$result['validated']) {
                 Console::log('Invalid block: ' . $result['reason']);
+
                 return false;
             }
         }
@@ -1055,6 +856,7 @@ class Block
 
             // ensure the block was stored
             $blockInsertId = (int)$this->db->lastInsertId();
+
             if ($blockInsertId <= 0) {
                 throw new RuntimeException("failed to add block to the database: " . $block['block_id']);
             }
@@ -1129,6 +931,7 @@ class Block
                 $stmt->execute();
 
                 $transactionId = (int)$this->db->lastInsertId();
+
                 if ($transactionId <= 0) {
                     throw new RuntimeException(
                         'failed to add transaction to the database: ' . $transaction['block_id'] . ' - ' .
@@ -1165,6 +968,7 @@ class Block
                     $stmt->execute();
 
                     $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
                     if (count($txOut) <= 0) {
                         throw new RuntimeException('failed to get unspent transaction for: ' .
                             $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']);
@@ -1172,6 +976,7 @@ class Block
 
                     // run script
                     $result = $this->transaction->unlockTransaction($txIn, $txOut);
+
                     if (!$result) {
                         throw new RuntimeException("Cannot unlock script for: " . $txIn['transaction_id']);
                     }
@@ -1223,6 +1028,7 @@ class Block
                     $stmt->execute();
 
                     $transactionTxId = (int)$this->db->lastInsertId();
+
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException('failed to add a new transaction tx: ' .
                             $txIn['transaction_id'] . ' - ' . $txIn['$txIn']);
@@ -1300,6 +1106,7 @@ class Block
 
                     $stmt->execute();
                     $transactionTxId = (int)$this->db->lastInsertId();
+
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException(
                             'failed to add a new transaction tx as unspent in the database: ' .
@@ -1311,8 +1118,8 @@ class Block
 
             $this->db->commit();
             $result = true;
-        } catch (Exception $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
 
@@ -1386,6 +1193,7 @@ class Block
                     $stmt->execute();
 
                     $txOut = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
                     if (count($txOut) <= 0) {
                         throw new RuntimeException('failed to get unspent transaction for: ' .
                             $txIn['previous_transaction_id'] . ' - ' . $txIn['previous_tx_out_id']);
@@ -1393,6 +1201,7 @@ class Block
 
                     // run script
                     $result = $this->transaction->unlockTransaction($txIn, $txOut);
+
                     if (!$result) {
                         throw new RuntimeException("Cannot unlock script for: " . $txIn['transaction_id']);
                     }
@@ -1419,6 +1228,7 @@ class Block
                     $stmt->execute();
 
                     $transactionTxId = (int)$this->db->lastInsertId();
+
                     if ($transactionTxId <= 0) {
                         throw new RuntimeException(
                             'failed to update transaction tx as spent in the database: ' .
@@ -1465,10 +1275,11 @@ class Block
 
             $this->db->commit();
             $result = true;
-        } catch (Exception|RuntimeException $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception|RuntimeException $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -1538,10 +1349,11 @@ class Block
 
             $this->db->commit();
             $result = true;
-        } catch (Exception|RuntimeException $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception|RuntimeException $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -1565,15 +1377,17 @@ class Block
             $stmt->execute();
 
             $this->reverseTransactions($blockId, $delete);
+
             if ($delete) {
                 $this->delete($blockId);
             }
 
             $result = true;
-        } catch (Exception|RuntimeException $ex) {
-            Console::log('Rolling back transaction: ' . $ex->getMessage());
+        } catch (Exception|RuntimeException $e) {
+            Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }
+
         return $result;
     }
 
@@ -1698,5 +1512,88 @@ class Block
          * need to be taken care of.
          */
         $this->mempool->add($transactions);
+    }
+
+    private function transactionWork(
+        string $previousBlockId,
+        int $date,
+        int $height,
+        string $publicKeyRaw,
+        string $signature,
+    ): array {
+        // create a block ID
+        $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
+
+        // transaction details
+        $amount = $this->getRewardValue(1);
+
+        // prepare script
+        $address = new Address();
+        $transferEncoding = new TransferEncoding();
+        $script = new Script([]);
+        $partialAddress = $transferEncoding->binToHex(
+            $address->createPartial(
+                $this->openSsl->formatPem(
+                    $publicKeyRaw,
+                    false
+                )
+            )
+        );
+        $scriptText = 'mov ax,' . $partialAddress . ';adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
+            'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
+            '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
+        $txId = 0;
+        $lockHeight = $height + Config::getLockHeight();
+        $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
+
+        $transactionId = $this->transaction->generateId($date, $blockId, $publicKeyRaw);
+        $transactionRecord = [
+            'id' => 1,
+            'block_id' => $blockId,
+            'transaction_id' => $transactionId,
+            'date_created' => $date,
+            'public_key' => $publicKeyRaw,
+            'peer' => 'genesis',
+            'version' => TransactionVersion::COINBASE,
+            'height' => 1,
+            Transaction::INPUTS => [],
+            Transaction::OUTPUTS => [
+                [
+                    'block_id' => $blockId,
+                    'tx_id' => $txId,
+                    'address' => $toAddress,
+                    'value' => $amount,
+                    'script' => $script->encodeScript($scriptText),
+                    'lock_height' => $lockHeight,
+                    'hash' => bin2hex(
+                        $this->pow->doubleSha256($transactionId . $txId . $toAddress . $amount . $lockHeight)
+                    ),
+                ]
+            ],
+        ];
+
+        // sign
+        $transactionRecord['signature'] = $signature;
+        /**
+         * used for creating the signature
+         *
+         * $transactionRecord['signature'] = $this->transaction->signTransaction(
+         * $transactionRecord,
+         * $this->openSsl->formatPem($publicKeyRaw, false),
+         * $this->openSsl->formatPem($privateKeyRaw, true)
+         * );
+         */
+
+        return [
+            'network_id' => Config::getNetworkIdentifier(),
+            'block_id' => $blockId,
+            'previous_block_id' => '',
+            'date_created' => $date,
+            'height' => $height,
+            'difficulty' => Config::getDefaultDifficulty(),
+            'transactions' => [$transactionRecord],
+            'transaction_count' => 1,
+            'previous_hash' => '',
+        ];
     }
 }

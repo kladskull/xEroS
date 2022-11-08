@@ -3,13 +3,26 @@
 namespace Blockchain;
 
 use JetBrains\PhpStorm\ArrayShape;
+use JetBrains\PhpStorm\NoReturn;
+use function count;
+use function ctype_xdigit;
+use function explode;
+use function gzcompress;
+use function gzuncompress;
+use function str_contains;
+use function str_replace;
+use function str_starts_with;
+use function strpos;
+use function strtolower;
+use function substr;
+use function time;
+use function trim;
 
 class Script
 {
     private const COMMAND_SEP = ' ';
     private const PARAM_SEP = ',';
     private const LINE_SEP = ';';
-
     public string $lastError = '';
 
     private bool $runnable;
@@ -27,7 +40,6 @@ class Script
         $this->scriptFunctions = new ScriptFunctions();
         $this->transferEncoding = new TransferEncoding();
         $this->runnable = false;
-
         // load the container into the state machine
         $this->stateMachine->setContainer($container);
     }
@@ -42,7 +54,7 @@ class Script
      * is doesn't interfere with json. An uncompressed script is about ~433 bytes, encoding it to base58 without
      * compression is about 592, and compressing it reduces it to 502.
      */
-    public function encodeScript(string $script): bool|string
+    public function encodeScript(string $script): string
     {
         return $this->transferEncoding->binToBase58(gzcompress($script, -1));
     }
@@ -66,6 +78,7 @@ class Script
 
             // if at any point the sx register is false, we are done
             $sxRegister = $this->stateMachine->getRegister('sx');
+
             if ($sxRegister === -1) {
                 break;
             }
@@ -73,6 +86,7 @@ class Script
 
         // get the end state of the execution, get the overall state from sx
         $returnVal = $this->stateMachine->getRegister('sx');
+
         return $returnVal > 0;
     }
 
@@ -80,10 +94,12 @@ class Script
     {
         // check if we are done
         $sc = $this->stateMachine->getScriptCounter();
+
         if ($sc > $this->stateMachine->getExecutableOperations()) {
             if ($debug) {
                 $this->stateMachine->dumpState(true);
             }
+
             return false; // we are done
         }
 
@@ -110,6 +126,7 @@ class Script
             $this->runnable = true;
             $operations = $this->parseScript($script);
             $this->stateMachine->setScript($operations);
+
             return true;
         }
 
@@ -126,6 +143,7 @@ class Script
         while (str_contains($text, '  ')) {
             $text = str_replace('  ', ' ', $text);
         }
+
         return trim($text);
     }
 
@@ -133,8 +151,8 @@ class Script
     {
         $fullScript = [];
         $script = str_replace(["\t", "\n", "\r"], '', $script);
-
         $lines = explode(self::LINE_SEP, $script);
+
         foreach ($lines as $line) {
             if (!empty(trim($line))) {
                 $fullScript[] = $this->parseStatement($line);
@@ -149,14 +167,13 @@ class Script
     {
         // ensure we split this right
         $line = $this->cleanScript($line);
-
         $params = [];
         $newParams = [];
         $firstSpace = strpos($line, self::COMMAND_SEP);
+
         if ($firstSpace > 0) {
             $command = strtolower(substr($line, 0, $firstSpace));
             $paramsStr = substr($line, $firstSpace);
-
             // split the params,
             $params = explode(self::PARAM_SEP, $paramsStr);
 
@@ -181,6 +198,7 @@ class Script
         // break the script by operation
         $op = 0;
         $operations = $this->parseScript($script);
+
         foreach ($operations as $operation) {
             // check the command and params
             $command = $operation['command'];
@@ -190,12 +208,15 @@ class Script
             // ensure its callable/valid
             if (isset($this->scriptFunctions->functions[$command])) {
                 $reqParams = $this->scriptFunctions->functions[$command]['required_params'];
+
                 if (count($params) !== $reqParams) {
                     $this->lastError = "expected $reqParams parameters for `$command` but given $paramCount";
+
                     return false;
                 }
             } else {
                 $this->lastError = "invalid command `$command` encountered on operation $op";
+
                 return false;
             }
 
@@ -214,6 +235,7 @@ class Script
         }
 
         $result = $value;
+
         if (ctype_xdigit($value)) {
             $result = BcmathExtensions::bchexdec($value);
         }
@@ -231,6 +253,7 @@ class Script
         };
     }
 
+    #[NoReturn]
     private function executeStatement(array $statement): void
     {
         switch ($statement['command']) {

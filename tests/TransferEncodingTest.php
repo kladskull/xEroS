@@ -2,6 +2,7 @@
 
 namespace Blockchain;
 
+use Exception;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 

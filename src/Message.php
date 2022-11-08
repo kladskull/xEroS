@@ -2,7 +2,12 @@
 
 namespace Blockchain;
 
-use Exception;
+use Throwable;
+use function gzcompress;
+use function gzuncompress;
+use function hash;
+use function json_encode;
+use function time;
 
 class Message
 {
@@ -21,9 +26,10 @@ class Message
             $message[self::TIME] = time();
             $message[self::HASH] = hash('ripemd160', json_encode($message, JSON_THROW_ON_ERROR));
             $packet = json_encode($message, JSON_THROW_ON_ERROR);
-        } catch (Exception) {
+        } catch (Throwable) {
             $packet = null;
         }
+
         return $packet;
     }
 
@@ -43,9 +49,10 @@ class Message
             $packet = $this->format([
                 self::DATA => $this->inflate($message),
             ]);
-        } catch (Exception) {
+        } catch (Throwable) {
             $packet = null;
         }
+
         return $packet;
     }
 
@@ -56,9 +63,10 @@ class Message
                 self::COMMAND => $command,
                 self::DATA => $data,
             ]);
-        } catch (Exception) {
+        } catch (Throwable) {
             $packet = null;
         }
+
         return $this->deflate($packet);
     }
 
@@ -69,9 +77,10 @@ class Message
                 self::RESULT => $result,
                 self::DATA => $data,
             ], JSON_THROW_ON_ERROR);
-        } catch (Exception) {
+        } catch (Throwable) {
             $packet = null;
         }
+
         return $packet;
     }
 }
