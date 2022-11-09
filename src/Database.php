@@ -9,10 +9,6 @@ class Database
 {
     protected static PDO $instance;
 
-    protected function __construct()
-    {
-    }
-
     public static function getInstance(): PDO
     {
         if (empty(self::$instance)) {

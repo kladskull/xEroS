@@ -32,5 +32,4 @@ class Blacklist
     {
         return array_key_exists($address, static::ADDRESSES);
     }
-
 }

@@ -14,10 +14,6 @@ class DatabaseHelpers
     public const TEXT = 1;
     public const INT = 2;
 
-    protected function __construct()
-    {
-    }
-
     public static function filterBindAll(PDOStatement $stmt, array $fields): PDOStatement
     {
         foreach ($fields as $field) {

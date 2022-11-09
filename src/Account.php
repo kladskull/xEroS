@@ -145,7 +145,7 @@ class Account
 
             $this->db->commit();
             $result = true;
-        } catch (Exception|RuntimeException $e) {
+        } catch (Exception $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
         }

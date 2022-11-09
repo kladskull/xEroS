@@ -35,11 +35,11 @@ class DataStore
         $record = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         if ($record !== null) {
-            $epiry = $record['expires'];
+            $expires = $record['expires'];
 
-            if ($epiry === 0) {
+            if ($expires === 0) {
                 $retVal = $record['data'];
-            } elseif (time() < $epiry) {
+            } elseif (time() < $expires) {
                 $retVal = $record['data'];
             }
 
@@ -50,7 +50,7 @@ class DataStore
         return $retVal;
     }
 
-    public function add(string $key, mixed $value, int $epires = 0): int
+    public function add(string $key, mixed $value, int $expires = 0): int
     {
         if (strlen($key) > 128) {
             return 0;
@@ -63,7 +63,7 @@ class DataStore
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind($stmt, 'key', $key, DatabaseHelpers::TEXT, 128);
             $stmt = DatabaseHelpers::filterBind($stmt, 'data', $value, DatabaseHelpers::TEXT);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'expires', $epires, DatabaseHelpers::INT);
+            $stmt = DatabaseHelpers::filterBind($stmt, 'expires', $expires, DatabaseHelpers::INT);
             $stmt->execute();
             $id = (int)$this->db->lastInsertId();
 

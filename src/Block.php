@@ -172,7 +172,7 @@ class Block
 
         try {
             $coinbase['signature'] = $this->transaction->signTransaction($coinbase, $publicKey, $privateKey);
-        } catch (Exception|RuntimeException $e) {
+        } catch (Exception $e) {
             Console::log($e->getMessage());
         }
 
