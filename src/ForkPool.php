@@ -50,6 +50,7 @@ class ForkPool
 
     /**
      * @param mixed $work
+     *
      * @return int|bool
      */
     private function doJob(mixed $work): int|bool

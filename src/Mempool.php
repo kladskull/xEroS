@@ -293,6 +293,7 @@ class Mempool
 
     /**
      * @param string $transactionId
+     *
      * @return array|null
      */
     public function getByTransactionId(string $transactionId): array|null
