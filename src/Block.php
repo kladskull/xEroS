@@ -8,6 +8,9 @@ use JetBrains\PhpStorm\Pure;
 use PDO;
 use RuntimeException;
 
+/**
+ * Class Block
+ */
 class Block
 {
     public const MAX_LIFETIME_BLOCKS = 9999999999999;
@@ -37,6 +40,10 @@ class Block
         $this->pow = new Pow();
     }
 
+    /**
+     * @param int $height
+     * @return int
+     */
     public static function filterBlockHeight(int $height): int
     {
         if ($height <= 0 || $height > self::MAX_LIFETIME_BLOCKS) {
@@ -46,6 +53,12 @@ class Block
         return $height;
     }
 
+    /**
+     * @param string $environment
+     * @param string $publicKey
+     * @param string $privateKey
+     * @return array
+     */
     public function genesis(string $environment, string $publicKey, string $privateKey): array
     {
         $environment = trim($environment);
@@ -78,6 +91,7 @@ class Block
                 // block details
                 $date = 1644364863;
 
+                // uncomment these to create new keys, and replace the strings below with them
                 //$publicKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
                 //$privateKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
 
@@ -123,6 +137,13 @@ class Block
         return $gBlock;
     }
 
+    /**
+     * @param int $height
+     * @param string $publicKey
+     * @param string $privateKey
+     * @return array
+     * @throws Exception
+     */
     public function getCandidateBlock(int $height, string $publicKey, string $privateKey): array
     {
         $difficulty = $this->getDifficulty($height);
@@ -211,6 +232,13 @@ class Block
         ];
     }
 
+    /**
+     * @param string $networkId
+     * @param string $previousBlockId
+     * @param int $date
+     * @param int $height
+     * @return string
+     */
     #[Pure]
     public function generateId(string $networkId, string $previousBlockId, int $date, int $height): string
     {
@@ -219,6 +247,10 @@ class Block
         ));
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): ?array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
@@ -231,6 +263,10 @@ class Block
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @param string $blockId
+     * @return array
+     */
     public function getByBlockId(string $blockId): array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
@@ -249,6 +285,10 @@ class Block
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @param string $previousBlockId
+     * @return array
+     */
     public function getByPreviousBlockId(string $previousBlockId): array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
@@ -267,6 +307,9 @@ class Block
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @return int
+     */
     public function getCurrentHeight(): int
     {
         $query = 'SELECT `height` FROM blocks WHERE `orphan`=0 ORDER BY `height` DESC LIMIT 1';
@@ -275,6 +318,10 @@ class Block
         return $stmt->fetchColumn() ?: 0;
     }
 
+    /**
+     * @param int $height
+     * @return array|null
+     */
     public function getByHeight(int $height): ?array
     {
         // prepare the statement
@@ -288,6 +335,9 @@ class Block
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @return array|null
+     */
     public function getCurrent(): ?array
     {
         $query = 'SELECT `id`,`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
@@ -298,6 +348,11 @@ class Block
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @param string $blockId
+     * @param bool $previousBlockId
+     * @return array
+     */
     public function assembleFullBlock(string $blockId, bool $previousBlockId = false): array
     {
         $transaction = new Transaction();
@@ -318,6 +373,10 @@ class Block
         return $currBlock ?: [];
     }
 
+    /**
+     * @param array $block
+     * @return array
+     */
     public function stripInternalFields(array $block): array
     {
         // remove internal columns
@@ -326,6 +385,10 @@ class Block
         return $block;
     }
 
+    /**
+     * @param array $block
+     * @return array
+     */
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
     public function validateFullBlock(array $block): array
     {
@@ -335,6 +398,11 @@ class Block
         return $this->validate($block, $transactions, $block['transaction_count']);
     }
 
+    /**
+     * @param string $reason
+     * @param bool $result
+     * @return array
+     */
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
     private function returnValidateResult(string $reason, bool $result): array
     {
@@ -344,6 +412,13 @@ class Block
         ];
     }
 
+    /**
+     * @param array $block
+     * @param array $transactions
+     * @param int $transactionCount
+     * @return array
+     * @throws Exception
+     */
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
     public function validate(array $block, array $transactions, int $transactionCount): array
     {
@@ -592,6 +667,10 @@ class Block
         return $block;
     }
 
+    /**
+     * @param array $block
+     * @return string
+     */
     public function generateBlockHeader(array $block): string
     {
         return
@@ -606,6 +685,10 @@ class Block
             $block['previous_hash'];
     }
 
+    /**
+     * @param int $nHeight
+     * @return string
+     */
     #[Pure]
     public function getRewardValue(int $nHeight): string
     {
@@ -635,6 +718,12 @@ class Block
         return $nSubsidy;
     }
 
+    /**
+     * @param int $currentTimeSeconds
+     * @param int $previousTimeSeconds
+     * @param int $blocksCreated
+     * @return float
+     */
     public function getBlockTime(int $currentTimeSeconds, int $previousTimeSeconds, int $blocksCreated): float
     {
         return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
@@ -1391,6 +1480,11 @@ class Block
         return $result;
     }
 
+    /**
+     * @param string $blockId
+     * @param bool $delete
+     * @return void
+     */
     private function reverseTransactions(string $blockId, bool $delete = false): void
     {
         // get all transactions associated with this block
@@ -1514,6 +1608,14 @@ class Block
         $this->mempool->add($transactions);
     }
 
+    /**
+     * @param string $previousBlockId
+     * @param int $date
+     * @param int $height
+     * @param string $publicKeyRaw
+     * @param string $signature
+     * @return array
+     */
     private function transactionWork(
         string $previousBlockId,
         int $date,

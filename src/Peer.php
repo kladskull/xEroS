@@ -15,6 +15,10 @@ use function shuffle;
 use function time;
 use function trim;
 
+/**
+ * Class Peer
+ * @package Blockchain
+ */
 class Peer
 {
     private PDO $db;
@@ -26,6 +30,9 @@ class Peer
         $this->db = Database::getInstance();
     }
 
+    /**
+     * @return string
+     */
     public function getUniquePeerId(): string
     {
         $data = $this->store->getKey('peer_id', '');
@@ -51,6 +58,10 @@ class Peer
         return $data;
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): ?array
     {
         $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE ' .
@@ -62,6 +73,10 @@ class Peer
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param int $limit
+     * @return array
+     */
     public function getAll(int $limit = 100): array
     {
         $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers WHERE ' .
@@ -94,6 +109,10 @@ class Peer
         return $peers;
     }
 
+    /**
+     * @param string $address
+     * @return array|null
+     */
     public function getByHostAddress(string $address): ?array
     {
         $query = 'SELECT `id`,`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created` FROM peers ' .
@@ -105,11 +124,19 @@ class Peer
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $address
+     * @return int
+     */
     public function addBlackList(string $address): int
     {
         return $this->add($address, true);
     }
 
+    /**
+     * @param string $address
+     * @return bool
+     */
     public function incrementFails(string $address): bool
     {
         $result = false;
@@ -134,6 +161,10 @@ class Peer
         return $result;
     }
 
+    /**
+     * @param string $address
+     * @return bool
+     */
     public function clearFails(string $address): bool
     {
         $result = false;
@@ -157,6 +188,10 @@ class Peer
         return $result;
     }
 
+    /**
+     * @param string $address
+     * @return bool
+     */
     public function updatePingTime(string $address): bool
     {
         $result = false;
@@ -186,6 +221,10 @@ class Peer
         return $result;
     }
 
+    /**
+     * @param string $address
+     * @return bool
+     */
     private function isValidAddress(string $address): bool
     {
         $valid = false;
@@ -199,6 +238,11 @@ class Peer
         return $valid;
     }
 
+    /**
+     * @param string $address
+     * @param bool $blacklisted
+     * @return int
+     */
     public function add(string $address, bool $blacklisted = false): int
     {
         if (!$this->isValidAddress($address)) {
@@ -277,6 +321,10 @@ class Peer
         return $id;
     }
 
+    /**
+     * @param int $id
+     * @return bool
+     */
     public function delete(int $id): bool
     {
         $result = false;

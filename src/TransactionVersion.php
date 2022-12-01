@@ -2,6 +2,10 @@
 
 namespace Blockchain;
 
+/**
+ * Class TransactionVersion
+ * @package Blockchain
+ */
 class TransactionVersion
 {
     public const COINBASE = '0';

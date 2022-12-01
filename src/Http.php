@@ -8,8 +8,16 @@ use function curl_init;
 use function curl_setopt;
 use function trim;
 
+/**
+ * Class Http
+ * @package Blockchain
+ */
 class Http
 {
+    /**
+     * @param string $url
+     * @return string
+     */
     public function get(string $url): string
     {
         // create curl resource

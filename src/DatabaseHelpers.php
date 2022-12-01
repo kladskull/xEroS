@@ -8,12 +8,21 @@ use RuntimeException;
 use function filter_var;
 use function preg_replace;
 
+/**
+ * Class DatabaseHelpers
+ * @package Blockchain
+ */
 class DatabaseHelpers
 {
     public const ALPHA_NUMERIC = 0;
     public const TEXT = 1;
     public const INT = 2;
 
+    /**
+     * @param PDOStatement $stmt
+     * @param array $fields
+     * @return PDOStatement
+     */
     public static function filterBindAll(PDOStatement $stmt, array $fields): PDOStatement
     {
         foreach ($fields as $field) {
@@ -29,6 +38,14 @@ class DatabaseHelpers
         return $stmt;
     }
 
+    /**
+     * @param PDOStatement $stmt
+     * @param string $fieldName
+     * @param mixed $value
+     * @param int $pdoType
+     * @param int $maxLength
+     * @return PDOStatement
+     */
     public static function filterBind(
         PDOStatement $stmt,
         string $fieldName,

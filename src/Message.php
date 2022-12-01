@@ -9,6 +9,10 @@ use function hash;
 use function json_encode;
 use function time;
 
+/**
+ * Class Message
+ * @package Blockchain
+ */
 class Message
 {
     // keep the structure small for bandwidth preservation
@@ -19,6 +23,10 @@ class Message
     private const TIME = 't';
     private const VERSION = 'v';
 
+    /**
+     * @param array $message
+     * @return string
+     */
     private function format(array $message): string
     {
         try {
@@ -33,16 +41,28 @@ class Message
         return $packet;
     }
 
+    /**
+     * @param string $message
+     * @return bool|string
+     */
     private function deflate(string $message): bool|string
     {
         return gzcompress($message, 9);
     }
 
+    /**
+     * @param string $message
+     * @return bool|string
+     */
     private function inflate(string $message): bool|string
     {
         return gzuncompress($message, 9);
     }
 
+    /**
+     * @param $message
+     * @return string
+     */
     public function process($message): string
     {
         try {
@@ -56,6 +76,11 @@ class Message
         return $packet;
     }
 
+    /**
+     * @param string $command
+     * @param array $data
+     * @return string
+     */
     public function send(string $command, array $data): string
     {
         try {
@@ -70,6 +95,11 @@ class Message
         return $this->deflate($packet);
     }
 
+    /**
+     * @param bool $result
+     * @param array $data
+     * @return string
+     */
     public function response(bool $result, array $data): string
     {
         try {

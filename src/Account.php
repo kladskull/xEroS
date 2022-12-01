@@ -8,6 +8,10 @@ use RuntimeException;
 use function bcadd;
 use function time;
 
+/**
+ * Class Account
+ * @package Blockchain
+ */
 class Account
 {
     private PDO $db;
@@ -21,6 +25,10 @@ class Account
         $this->openSsl = new OpenSsl();
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
@@ -32,6 +40,9 @@ class Account
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @return array|null
+     */
     public function getNewestAccount(): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
@@ -41,6 +52,10 @@ class Account
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $address
+     * @return array|null
+     */
     public function getByAddress(string $address): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
@@ -52,6 +67,10 @@ class Account
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $publicKeyRaw
+     * @return array|null
+     */
     public function getByPublicKeyRaw(string $publicKeyRaw): ?array
     {
         $query = 'SELECT `id`,`address`,`public_key`,`public_key_raw`,`private_key`,`date_created` FROM accounts ' .
@@ -63,6 +82,9 @@ class Account
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @return int
+     */
     public function create(): int
     {
         try {
@@ -126,6 +148,10 @@ class Account
         return $id;
     }
 
+    /**
+     * @param int $id
+     * @return bool
+     */
     public function delete(int $id): bool
     {
         $result = false;
@@ -153,6 +179,10 @@ class Account
         return $result;
     }
 
+    /**
+     * @param string $address
+     * @return string
+     */
     public function getBalance(string $address): string
     {
         $balance = "0";
@@ -169,6 +199,10 @@ class Account
         return $balance;
     }
 
+    /**
+     * @param string $address
+     * @return string
+     */
     public function getPendingBalance(string $address): string
     {
         // get the current balance

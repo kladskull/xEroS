@@ -8,6 +8,10 @@ use function socket_close;
 use function socket_create_listen;
 use function socket_getsockname;
 
+/**
+ * Class TcpIp
+ * @package Blockchain
+ */
 class TcpIp
 {
     /**
@@ -20,6 +24,10 @@ class TcpIp
         return ($port < 1024 || $port > 65535) === false;
     }
 
+    /**
+     * @param string|null $ip
+     * @return bool
+     */
     #[Pure]
     public function isValidIp(?string $ip): bool
     {
@@ -28,6 +36,10 @@ class TcpIp
         );
     }
 
+    /**
+     * @param string|null $ip
+     * @return bool
+     */
     #[Pure]
     public function isPrivateIp(?string $ip): bool
     {
@@ -36,6 +48,10 @@ class TcpIp
         );
     }
 
+    /**
+     * @param string|null $ip
+     * @return bool
+     */
     public function isIpv4(?string $ip): bool
     {
         return (
@@ -47,6 +63,10 @@ class TcpIp
         );
     }
 
+    /**
+     * @param string|null $ip
+     * @return bool
+     */
     public function isIpv6(?string $ip): bool
     {
         return (
@@ -58,6 +78,10 @@ class TcpIp
         );
     }
 
+    /**
+     * @param string|null $ip
+     * @return bool
+     */
     public function isPrivateIpv4(?string $ip): bool
     {
         $result = filter_var(
@@ -73,6 +97,10 @@ class TcpIp
         return $result;
     }
 
+    /**
+     * @param string|null $ip
+     * @return bool
+     */
     public function isPrivateIpv6(?string $ip): bool
     {
         $result = filter_var(

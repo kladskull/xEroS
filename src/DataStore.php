@@ -5,6 +5,10 @@ namespace Blockchain;
 use Exception;
 use PDO;
 
+/**
+ * Class DataStore
+ * @package Blockchain
+ */
 class DataStore
 {
     private PDO $db;
@@ -14,6 +18,10 @@ class DataStore
         $this->db = Database::getInstance();
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): ?array
     {
         $query = 'SELECT `key`,`data` FROM key_value_store WHERE `id` = :id LIMIT 1';
@@ -24,6 +32,11 @@ class DataStore
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $key
+     * @param string $default
+     * @return string|int
+     */
     public function getKey(string $key, $default = ''): string|int
     {
         $query = 'SELECT `data`,`expires` FROM key_value_store WHERE `key` = :key LIMIT 1';
@@ -50,6 +63,12 @@ class DataStore
         return $retVal;
     }
 
+    /**
+     * @param string $key
+     * @param mixed $value
+     * @param int $expires
+     * @return int
+     */
     public function add(string $key, mixed $value, int $expires = 0): int
     {
         if (strlen($key) > 128) {
@@ -77,6 +96,10 @@ class DataStore
         return $id;
     }
 
+    /**
+     * @param int $id
+     * @return bool
+     */
     public function delete(int $id): bool
     {
         $result = false;
@@ -104,6 +127,10 @@ class DataStore
         return $result;
     }
 
+    /**
+     * @param string $key
+     * @return bool
+     */
     public function deleteKey(string $key): bool
     {
         $result = false;

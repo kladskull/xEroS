@@ -6,6 +6,10 @@ use Exception;
 use PDO;
 use RuntimeException;
 
+/**
+ * Class Queue
+ * @package Blockchain
+ */
 class Queue
 {
     private PDO $db;
@@ -15,6 +19,10 @@ class Queue
         $this->db = Database::getInstance();
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): ?array
     {
         $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE `id` = :id LIMIT 1';
@@ -25,6 +33,11 @@ class Queue
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $command
+     * @param int $limit
+     * @return array
+     */
     public function getItems(string $command, int $limit = 100): array
     {
         $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE command=:command and ' .
@@ -47,6 +60,10 @@ class Queue
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @param int $id
+     * @return bool
+     */
     public function incrementFails(int $id): bool
     {
         $result = false;
@@ -65,6 +82,10 @@ class Queue
         return $result;
     }
 
+    /**
+     * @param int $id
+     * @return bool
+     */
     public function clearFails(int $id): bool
     {
         $result = false;
@@ -83,6 +104,11 @@ class Queue
         return $result;
     }
 
+    /**
+     * @param string $command
+     * @param string $data
+     * @return int
+     */
     public function add(string $command, string $data): int
     {
         try {
@@ -135,6 +161,9 @@ class Queue
         return $id;
     }
 
+    /**
+     * @return bool
+     */
     public function prune(): bool
     {
         $result = false;
@@ -153,6 +182,10 @@ class Queue
         return $result;
     }
 
+    /**
+     * @param int $id
+     * @return bool
+     */
     public function delete(int $id): bool
     {
         $result = false;

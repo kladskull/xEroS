@@ -15,6 +15,10 @@ use function hash;
 use function strtolower;
 use function usleep;
 
+/**
+ * Class ScriptFunctions
+ * @package Blockchain
+ */
 class ScriptFunctions
 {
     private TransferEncoding $transferEncoding;
@@ -114,7 +118,14 @@ class ScriptFunctions
      *
      ********************************************************************************/
 
-    // -1 (l < r), 0 (l = r), 1 (l > r)
+    /**
+     * -1 (l < r), 0 (l = r), 1 (l > r)
+     *
+     * @param StateMachine $stateMachine
+     * @param string|bool|int $leftValue
+     * @param string|bool|int $rightValue
+     * @return void
+     */
     #[NoReturn]
     public function cmp(StateMachine $stateMachine, string|bool|int $leftValue, string|bool|int $rightValue): void
     {
@@ -141,7 +152,13 @@ class ScriptFunctions
      *
      ********************************************************************************/
 
-    // make the location positive
+    /**
+     * make the location positive
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function abs(StateMachine $stateMachine, string $location): void
     {
@@ -155,7 +172,14 @@ class ScriptFunctions
         }
     }
 
-    // add number with the location
+    /**
+     * add number with the location
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @param string $number
+     * @return void
+     */
     #[NoReturn]
     public function add(StateMachine $stateMachine, string $location, string $number): void
     {
@@ -165,7 +189,13 @@ class ScriptFunctions
         );
     }
 
-    // decrement the location
+    /**
+     * decrement the location
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function dec(StateMachine $stateMachine, string $location): void
     {
@@ -175,7 +205,14 @@ class ScriptFunctions
         );
     }
 
-    // divide [register value] with the number
+    /**
+     * divide [register value] with the number
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @param string $number
+     * @return void
+     */
     #[NoReturn]
     public function div(StateMachine $stateMachine, string $location, string $number): void
     {
@@ -191,7 +228,13 @@ class ScriptFunctions
         $stateMachine->setRegister($location, $value);
     }
 
-    // increment the location
+    /**
+     * increment the location
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function inc(StateMachine $stateMachine, string $location): void
     {
@@ -201,7 +244,14 @@ class ScriptFunctions
         );
     }
 
-    // sets location to the greater number
+    /**
+     * sets location to the greater number
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @param string $number
+     * @return void
+     */
     #[NoReturn]
     public function max(StateMachine $stateMachine, string|bool|int $left, string|bool|int $right): void
     {
@@ -216,7 +266,14 @@ class ScriptFunctions
         $stateMachine->setRegister($location, $right);
     }
 
-    // sets location to the smaller number
+    /**
+     * sets location to the smaller number
+     *
+     * @param StateMachine $stateMachine
+     * @param string|bool|int $left
+     * @param string|bool|int $right
+     * @return void
+     */
     #[NoReturn]
     public function min(StateMachine $stateMachine, string|bool|int $left, string|bool|int $right): void
     {
@@ -231,7 +288,14 @@ class ScriptFunctions
         $stateMachine->setRegister($location, $right);
     }
 
-    // multiply number with the location
+    /**
+     * multiply number with the location
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @param string $number
+     * @return void
+     */
     #[NoReturn]
     public function mul(StateMachine $stateMachine, string $location, string $number): void
     {
@@ -241,7 +305,13 @@ class ScriptFunctions
         );
     }
 
-    // negate the location (flip the sign)
+    /**
+     * negate the location (flip the sign)
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function neg(StateMachine $stateMachine, string $location): void
     {
@@ -253,19 +323,36 @@ class ScriptFunctions
         }
     }
 
-    // no-op
+    /**
+     * no-op
+     *
+     * @param StateMachine $stateMachine
+     * @return void
+     */
     #[NoReturn]
     public function nop(StateMachine $stateMachine): void
     {
         usleep(0);
     }
 
-    // remark
+    /**
+     * remark
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function rem(StateMachine $stateMachine, string $location): void
     {}
 
-    // if 0 or 1, flip, otherwise make 0
+    /**
+     * if 0 or 1, flip, otherwise make 0
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function not(StateMachine $stateMachine, string $location): void
     {
@@ -282,14 +369,27 @@ class ScriptFunctions
         $stateMachine->setRegister($location, $value);
     }
 
-    // set precision for the script
+    /**
+     * set precision for the script
+     *
+     * @param StateMachine $stateMachine
+     * @param string $precision
+     * @return void
+     */
     #[NoReturn]
     public function prec(StateMachine $stateMachine, string $precision): void
     {
         $stateMachine->setPrecision((int)$precision);
     }
 
-    // subtract number with the location
+    /**
+     * subtract number with the location
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @param string $number
+     * @return void
+     */
     #[NoReturn]
     public function sub(StateMachine $stateMachine, string $location, string $number): void
     {
@@ -304,6 +404,12 @@ class ScriptFunctions
      *    DATA TRANSFER
      *
      ********************************************************************************/
+
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $source
+     * @return void
+     */
     #[NoReturn]
     public function clr(StateMachine $stateMachine, string $source): void
     {
@@ -318,6 +424,12 @@ class ScriptFunctions
         }
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string|bool|int $source
+     * @param string $destination
+     * @return void
+     */
     #[NoReturn]
     public function mov(StateMachine $stateMachine, string|bool|int $source, string $destination): void
     {
@@ -328,6 +440,11 @@ class ScriptFunctions
         $stateMachine->setRegister($destination, $source);
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $source
+     * @return void
+     */
     #[NoReturn]
     public function pop(StateMachine $stateMachine, string $source): void
     {
@@ -335,6 +452,11 @@ class ScriptFunctions
         $stateMachine->setRegister($source, $value);
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string|bool|int $source
+     * @return void
+     */
     #[NoReturn]
     public function push(StateMachine $stateMachine, string|bool|int $source): void
     {
@@ -345,6 +467,10 @@ class ScriptFunctions
         $stateMachine->pushStack($source);
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @return void
+     */
     #[NoReturn]
     public function dup(StateMachine $stateMachine): void
     {
@@ -359,12 +485,23 @@ class ScriptFunctions
      *    CRYPTO
      *
      ********************************************************************************/
+
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function adpk(StateMachine $stateMachine, string $location): void
     {
         $stateMachine->setRegister($location, $this->address->create($stateMachine->getRegister($location)));
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function adha(StateMachine $stateMachine, string $location): void
     {
@@ -376,18 +513,33 @@ class ScriptFunctions
         );
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function adpa(StateMachine $stateMachine, string $location): void
     {
         $stateMachine->setRegister($location, $this->address->createPartial($stateMachine->getRegister($location)));
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $source
+     * @return void
+     */
     #[NoReturn]
     public function r160(StateMachine $stateMachine, string $source): void
     {
         $stateMachine->setRegister($source, hash('ripemd160', $stateMachine->getRegister($source), true));
     }
 
+    /**
+     * @param StateMachine $stateMachine
+     * @param string $source
+     * @return void
+     */
     #[NoReturn]
     public function s256(StateMachine $stateMachine, string $source): void
     {
@@ -400,7 +552,13 @@ class ScriptFunctions
      *
      ********************************************************************************/
 
-    // base58encode
+    /**
+     * base58encode
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function b58e(StateMachine $stateMachine, string $location): void
     {
@@ -410,7 +568,13 @@ class ScriptFunctions
         );
     }
 
-    // base58decode
+    /**
+     * base58decode
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function b58d(StateMachine $stateMachine, string $location): void
     {
@@ -420,14 +584,26 @@ class ScriptFunctions
         );
     }
 
-    // base64encode
+    /**
+     * base64encode
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function b64e(StateMachine $stateMachine, string $location): void
     {
         $stateMachine->setRegister($location, base64_encode($stateMachine->getRegister($location)));
     }
 
-    // base64decode
+    /**
+     * base64decode
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function b64d(StateMachine $stateMachine, string $location): void
     {
@@ -440,7 +616,13 @@ class ScriptFunctions
         $stateMachine->setRegister($location, $value);
     }
 
-    // binary to hex
+    /**
+     * binary to hex
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function hexe(StateMachine $stateMachine, string $location): void
     {
@@ -450,7 +632,13 @@ class ScriptFunctions
         );
     }
 
-    // binary to hex
+    /**
+     * binary to hex
+     *
+     * @param StateMachine $stateMachine
+     * @param string $location
+     * @return void
+     */
     #[NoReturn]
     public function hexd(StateMachine $stateMachine, string $location): void
     {
@@ -463,7 +651,14 @@ class ScriptFunctions
      *
      ********************************************************************************/
 
-    // binary to hex
+    /**
+     * binary to hex
+     *
+     * @param StateMachine $stateMachine
+     * @param string|bool|int $leftValue
+     * @param string|bool|int $rightValue
+     * @return void
+     */
     #[NoReturn]
     public function vadr(StateMachine $stateMachine, string|bool|int $leftValue, string|bool|int $rightValue): void
     {
@@ -476,7 +671,16 @@ class ScriptFunctions
         $stateMachine->setRegister('sx', $result, true);
     }
 
-    // binary to hex
+    /**
+     * binary to hex
+     *
+     * @param StateMachine $stateMachine
+     * @param string|bool|int $firstValue
+     * @param string|bool|int $secondValue
+     * @param string|bool|int $thirdValue
+     * @return void
+     * @throws \Exception
+     */
     #[NoReturn]
     public function vsig(
         StateMachine $stateMachine,
@@ -493,14 +697,24 @@ class ScriptFunctions
         $stateMachine->setRegister('sx', $nResult, true);
     }
 
-    // binary to hex
+    /**
+     * binary to hex
+     *
+     * @param StateMachine $stateMachine
+     * @return void
+     */
     #[NoReturn]
     public function vfal(StateMachine $stateMachine): void
     {
         $stateMachine->setRegister('sx', 0, true);
     }
 
-    // binary to hex
+    /**
+     * binary to hex
+     *
+     * @param StateMachine $stateMachine
+     * @return void
+     */
     #[NoReturn]
     public function vtru(StateMachine $stateMachine): void
     {

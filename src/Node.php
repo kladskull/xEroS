@@ -5,6 +5,10 @@ namespace Blockchain;
 use JetBrains\PhpStorm\NoReturn;
 use JsonException;
 
+/**
+ * Class Console
+ * @package Blockchain
+ */
 class Node
 {
     private Peer $peer;
@@ -36,6 +40,11 @@ class Node
         $this->queue = new Queue();
     }
 
+    /**
+     * @param $client
+     * @param string $data
+     * @return void
+     */
     #[NoReturn]
     public function send($client, string $data): void
     {
@@ -48,6 +57,10 @@ class Node
         }
     }
 
+    /**
+     * @param $client
+     * @return string
+     */
     public function receive($client): string
     {
         // todo: add a loop with timeout
@@ -61,7 +74,9 @@ class Node
     }
 
     /**
+     * @param $client
      * @throws JsonException
+     * @return void
      */
     #[NoReturn]
     public function sendHandshake($client): void
@@ -76,7 +91,9 @@ class Node
     }
 
     /**
+     * @param $data
      * @throws JsonException
+     * @return array
      */
     public function parseResponse($data): array
     {
@@ -90,6 +107,11 @@ class Node
         return $packets;
     }
 
+    /**
+     * @param string $address
+     * @param int $port
+     * @return void
+     */
     #[NoReturn]
     public function listen(string $address, int $port): void
     {

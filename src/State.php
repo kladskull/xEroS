@@ -2,6 +2,10 @@
 
 namespace Blockchain;
 
+/**
+ * Class State
+ * @package Blockchain
+ */
 class State
 {
     public const MINE = 'mine';

@@ -6,6 +6,9 @@ use PDO;
 use function count;
 use function in_array;
 
+/**
+ * Class App
+ */
 class App
 {
     private PDO $db;
@@ -15,6 +18,9 @@ class App
         $this->db = Database::getInstance();
     }
 
+    /**
+     * @return void
+     */
     public function checkMigrations(): void
     {
         // check if migration was run

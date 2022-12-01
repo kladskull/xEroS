@@ -14,6 +14,10 @@ use function ksort;
 use function str_pad;
 use function strlen;
 
+/**
+ * Class Transaction
+ * @package Blockchain
+ */
 class Transaction
 {
     private PDO $db;
@@ -28,6 +32,12 @@ class Transaction
         $this->pow = new Pow();
     }
 
+    /**
+     * @param int $date
+     * @param string $blockId
+     * @param string $publicKeyRaw
+     * @return string
+     */
     #[Pure]
     public function generateId(int $date, string $blockId, string $publicKeyRaw): string
     {
@@ -38,6 +48,10 @@ class Transaction
         );
     }
 
+    /**
+     * @param string $transactionId
+     * @return bool
+     */
     public function exists(string $transactionId): bool
     {
         $query = 'SELECT `id` FROM transactions WHERE `transaction_id` = :transaction_id LIMIT 1';
@@ -56,6 +70,11 @@ class Transaction
         return ($id !== null && $id > 0);
     }
 
+    /**
+     * @param string $blockId
+     * @param string $transactionId
+     * @return bool
+     */
     public function existStrict(string $blockId, string $transactionId): bool
     {
         $query = 'SELECT `id` FROM transactions WHERE `block_id` =:block_id AND `transaction_id` = ' .
@@ -82,6 +101,10 @@ class Transaction
         return ($id !== null && $id > 0);
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): array|null
     {
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,' .
@@ -93,6 +116,11 @@ class Transaction
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $blockId
+     * @param string $transactionId
+     * @return array|null
+     */
     public function getByTransactionId(string $blockId, string $transactionId): array|null
     {
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`' .
@@ -127,6 +155,11 @@ class Transaction
         return $transaction;
     }
 
+    /**
+     * @param string $blockId
+     * @param string $transactionId
+     * @return array
+     */
     public function getTransactionInputs(string $blockId, string $transactionId): array
     {
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`' .
@@ -151,6 +184,11 @@ class Transaction
         return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
     }
 
+    /**
+     * @param string $blockId
+     * @param string $transactionId
+     * @return array
+     */
     public function getTransactionOutputs(string $blockId, string $transactionId): array
     {
         $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` ' .
@@ -175,6 +213,10 @@ class Transaction
         return self::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
     }
 
+    /**
+     * @param string $blockId
+     * @return array
+     */
     public function getTransactionsByBlockId(string $blockId): array
     {
         $returnTransactions = [];
@@ -202,6 +244,10 @@ class Transaction
         return $returnTransactions;
     }
 
+    /**
+     * @param array $transaction
+     * @return array
+     */
     public function stripInternalFields(array $transaction): array
     {
         $inputs = [];
@@ -227,6 +273,10 @@ class Transaction
         return $transaction;
     }
 
+    /**
+     * @param array $transaction
+     * @return string
+     */
     public function calculateMinerFee(array $transaction): string
     {
         $totalInputs = "0";
@@ -263,6 +313,8 @@ class Transaction
     }
 
     /**
+     * @param array $transaction
+     * @return array
      * @throws Exception
      */
     #[ArrayShape(['validated' => "false", 'reason' => "string"])]
@@ -465,6 +517,10 @@ class Transaction
         ];
     }
 
+    /**
+     * @param array $transactions
+     * @return array
+     */
     public static function sort(array $transactions): array
     {
         // we must sort the same way every time
@@ -488,6 +544,10 @@ class Transaction
         return $sortedTransactions;
     }
 
+    /**
+     * @param array $txs
+     * @return array
+     */
     public static function sortTx(array $txs): array
     {
         $sorted = [];
@@ -508,6 +568,10 @@ class Transaction
         return $sortedTx;
     }
 
+    /**
+     * @param array $transaction
+     * @return string
+     */
     public function generateSignatureText(array $transaction): string
     {
         $txInData = '';
@@ -531,7 +595,10 @@ class Transaction
     }
 
     /**
-     * @throws Exception
+     * @param $signatureText
+     * @param $publicKey
+     * @param $privateKey
+     * @return string
      */
     public function generateSignature($signatureText, $publicKey, $privateKey): string
     {
@@ -539,13 +606,21 @@ class Transaction
     }
 
     /**
-     * @throws Exception
+     * @param array $transaction
+     * @param $publicKey
+     * @param $privateKey
+     * @return string
      */
     public function signTransaction(array $transaction, $publicKey, $privateKey): string
     {
         return $this->generateSignature($this->generateSignatureText($transaction), $publicKey, $privateKey);
     }
 
+    /**
+     * @param array $input
+     * @param array $output
+     * @return bool
+     */
     public function unlockTransaction(array $input, array $output): bool
     {
         $container = [

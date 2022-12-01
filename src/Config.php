@@ -2,11 +2,14 @@
 
 namespace Blockchain;
 
+/**
+ * Class Config
+ */
 class Config
 {
     // Project
     private const PRODUCT_NAME = 'Xero';
-    private const PRODUCT_COPYRIGHT = 'Copyright (c)2021,2022 by Kladskull <mike@currazy.com>';
+    private const PRODUCT_COPYRIGHT = 'Copyright (c)2021,2022 by Kladskull <kladskull@currazy.com>';
     private const VERSION = '0.0001';
     private const NETWORK_IDENTIFIER = "xv01";
     private const ENVIRONMENT = "prod";
@@ -58,36 +61,57 @@ class Config
         '3.99.119.232:7747',
     ];
 
+    /**
+     * @return string
+     */
     public static function getAddressHeader(): string
     {
         return self::ADDRESS_HEADER;
     }
 
+    /**
+     * @return array
+     */
     public static function getAllowedLocalHosts(): array
     {
         return self::ALLOWED_LOCAL_HOSTS;
     }
 
+    /**
+     * @return array
+     */
     public static function getAllowedPublicHosts(): array
     {
         return self::ALLOWED_PUBLIC_HOSTS;
     }
 
+    /**
+     * @return string
+     */
     public static function getChainVersion(): string
     {
         return self::CHAIN_VERSION;
     }
 
+    /**
+     * @return string
+     */
     public static function getDefaultBlockReward(): string
     {
         return self::DEFAULT_BLOCK_REWARD;
     }
 
+    /**
+     * @return int
+     */
     public static function getDesiredBlockTime(): int
     {
         return self::DESIRED_BLOCK_TIME;
     }
 
+    /**
+     * @return int
+     */
     public static function getDefaultDifficulty(): int
     {
         $env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
@@ -99,6 +123,9 @@ class Config
         };
     }
 
+    /**
+     * @return string
+     */
     public static function getDbEnvironment(): string
     {
         $return = '';
@@ -122,106 +149,169 @@ class Config
         return $return;
     }
 
+    /**
+     * @return int
+     */
     public static function getGenesisDate(): int
     {
         return self::GENESYS_DATE;
     }
 
+    /**
+     * @return string
+     */
     public static function getHostIdService(): string
     {
         return self::HOST_ID_SERVICE;
     }
 
+    /**
+     * @return array
+     */
     public static function getInitialPeers(): array
     {
         return self::INITIAL_PEER_LIST;
     }
 
+    /**
+     * @return int
+     */
     public static function getListenAddress(): string
     {
         return $_ENV['LISTEN_IP'] ?? '0.0.0.0';
     }
 
+    /**
+     * @return int
+     */
     public static function getListenPort(): int
     {
         return (int)($_ENV['LISTEN_PORT'] ?? 7747);
     }
 
+    /**
+     * @return int
+     */
     public static function getLockHeight(): int
     {
         return self::LOCK_HEIGHT;
     }
 
+    /**
+     * @return string
+     */
     public static function getMaxCurrencySupply(): string
     {
         return self::MAX_CURRENCY_SUPPLY;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxLoops(): int
     {
         return self::MAX_LOOPS;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxPeers(): int
     {
         return self::MAX_PEERS;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxRebroadcastPeers(): int
     {
         return self::MAX_REBROADCASTING_PEERS;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxScriptLength(): int
     {
         return self::MAX_SCRIPT_LENGTH;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxSpentTransactionCount(): int
     {
         return self::MAX_SPENT_PER_TRANSACTION;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxTransactionSize(): int
     {
         return self::MAX_TRANSACTION_SIZE;
     }
 
+    /**
+     * @return int
+     */
     public static function getMaxUnspentTransactionCount(): int
     {
         return self::MAX_UNSPENT_PER_TRANSACTION;
     }
 
+    /**
+     * @return string
+     */
     public static function getMinimumTransactionFee(): string
     {
         return self::MINIMUM_FEE;
     }
 
+    /**
+     * @return string
+     */
     public static function getNetworkIdentifier(): string
     {
         return self::NETWORK_IDENTIFIER;
     }
 
+    /**
+     * @return int
+     */
     public static function getPeerRequestTimeout(): int
     {
         return self::PEER_REQUEST_TIMEOUT;
     }
 
+    /**
+     * @return string
+     */
     public static function getProductCopyright(): string
     {
         return self::PRODUCT_COPYRIGHT;
     }
 
+    /**
+     * @return string
+     */
     public static function getProductName(): string
     {
         return self::PRODUCT_NAME;
     }
 
+    /**
+     * @return bool
+     */
     public static function getPublicAccess(): bool
     {
         return self::PUBLIC_API_ACCESS;
     }
 
+    /**
+     * @return string
+     */
     public static function getVersion(): string
     {
         return self::VERSION;

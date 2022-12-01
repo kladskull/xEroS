@@ -2,8 +2,16 @@
 
 namespace Blockchain;
 
+/**
+ * Class Merkle
+ * @package Blockchain
+ */
 class Merkle
 {
+    /**
+     * @param array $transactions
+     * @return string|null
+     */
     public function computeMerkleHash(array $transactions): ?string
     {
         // sort it

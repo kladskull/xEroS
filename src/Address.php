@@ -8,6 +8,9 @@ use function rtrim;
 use function str_starts_with;
 use function substr;
 
+/**
+ * Class Address
+ */
 class Address
 {
     private TransferEncoding $transferEncoding;
@@ -19,11 +22,19 @@ class Address
         $this->openssl = new OpenSsl();
     }
 
+    /**
+     * @param string $addressRaw
+     * @return string
+     */
     public function getAddressChecksum(string $addressRaw): string
     {
         return substr(hash('sha256', $addressRaw), 0, 4);
     }
 
+    /**
+     * @param string $publicKey
+     * @return string
+     */
     public function create(string $publicKey): string
     {
         if (!str_starts_with($publicKey, OpenSsl::BEGIN_PUBLIC_KEY)
@@ -37,6 +48,10 @@ class Address
         return $this->createAddressFromPartial($sha256hash);
     }
 
+    /**
+     * @param string $publicKey
+     * @return string
+     */
     public function createPartial(string $publicKey): string
     {
         $publicKeyRaw = $this->openssl->pemToBin($publicKey);
@@ -45,6 +60,10 @@ class Address
         return hash('sha256', $binaryNonce . $publicKeyRaw, true);
     }
 
+    /**
+     * @param string $sha256Hash
+     * @return string
+     */
     public function createAddressFromPartial(string $sha256Hash): string
     {
         $ripeMdHash = hash('ripemd160', $sha256Hash, true);
@@ -56,6 +75,10 @@ class Address
         return Config::getAddressHeader() . $this->transferEncoding->binToBase58($addressRaw . $checkSum);
     }
 
+    /**
+     * @param string $address
+     * @return bool
+     */
     public function validateAddress(string $address): bool
     {
         if (!str_starts_with($address, Config::getAddressHeader())) {

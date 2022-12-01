@@ -15,6 +15,9 @@ use function str_split;
 use function strlen;
 use function strtolower;
 
+/**
+ * Class TransactionEncoding
+ */
 class TransferEncoding
 {
     private Base58 $base58;
@@ -24,6 +27,10 @@ class TransferEncoding
         $this->base58 = new Base58();
     }
 
+    /**
+     * @param string $base58
+     * @return bool
+     */
     public function isBase58(string $base58): bool
     {
         $result = true;
@@ -41,26 +48,46 @@ class TransferEncoding
         return $result;
     }
 
+    /**
+     * @param string $data
+     * @return string
+     */
     public function encodeBase58(string $data): string
     {
         return $this->base58->encode($data);
     }
 
+    /**
+     * @param string $base58
+     * @return string
+     */
     public function decodeBase58(string $base58): string
     {
         return $this->base58->decode($base58);
     }
 
+    /**
+     * @param string $binary
+     * @return string
+     */
     public function binToBase58(string $binary): string
     {
         return $this->encodeBase58($binary);
     }
 
+    /**
+     * @param string $base58
+     * @return string
+     */
     public function base58ToBin(string $base58): string
     {
         return $this->decodeBase58($base58);
     }
 
+    /**
+     * @param string $bin
+     * @return string
+     */
     public function binToHex(string $bin): string
     {
         return implode(
@@ -69,6 +96,10 @@ class TransferEncoding
         );
     }
 
+    /**
+     * @param string $hex
+     * @return string
+     */
     public function hexToBin(string $hex): string
     {
         $string = '';

@@ -6,18 +6,30 @@ use function key;
 use function pcntl_fork;
 use function pcntl_wait;
 
+/**
+ * Class ForkPool
+ * @package Blockchain
+ *
+ * todo: this needs to be implemented once things seem stable
+ */
 class ForkPool
 {
     protected array $jobs = [];
     protected array $pid = [];
     protected int $max_workers = 10;
 
+    /**
+     * @param $job
+     */
     public function addWork($job): void
     {
         $this->jobs[] = $job;
     }
 
-    public function getWork()
+    /**
+     * @return mixed|null
+     */
+    public function getWork(): mixed
     {
         $work = null;
         if (count($this->jobs) > 0) {
@@ -28,12 +40,19 @@ class ForkPool
         return $work;
     }
 
+    /**
+     * @param $work
+     */
     protected function job($work): void
     {
         // your work here...
     }
 
-    private function doJob($work)
+    /**
+     * @param mixed $work
+     * @return int
+     */
+    private function doJob(mixed $work): int|bool
     {
         $pid = pcntl_fork();
 
@@ -52,6 +71,9 @@ class ForkPool
         return $pid;
     }
 
+    /**
+     * @return void
+     */
     public function run(): void
     {
         // loop until all work is distributed...

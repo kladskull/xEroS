@@ -22,6 +22,10 @@ use function str_starts_with;
 
 // todo: reduce the size of the signature (dechex, and base58?)
 
+/**
+ * Class OpenSsl
+ * @package Blockchain
+ */
 class OpenSsl
 {
     public const BEGIN_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----";
@@ -29,12 +33,21 @@ class OpenSsl
     public const BEGIN_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----";
     public const END_PRIVATE_KEY = "-----END PRIVATE KEY-----";
 
+    /**
+     * @param string $text
+     * @return string
+     */
     public function pemToBin(string $text): string
     {
         return base64_decode(str_replace([self::BEGIN_PUBLIC_KEY, self::END_PUBLIC_KEY,
             self::BEGIN_PRIVATE_KEY, self::END_PRIVATE_KEY, PHP_EOL], "", $text));
     }
 
+    /**
+     * @param string $data
+     * @param bool $privateKey
+     * @return string
+     */
     public function binToPem(string $data, bool $privateKey): string
     {
         $data = implode(PHP_EOL, str_split(base64_encode($data), 64));
@@ -48,12 +61,21 @@ class OpenSsl
         return $formatted;
     }
 
+    /**
+     * @param string $text
+     * @return string
+     */
     public function stripPem(string $text): string
     {
         return str_replace([self::BEGIN_PUBLIC_KEY, self::END_PUBLIC_KEY,
             self::BEGIN_PRIVATE_KEY, self::END_PRIVATE_KEY, PHP_EOL], "", $text);
     }
 
+    /**
+     * @param string $data
+     * @param bool $privateKey
+     * @return string
+     */
     public function formatPem(string $data, bool $privateKey): string
     {
         if ($privateKey) {
@@ -65,6 +87,9 @@ class OpenSsl
         return $formatted;
     }
 
+    /**
+     * @return array
+     */
     #[ArrayShape(['public_key' => "mixed", 'public_key_raw' => "string", 'private_key' => ""])]
     public function createRsaKeyPair(): array
     {
@@ -89,7 +114,10 @@ class OpenSsl
     }
 
     /**
-     * @throws Exception
+     * @param string $textToSign
+     * @param string $publicPemKey
+     * @param string $privatePemKey
+     * @return string
      */
     public function signAndVerifyData(string $textToSign, string $publicPemKey, string $privatePemKey): string
     {
@@ -113,7 +141,11 @@ class OpenSsl
     }
 
     /**
+     * @param string $textToSign
+     * @param string $signature
+     * @param string $publicPemKey
      * @throws Exception
+     * @return bool
      */
     public function verifySignature(string $textToSign, string $signature, string $publicPemKey): bool
     {
@@ -134,6 +166,8 @@ class OpenSsl
     }
 
     /**
+     * @param int $byteCount
+     * @return string
      * @throws Exception
      */
     #[ArrayShape(['bytes' => "string", 'strong' => ""])]
@@ -143,9 +177,11 @@ class OpenSsl
     }
 
     /**
+     * @param int $byteCount
      * @throws Exception
+     * @return string
      */
-    public function getRandomBytesHex($byteCount = 32): string
+    public function getRandomBytesHex(int $byteCount = 32): string
     {
         return bin2hex($this->getRandomBytesBinary($byteCount));
     }

@@ -9,8 +9,15 @@ use function bcpow;
 use function hexdec;
 use function strlen;
 
+/**
+ * Class BcmathExtensions
+ */
 class BcmathExtensions
 {
+    /**
+     * @param string $number
+     * @return string
+     */
     public static function bcabs(string $number): string
     {
         if (bccomp($number, '0') === -1) {
@@ -20,6 +27,10 @@ class BcmathExtensions
         return $number;
     }
 
+    /**
+     * @param string $hex
+     * @return string
+     */
     public static function bchexdec(string $hex): string
     {
         $dec = "0";

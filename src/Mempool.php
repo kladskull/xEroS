@@ -6,6 +6,10 @@ use Exception;
 use PDO;
 use RuntimeException;
 
+/**
+ * Class Mempool
+ * @package Blockchain
+ */
 class Mempool
 {
     protected PDO $db;
@@ -20,6 +24,10 @@ class Mempool
         $this->transaction = new Transaction();
     }
 
+    /**
+     * @param array $transaction
+     * @return bool
+     */
     public function add(array $transaction): bool
     {
         $result = false;
@@ -268,6 +276,10 @@ class Mempool
         return $result;
     }
 
+    /**
+     * @param int $id
+     * @return array|null
+     */
     public function get(int $id): array|null
     {
         $query = 'SELECT `id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` ' .
@@ -279,6 +291,10 @@ class Mempool
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * @param string $transactionId
+     * @return array|null
+     */
     public function getByTransactionId(string $transactionId): array|null
     {
         $query = 'SELECT `id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`,`public_key` ' .
@@ -305,6 +321,10 @@ class Mempool
         return $transaction;
     }
 
+    /**
+     * @param string $transactionId
+     * @return array
+     */
     public function getTransactionInputs(string $transactionId): array
     {
         $query = 'SELECT `id`,`transaction_id`,`tx_id`,`previous_transaction_id`,`previous_tx_out_id`,`script` ' .
@@ -322,6 +342,10 @@ class Mempool
         return Transaction::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
     }
 
+    /**
+     * @param string $transactionId
+     * @return bool|array|null
+     */
     public function getTransactionOutputs(string $transactionId): bool|array|null
     {
         $query = 'SELECT `id`,`transaction_id`,`tx_id`,`address`,`value`,`script`,`lock_height`,`spent`,`hash` ' .
@@ -339,6 +363,10 @@ class Mempool
         return Transaction::sortTx($stmt->fetchAll(PDO::FETCH_ASSOC)) ?: [];
     }
 
+    /**
+     * @param string $transactionId
+     * @return bool
+     */
     public function delete(string $transactionId): bool
     {
         // delete mempool transactions with same transaction id's
@@ -376,6 +404,10 @@ class Mempool
         return true;
     }
 
+    /**
+     * @param int $height
+     * @return array
+     */
     public function getAllTransactions(int $height): array
     {
         $returnTransactions = [];
@@ -400,6 +432,10 @@ class Mempool
         return $returnTransactions;
     }
 
+    /**
+     * @param int $height
+     * @return int
+     */
     public function getMempoolCount(int $height): int
     {
         $stmt = $this->db->query('SELECT count(1) FROM mempool_transactions WHERE height=:height;');

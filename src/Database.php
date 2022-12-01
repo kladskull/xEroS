@@ -5,10 +5,17 @@ namespace Blockchain;
 use PDO;
 use PDOException;
 
+/**
+ * Class Database
+ * @package Blockchain
+ */
 class Database
 {
     protected static PDO $instance;
 
+    /**
+     * @return PDO
+     */
     public static function getInstance(): PDO
     {
         if (empty(self::$instance)) {
@@ -23,5 +30,4 @@ class Database
 
         return self::$instance;
     }
-
 }

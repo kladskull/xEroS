@@ -11,7 +11,9 @@ use function ord;
 use function sprintf;
 use function time;
 
-
+/**
+ * Class Miner
+ */
 class Miner
 {
     protected Block $block;
@@ -25,6 +27,10 @@ class Miner
         $this->store = new DataStore();
     }
 
+    /**
+     * @param int $v
+     * @return int
+     */
     public function numberOfSetBits(int $v): int
     {
         $c = $v - (($v >> 1) & 0x55555555);
@@ -35,7 +41,11 @@ class Miner
         return (($c >> 16) + $c) & 0x0000FFFF;
     }
 
-    public function hashOutput($hashesPerSecond): string
+    /**
+     * @param float $hashesPerSecond
+     * @return string
+     */
+    public function hashOutput(float $hashesPerSecond): string
     {
         $magnitudes = ['hps', 'Khps', 'Mhps', 'Ghps', 'Thps', 'Phps', 'Ehps'];
         $mag = log($hashesPerSecond, 1000);
@@ -43,13 +53,22 @@ class Miner
         return sprintf('%.2f%s', $hashesPerSecond / (1000 ** ((int)$mag)), $magnitudes[(int)$mag]);
     }
 
+    /**
+     * @param string $blockHeader
+     * @param int $difficulty
+     * @param int $height
+     * @param int $startingNonce
+     * @param bool $checkNewBlocks
+     * @return array|bool
+     */
     public function mineBlock(
         string $blockHeader,
-        int $difficulty,
-        int $height,
-        int $startingNonce = 0,
-        bool $checkNewBlocks = true
-    ): array|bool {
+        int    $difficulty,
+        int    $height,
+        int    $startingNonce = 0,
+        bool   $checkNewBlocks = true
+    ): array|bool
+    {
         $start = time();
         $nonce = $startingNonce;
         $bytes = (int)ceil($difficulty / 8);
@@ -75,7 +94,7 @@ class Miner
                 if ($i === ($bytes - 1)) {
                     $bit = 8 - ($difficulty % 8);
 
-                    // the breaks were left out intentionally
+                    // missing breaks are intentional
                     switch ($bit) {
                         case 7:
                             $byte &= ~64;

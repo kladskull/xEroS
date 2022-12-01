@@ -18,6 +18,10 @@ use function substr;
 use function time;
 use function trim;
 
+/**
+ * Class Block
+ * @package Blockchain
+ */
 class Script
 {
     private const COMMAND_SEP = ' ';
@@ -33,6 +37,7 @@ class Script
     private StateMachine $stateMachine;
     private ScriptFunctions $scriptFunctions;
 
+    #[NoReturn]
     public function __construct(array $container)
     {
         $this->transaction = new Transaction();
@@ -44,6 +49,9 @@ class Script
         $this->stateMachine->setContainer($container);
     }
 
+    /**
+     * @return string
+     */
     public function getErrorMessage(): string
     {
         return $this->lastError;
@@ -53,18 +61,29 @@ class Script
      * encoding actually makes the string slightly bigger overall than the script, but it needs to be encoded, so that
      * is doesn't interfere with json. An uncompressed script is about ~433 bytes, encoding it to base58 without
      * compression is about 592, and compressing it reduces it to 502.
+     *
+     * @param string $script
+     * @return string
      */
     public function encodeScript(string $script): string
     {
         return $this->transferEncoding->binToBase58(gzcompress($script, -1));
     }
 
-    // see note above
+    /**
+     * see note above
+     * @param string $compressed
+     * @return bool|string
+     */
     public function decodeScript(string $compressed): bool|string
     {
         return gzuncompress($this->transferEncoding->base58ToBin($compressed));
     }
 
+    /**
+     * @param bool $debug
+     * @return bool
+     */
     public function run(bool $debug): bool
     {
         if (!$this->runnable) {
@@ -90,6 +109,10 @@ class Script
         return $returnVal > 0;
     }
 
+    /**
+     * @param bool $debug
+     * @return bool
+     */
     public function execute(bool $debug): bool
     {
         // check if we are done
@@ -118,6 +141,10 @@ class Script
         return true;
     }
 
+    /**
+     * @param string $script
+     * @return bool
+     */
     public function loadScript(string $script): bool
     {
         $this->runnable = $this->validateScript($script);
@@ -133,11 +160,18 @@ class Script
         return false;
     }
 
+    /**
+     * @return StateMachine
+     */
     public function debugGetStateMachine(): StateMachine
     {
         return $this->stateMachine;
     }
 
+    /**
+     * @param string $text
+     * @return string
+     */
     private function cleanScript(string $text): string
     {
         while (str_contains($text, '  ')) {
@@ -147,6 +181,10 @@ class Script
         return trim($text);
     }
 
+    /**
+     * @param string $script
+     * @return array
+     */
     public function parseScript(string $script): array
     {
         $fullScript = [];
@@ -162,6 +200,10 @@ class Script
         return $fullScript;
     }
 
+    /**
+     * @param string $line
+     * @return array
+     */
     #[ArrayShape(['command' => "string", 'params' => "string[]", 'param_count' => "int"])]
     public function parseStatement(string $line): array
     {
@@ -192,7 +234,12 @@ class Script
         ];
     }
 
-    // checks basic formatting and command, doesn't test if correct registers are used, etc.
+    /**
+     * checks basic formatting and command, doesn't test if correct registers are used, etc.
+     *
+     * @param string $script
+     * @return bool
+     */
     public function validateScript(string $script): bool
     {
         // break the script by operation
@@ -226,7 +273,12 @@ class Script
         return true;
     }
 
-    // convert hex to int
+    /**
+     * convert hex to int
+     *
+     * @param string $value
+     * @return string
+     */
     private function standardizeNumeric(string $value): string
     {
         // must be in the format of 0x...
@@ -243,6 +295,10 @@ class Script
         return $result;
     }
 
+    /**
+     * @param string $value
+     * @return string
+     */
     public function executeValue(string $value): string
     {
         return match ($value) {
@@ -253,6 +309,10 @@ class Script
         };
     }
 
+    /**
+     * @param array $statement
+     * @return void
+     */
     #[NoReturn]
     private function executeStatement(array $statement): void
     {

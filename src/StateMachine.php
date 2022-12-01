@@ -7,6 +7,10 @@ use function array_pop;
 use function count;
 use function str_pad;
 
+/**
+ * Class StateMachine
+ * @package Blockchain
+ */
 class StateMachine
 {
     private array $script = [];
@@ -27,12 +31,19 @@ class StateMachine
     // the stack
     private array $stack = [];
 
+    /**
+     * @param array $container
+     * @return void
+     */
     #[NoReturn]
     public function setContainer(array $container): void
     {
         $this->container = $container;
     }
 
+    /**
+     * @return void
+     */
     #[NoReturn]
     protected function resetStateMachine(): void
     {
@@ -52,11 +63,19 @@ class StateMachine
         $this->stack = [];
     }
 
+    /**
+     * @param int $value
+     * @return string
+     */
     private function showBool(int $value): string
     {
         return $value === 1 ? 'true' : 'false';
     }
 
+    /**
+     * @param bool $finalState
+     * @return void
+     */
     #[NoReturn]
     public function dumpState(bool $finalState = false): void
     {
@@ -96,6 +115,11 @@ class StateMachine
         echo "-----------------+\n\n";
     }
 
+    /**
+     * @param $line
+     * @param $current
+     * @return void
+     */
     #[NoReturn]
     private function dumpScriptLine($line, $current = false): void
     {
@@ -109,16 +133,25 @@ class StateMachine
         echo "\n";
     }
 
+    /**
+     * @return int
+     */
     public function getExecutableOperations(): int
     {
         return $this->executableOperations;
     }
 
+    /**
+     * @return int
+     */
     public function getScriptCounter(): int
     {
         return $this->scriptCounter;
     }
 
+    /**
+     * @return void
+     */
     #[NoReturn]
     public function incScriptCounter(): void
     {
@@ -130,6 +163,10 @@ class StateMachine
         return $this->precision;
     }
 
+    /**
+     * @param int $precision
+     * @return void
+     */
     #[NoReturn]
     public function setPrecision(int $precision): void
     {
@@ -145,11 +182,18 @@ class StateMachine
         $this->precision = $precision;
     }
 
+    /**
+     * @return array
+     */
     public function getScript(): array
     {
         return $this->script;
     }
 
+    /**
+     * @param array $script
+     * @return void
+     */
     #[NoReturn]
     public function setScript(array $script): void
     {
@@ -161,6 +205,10 @@ class StateMachine
         $this->executableOperations = count($script) - 1;
     }
 
+    /**
+     * @param string $value
+     * @return bool
+     */
     public function isRegister(string $value): bool
     {
         return match ($value) {
@@ -169,6 +217,10 @@ class StateMachine
         };
     }
 
+    /**
+     * @param string $register
+     * @return string|bool|int
+     */
     public function getRegister(string $register): string|bool|int
     {
         $found = false;
@@ -202,7 +254,14 @@ class StateMachine
         return $value;
     }
 
-    // if it's not a register, we will throw it on the stack
+    /**
+     * if it's not a register, we will throw it on the stack
+     *
+     * @param string $register
+     * @param string|int|bool $value
+     * @param bool $system
+     * @return void
+     */
     #[NoReturn]
     public function setRegister(string $register, string|int|bool $value, bool $system = false): void
     {
@@ -229,12 +288,19 @@ class StateMachine
         }
     }
 
+    /**
+     * @param string $value
+     * @return void
+     */
     #[NoReturn]
     public function pushStack(string $value): void
     {
         $this->stack[] = $value;
     }
 
+    /**
+     * @return string
+     */
     public function popStack(): string
     {
         return array_pop($this->stack) ?? '';
