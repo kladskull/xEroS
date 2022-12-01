@@ -16,7 +16,7 @@ class ForkPool
 {
     protected array $jobs = [];
     protected array $pid = [];
-    protected int $max_workers = 10;
+    protected int $maxWorkers = 10;
 
     /**
      * @param $job
@@ -50,7 +50,7 @@ class ForkPool
 
     /**
      * @param mixed $work
-     * @return int
+     * @return int|bool
      */
     private function doJob(mixed $work): int|bool
     {
@@ -79,7 +79,7 @@ class ForkPool
         // loop until all work is distributed...
         while (true) {
 
-            if (count($this->pid) < $this->max_workers) {
+            if (count($this->pid) < $this->maxWorkers) {
                 // fetch work
                 $work = $this->getWork();
 
