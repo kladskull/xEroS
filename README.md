@@ -13,7 +13,7 @@ version of assembler - one thing I'd like to do is offer easier scripting langua
 ## Contact
 You can email me: xeros@currazy.com.
 
-## Status of the Project (Yes it's active!)
+## Status of the Project
 Currently, the blockchain has not launched - it is however close to its first release version. I plan on launching it
 in the next month or two - once I have some higher priority tasks are done in the Github issues area of this 
 project.
