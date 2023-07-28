@@ -2,6 +2,15 @@
 
 namespace Xeros;
 
+use Blockchain\Address;
+use Blockchain\Config;
+use Blockchain\Http;
+use Blockchain\OpenSsl;
+use Blockchain\Peer;
+use Blockchain\Script;
+use Blockchain\Transaction;
+use Blockchain\TransferEncoding;
+
 require __DIR__ . '../vendor/autoload.php';
 require __DIR__ . '../bootstrap.php';
 
