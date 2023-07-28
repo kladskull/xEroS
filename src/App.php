@@ -53,8 +53,8 @@ class App
         }
 
         if (count($requiredTables) !== $tableCount) {
-            Console::log('Error: Before you run ' . Config::getProductName() . ' you must run ./phinx migrate');
-            exit(0);
+            Console::log('Running migrations...');
+            shell_exec('./phinx migrate');
         }
     }
 }

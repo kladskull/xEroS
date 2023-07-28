@@ -19,8 +19,8 @@ define('APP_DIR', $appDir);
  * Make sure they have installed and executed composer
  */
 if (!file_exists(APP_DIR . 'vendor/autoload.php')) {
-    echo 'Error: You have to install composer and run `composer install` before you can continue.', PHP_EOL;
-    exit(0);
+    echo 'Installing dependencies...', PHP_EOL;
+    shell_exec('composer install');
 }
 
 // includes
@@ -36,8 +36,8 @@ if ($phpVersion < 81001) {
 
 // setup .env
 if (!file_exists(APP_DIR . '.env')) {
-    echo 'Error: rename .env_sample to .env, and change the values accordingly', PHP_EOL;
-    exit(0);
+    echo 'Creating .env', PHP_EOL;
+    copy(APP_DIR . '.env_sample', APP_DIR . '.env');
 }
 
 // load the environment
