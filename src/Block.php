@@ -66,25 +66,20 @@ class Block
         $previousBlockId = '';
         $gBlock = [];
 
-        // uncomment these to create new keys, and replace the strings below with them
-        //$publicKeyRaw = $this->openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
-        //$privateKeyRaw = $this->openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
-
-        //exit(0);
-
-        $publicKeyRaw = $this->openSsl->stripPem($publicKey);
-        $privateKeyRaw = $this->openSsl->stripPem($privateKey);
+        $publicKeyRaw = $this->openSsl->stripPem(file_get_contents(APP_DIR . 'public.key'));
+        $privateKeyRaw = $this->openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
 
         switch ($environment) {
+            case 'production':
             case 'live':
                 // block details
                 $date = 1644364863;
 
                 $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrAMjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2YjsrrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB';
-                $hash = '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67';
+                $hash = '0000000f8fd419d81b0eb5ed9512a1cc42910c94a5034bd543653edd83fcb4f3';
                 $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
                 $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c69295c476414';
-                $nonce = '1192faa7';
+                $nonce = '5bd5d65';
 
                 $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
                 $gBlock['merkle_root'] = $merkleRoot;
@@ -123,6 +118,7 @@ class Block
                 break;
 
             case 'dev':
+            case 'development':
                 // block details
                 $date = 1646786361;
 
@@ -1624,11 +1620,12 @@ class Block
      */
     private function transactionWork(
         string $previousBlockId,
-        int $date,
-        int $height,
+        int    $date,
+        int    $height,
         string $publicKeyRaw,
         string $signature,
-    ): array {
+    ): array
+    {
         // create a block ID
         $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
 

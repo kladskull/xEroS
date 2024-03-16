@@ -70,6 +70,11 @@ class Miner
     ): array|bool
     {
         $start = time();
+
+        if ($startingNonce == 0) {
+            $startingNonce = rand(0, 18346744073709551615);
+        }
+
         $nonce = $startingNonce;
         $bytes = (int)ceil($difficulty / 8);
         $elapsed = 0;
@@ -77,7 +82,7 @@ class Miner
 
         $displayFreq = 1000000;
 
-        if ($_ENV['ENVIRONMENT'] !== 'live') {
+        if ($_ENV['ENVIRONMENT'] !== 'live' && $_ENV['ENVIRONMENT'] !== 'production') {
             $displayFreq = 25000;
         }
 
