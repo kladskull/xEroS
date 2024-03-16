@@ -66,6 +66,12 @@ class Block
         $previousBlockId = '';
         $gBlock = [];
 
+        // uncomment these to create new keys, and replace the strings below with them
+        //$publicKeyRaw = $this->openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
+        //$privateKeyRaw = $this->openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
+
+        //exit(0);
+
         $publicKeyRaw = $this->openSsl->stripPem($publicKey);
         $privateKeyRaw = $this->openSsl->stripPem($privateKey);
 

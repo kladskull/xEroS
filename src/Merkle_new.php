@@ -7,8 +7,8 @@ use RuntimeException;
 
 class Merkle_new
 {
-    private $hashList;
-    private $hashAlgorithm;
+    private array $hashList;
+    private mixed $hashAlgorithm;
 
     public function __construct(array $data, $hashAlgorithm = 'sha256')
     {
@@ -20,12 +20,12 @@ class Merkle_new
         $this->hashList = $this->build($data);
     }
 
-    private function hash($data)
+    private function hash($data): string
     {
         return hash($this->hashAlgorithm, $data);
     }
 
-    private function build(array $data)
+    private function build(array $data): array
     {
         $hashList = [];
 
@@ -33,7 +33,7 @@ class Merkle_new
             $hashList[] = $this->hash($item);
         }
 
-// Duplicate the last item until the total number is a power of two
+        // Duplicate the last item until the total number is a power of two
         while (count($hashList) & (count($hashList) - 1)) {
             $hashList[] = end($hashList);
         }
@@ -46,7 +46,7 @@ class Merkle_new
         return $this->buildTree($this->hashList)[0];
     }
 
-    private function buildTree(array $hashList)
+    private function buildTree(array $hashList): array
     {
         $tree = $hashList;
 
@@ -55,7 +55,7 @@ class Merkle_new
 
             for ($i = 0; $i < count($tree); $i += 2) {
                 $left = $tree[$i];
-                $right = isset($tree[$i + 1]) ? $tree[$i + 1] : $tree[$i]; // If right node doesn't exist, use left node hash
+                $right = $tree[$i + 1] ?? $tree[$i]; // If right node doesn't exist, use left node hash
 
                 $level[] = $this->hash($left . $right);
             }
@@ -66,27 +66,46 @@ class Merkle_new
         return $tree;
     }
 
-    public function verify(array $data, $rootHash)
+    public function verify(array $data, $rootHash): bool
     {
         if (empty($data)) {
-            throw new InvalidArgumentException("Input data array cannot be empty.");
+            return false;
+            //throw new InvalidArgumentException("Input data array cannot be empty.");
         }
 
         $treeRootHash = $this->getRootHash();
 
         if ($rootHash !== $treeRootHash) {
-            throw new RuntimeException("Root hash mismatch. Data has been tampered with.");
+            return false;
+            //throw new RuntimeException("Root hash mismatch. Data has been tampered with.");
         }
 
-// Verify each transaction hash against the calculated Merkle root hash
+        // Verify each transaction hash against the calculated Merkle root hash
         foreach ($data as $item) {
             if (!in_array($this->hash($item), $this->hashList)) {
-                throw new RuntimeException("Transaction hash mismatch. Data has been tampered with.");
+                return false;
+                //throw new RuntimeException("Transaction hash mismatch. Data has been tampered with.");
             }
         }
 
         return true;
     }
+}
+
+public function computeMerkleHash(array $transactions): ?string
+{
+    // sort it
+    $transactions = Transaction::sort($transactions); // sort the array
+
+    // calculate the merkle root
+    $tree = new \drupol\phpmerkle\Merkle();
+
+    foreach ($transactions as $tx) {
+        $tree[] = $tx['transaction_id'];
+    }
+
+    // compute the merkle root
+    return $tree->hash();
 }
 
 /*

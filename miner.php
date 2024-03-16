@@ -11,7 +11,7 @@ $account = new Account();
 $block = new Block();
 $pow = new Pow();
 $miner = new Miner();
-$queue = new Queue();
+$queue = new Queue(Database::getInstance());
 
 echo PHP_EOL, Config::getProductName(), ' Miner ', PHP_EOL;
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
