@@ -227,16 +227,11 @@ class Peer
      */
     private function isValidAddress(string $address): bool
     {
-        $valid = false;
-        $host = explode(':', $address);
-
-        if ((count($host) === 2) && filter_var($host[0], FILTER_VALIDATE_IP) 
-            && (int)$host[1] > 0 && (int)$host[1] <= 65535) {
-            $valid = true;
-        }
-
-        return $valid;
+        // Strict validation of peer address format
+        $pattern = '/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}:[1-9][0-9]{0,4}$/';
+        return (bool)preg_match($pattern, $address);
     }
+
 
     /**
      * @param string $address
@@ -246,108 +241,77 @@ class Peer
     public function add(string $address, bool $blacklisted = false): int
     {
         if (!$this->isValidAddress($address)) {
-            Console::log('failed to add peer to the database - junk address: ' . $address);
-
-            return 0;
-        }
-
-        if ($this->getByHostAddress($address) !== null) {
-            Console::log('duplicate peer address, not adding: ' . $address);
-
+            // Invalid address format
+            Console::log('Failed to add peer to the database - invalid address format: ' . $address);
             return 0;
         }
 
         try {
-            $blist = $blacklisted ? 1 : 0;
             $this->db->beginTransaction();
 
-            // prepare the statement and execute
-            $query = 'INSERT OR REPLACE INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,' .
-                '`date_created`) VALUES (:address,:reserve,:last_ping,:blacklisted,:fails,:date_created)';
+            // Prepare the statement with parameterized query
+            $query = 'INSERT OR REPLACE INTO peers (`address`, `reserve`, `last_ping`, `blacklisted`, `fails`, `date_created`) 
+                      VALUES (:address, :reserve, :last_ping, :blacklisted, :fails, :date_created)';
             $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'address',
-                value: $address,
-                pdoType: DatabaseHelpers::TEXT,
-                maxLength: 256
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'last_ping',
-                value: 0,
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'blacklisted',
-                value: $blist,
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'reserve',
-                value: 0,
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'fails',
-                value: 0,
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'date_created',
-                value: time(),
-                pdoType: DatabaseHelpers::INT
-            );
+
+            // Bind parameters
+            $stmt->bindParam(':address', $address, PDO::PARAM_STR);
+            $reserve = 0; // Set default value for reserve
+            $stmt->bindParam(':reserve', $reserve, PDO::PARAM_INT);
+            $lastPing = time(); // Current timestamp
+            $stmt->bindParam(':last_ping', $lastPing, PDO::PARAM_INT);
+            $stmt->bindParam(':blacklisted', $blacklisted, PDO::PARAM_INT);
+            $fails = 0; // Set default value for fails
+            $stmt->bindParam(':fails', $fails, PDO::PARAM_INT);
+            $dateCreated = time(); // Current timestamp
+            $stmt->bindParam(':date_created', $dateCreated, PDO::PARAM_INT);
+
+            // Execute the statement
             $stmt->execute();
 
-            // ensure the block was stored
+            // Get the last inserted ID
             $id = (int)$this->db->lastInsertId();
 
             if ($id <= 0) {
-                throw new RuntimeException('failed to add peer to the database: ' . $address);
+                // Failed to add peer to the database
+                throw new RuntimeException('Failed to add peer to the database: ' . $address);
             }
 
             $this->db->commit();
         } catch (Exception $e) {
-            $id = 0;
+            // Log and rollback transaction in case of error
             Console::log('Rolling back transaction: ' . $e->getMessage());
             $this->db->rollback();
+            $id = 0; // Return 0 indicating failure
         }
 
         return $id;
     }
 
     /**
-     * @param int $id
-     * @return bool
+     * Deletes a peer by its ID from the database.
+     *
+     * @param int $id The ID of the peer to delete.
+     * @return bool True if the deletion was successful, false otherwise.
      */
     public function delete(int $id): bool
     {
-        $result = false;
         try {
             $this->db->beginTransaction();
-            // delete the block
-            $query = 'DELETE FROM peers WHERE `id` = :id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'id',
-                value: $id,
-                pdoType: DatabaseHelpers::INT
-            );
+
+            // Prepare the delete statement
+            $stmt = $this->db->prepare('DELETE FROM peers WHERE id = :id');
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
+
+            // Commit the transaction
             $this->db->commit();
-
-            $result = true;
-        } catch (Exception|RuntimeException $e) {
+            return true;
+        } catch (Exception $e) {
+            // Log the error and roll back the transaction
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            $this->db->rollBack();
+            return false;
         }
-
-        return $result;
     }
 }

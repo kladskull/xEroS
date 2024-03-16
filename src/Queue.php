@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 
 namespace Blockchain;
 
@@ -6,208 +7,149 @@ use Exception;
 use PDO;
 use RuntimeException;
 
-/**
- * Class Queue
- * @package Blockchain
- */
 class Queue
 {
     private PDO $db;
 
-    public function __construct()
+    public function __construct(PDO $db)
     {
-        $this->db = Database::getInstance();
+        $this->db = $db;
     }
 
     /**
-     * @param int $id
-     * @return array|null
+     * Retrieves a queue item by its ID.
+     *
+     * @param int $id The ID of the queue item.
+     * @return array|null The queue item data if found, null otherwise.
      */
     public function get(int $id): ?array
     {
-        $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE `id` = :id LIMIT 1';
-        $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
-        $stmt->execute();
-
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        try {
+            $stmt = $this->db->prepare('SELECT `id`, `date_created`, `command`, `data`, `trys` FROM queue WHERE `id` = :id LIMIT 1');
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Exception $e) {
+            Console::log('Error retrieving queue item: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
-     * @param string $command
-     * @param int $limit
-     * @return array
+     * Retrieves queue items by command with a limit.
+     *
+     * @param string $command The command associated with the queue items.
+     * @param int $limit The maximum number of items to retrieve.
+     * @return array The array of queue items.
      */
     public function getItems(string $command, int $limit = 100): array
     {
-        $query = 'SELECT `id`,`date_created`,`command`,`data`,`trys` FROM queue WHERE command=:command and ' .
-            'trys < 5 LIMIT :limit;';
-        $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind(
-            $stmt, 'command',
-            $command,
-            DatabaseHelpers::TEXT,
-            32
-        );
-        $stmt = DatabaseHelpers::filterBind(
-            $stmt,
-            'limit',
-            $limit,
-            DatabaseHelpers::INT
-        );
-        $stmt->execute();
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        try {
+            $stmt = $this->db->prepare('SELECT `id`, `date_created`, `command`, `data`, `trys` FROM queue WHERE command = :command AND trys < 5 LIMIT :limit');
+            $stmt->bindValue(':command', $command, PDO::PARAM_STR);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Exception $e) {
+            Console::log('Error retrieving queue items: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /**
-     * @param int $id
-     * @return bool
+     * Increments the failure count for a queue item.
+     *
+     * @param int $id The ID of the queue item.
+     * @return bool True if successful, false otherwise.
      */
     public function incrementFails(int $id): bool
     {
-        $result = false;
         try {
-            $this->db->beginTransaction();
-            $query = 'UPDATE queue SET trys=trys+1 WHERE id=:id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+            $stmt = $this->db->prepare('UPDATE queue SET trys = trys + 1 WHERE id = :id');
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
-            $this->db->commit();
-            $result = true;
-        } catch (Exception) {
-            $this->db->rollback();
+            return true;
+        } catch (Exception $e) {
+            Console::log('Error incrementing failure count: ' . $e->getMessage());
+            return false;
         }
-
-        return $result;
     }
 
     /**
-     * @param int $id
-     * @return bool
+     * Clears the failure count for a queue item.
+     *
+     * @param int $id The ID of the queue item.
+     * @return bool True if successful, false otherwise.
      */
     public function clearFails(int $id): bool
     {
-        $result = false;
         try {
-            $this->db->beginTransaction();
-            $query = 'UPDATE queue SET trys=0 WHERE id=:id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
+            $stmt = $this->db->prepare('UPDATE queue SET trys = 0 WHERE id = :id');
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
-            $this->db->commit();
-            $result = true;
-        } catch (Exception) {
-            $this->db->rollback();
+            return true;
+        } catch (Exception $e) {
+            Console::log('Error clearing failure count: ' . $e->getMessage());
+            return false;
         }
-
-        return $result;
     }
 
     /**
-     * @param string $command
-     * @param string $data
-     * @return int
+     * Adds a new item to the queue.
+     *
+     * @param string $command The command associated with the queue item.
+     * @param string $data The data to be stored in the queue item.
+     * @return int The ID of the newly added queue item, or 0 on failure.
      */
     public function add(string $command, string $data): int
     {
         try {
-            $this->db->beginTransaction();
-            // prepare the statement and execute
-            $query = 'INSERT INTO queue (`command`,`date_created`,`data`,`trys`) VALUES ' .
-                '(:command,:date_created,:data,:trys)';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'command',
-                value: $command,
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 64
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'data',
-                value: $data,
-                pdoType: DatabaseHelpers::ALPHA_NUMERIC,
-                maxLength: 1048576
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'date_created',
-                value: time(),
-                pdoType: DatabaseHelpers::INT
-            );
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'trys',
-                value: 0,
-                pdoType: DatabaseHelpers::INT
-            );
+            $stmt = $this->db->prepare('INSERT INTO queue (`command`, `date_created`, `data`, `trys`) VALUES (:command, :date_created, :data, 0)');
+            $stmt->bindValue(':command', $command, PDO::PARAM_STR);
+            $stmt->bindValue(':date_created', time(), PDO::PARAM_INT);
+            $stmt->bindValue(':data', $data, PDO::PARAM_STR);
             $stmt->execute();
-            // ensure the block was stored
             $id = (int)$this->db->lastInsertId();
-
-            if ($id <= 0) {
-                throw new RuntimeException('failed to add queue to the database: ' . $command);
-            }
-
-            $this->db->commit();
+            return $id > 0 ? $id : 0;
         } catch (Exception $e) {
-            $id = 0;
-            Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            Console::log('Error adding item to queue: ' . $e->getMessage());
+            return 0;
         }
-
-        return $id;
     }
 
     /**
-     * @return bool
-     */
-    public function prune(): bool
-    {
-        $result = false;
-        try {
-            $this->db->beginTransaction();
-            // delete the block
-            $query = 'DELETE FROM queue WHERE trys > 4;';
-            $this->db->query($query);
-            $this->db->commit();
-            $result = true;
-        } catch (Exception|RuntimeException $e) {
-            Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param int $id
-     * @return bool
+     * Deletes a queue item by its ID.
+     *
+     * @param int $id The ID of the queue item to delete.
+     * @return bool True if successful, false otherwise.
      */
     public function delete(int $id): bool
     {
-        $result = false;
         try {
-            $this->db->beginTransaction();
-            // delete the block
-            $query = 'DELETE FROM queue WHERE `id` = :id;';
-            $stmt = $this->db->prepare($query);
-            $stmt = DatabaseHelpers::filterBind(
-                stmt: $stmt,
-                fieldName: 'id',
-                value: $id,
-                pdoType: DatabaseHelpers::INT
-            );
+            $stmt = $this->db->prepare('DELETE FROM queue WHERE id = :id');
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
-            $this->db->commit();
-            $result = true;
-        } catch (Exception|RuntimeException $e) {
-            Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            return true;
+        } catch (Exception $e) {
+            Console::log('Error deleting item from queue: ' . $e->getMessage());
+            return false;
         }
+    }
 
-        return $result;
+    /**
+     * Prunes (deletes) queue items with failure count greater than 4.
+     *
+     * @return bool True if successful, false otherwise.
+     */
+    public function prune(): bool
+    {
+        try {
+            $stmt = $this->db->prepare('DELETE FROM queue WHERE trys > 4');
+            $stmt->execute();
+            return true;
+        } catch (Exception $e) {
+            Console::log('Error pruning queue: ' . $e->getMessage());
+            return false;
+        }
     }
 }

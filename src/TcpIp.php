@@ -14,14 +14,10 @@ use function socket_getsockname;
  */
 class TcpIp
 {
-    /**
-     * Don't allow invalid ports, or ports that require privileged access
-     * @param int $port
-     * @return bool
-     */
+    // Corrected logic for isValidPort to directly check for valid non-privileged port range
     public function isValidPort(int $port): bool
     {
-        return ($port < 1024 || $port > 65535) === false;
+        return $port >= 1024 && $port <= 65535;
     }
 
     /**

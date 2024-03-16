@@ -2,10 +2,6 @@
 
 namespace Blockchain;
 
-use JetBrains\PhpStorm\Pure;
-use function bin2hex;
-use function hash;
-
 /**
  * Class Pow
  * @package Blockchain
@@ -13,43 +9,38 @@ use function hash;
 class Pow
 {
     /**
-     * @param string $data
-     * @return string
+     * Computes the double SHA256 hash of the given data.
+     *
+     * @param string $data The input data.
+     * @return string The double SHA256 hash.
      */
     public function doubleSha256(string $data): string
     {
-        return hash(
-            algo: 'sha256',
-            data: hash(
-                algo: 'sha256',
-                data: $data,
-                binary: true
-            ),
-            binary: true,
-        );
+        return hash('sha256', hash('sha256', $data, true), true);
     }
 
     /**
-     * @param string $hash
-     * @param string $data
-     * @param string $nonce
-     * @return bool
+     * Verifies the proof of work for the given hash, data, and nonce.
+     *
+     * @param string $hash The hash to verify.
+     * @param string $data The data.
+     * @param string $nonce The nonce.
+     * @return bool True if the proof of work is valid, false otherwise.
      */
-    #[Pure]
     public function verifyPow(string $hash, string $data, string $nonce): bool
     {
-        return $hash === bin2hex(string: $this->doubleSha256(data: $data . $nonce));
+        return $hash === bin2hex($this->doubleSha256($data . $nonce));
     }
 
     /**
-     * function for proof of work
-     * @param string $data
-     * @param string $nonce
-     * @return string
+     * Calculates the proof of work for the given data and nonce.
+     *
+     * @param string $data The data.
+     * @param string $nonce The nonce.
+     * @return string The calculated proof of work.
      */
-    #[Pure]
     public function calculate(string $data, string $nonce): string
     {
-        return $this->doubleSha256(data: $data . $nonce);
+        return $this->doubleSha256($data . $nonce);
     }
 }

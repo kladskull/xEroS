@@ -25,7 +25,7 @@ final class Blocks extends AbstractMigration
             ->addColumn('previous_block_id', 'text', ['limit' => 64])
             ->addColumn('date_created', 'integer', ['signed' => false])
             ->addColumn('height', 'integer', ['signed' => false])
-            ->addColumn('nonce', 'text', ['limit' => '128'])
+            ->addColumn('nonce', 'text', ['limit' => 128])
             ->addColumn('difficulty', 'integer', ['signed' => false])
             ->addColumn('merkle_root', 'text', ['limit' => 64])
             ->addColumn('transaction_count', 'integer', ['signed' => false])
