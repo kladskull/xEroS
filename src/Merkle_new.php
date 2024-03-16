@@ -92,6 +92,7 @@ class Merkle_new
     }
 }
 
+/*
 public function computeMerkleHash(array $transactions): ?string
 {
     // sort it
@@ -107,6 +108,7 @@ public function computeMerkleHash(array $transactions): ?string
     // compute the merkle root
     return $tree->hash();
 }
+*/
 
 /*
 // Example usage:
