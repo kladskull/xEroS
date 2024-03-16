@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4d0e2f628002a392d2fcd5798ccb4a8e",
+    "content-hash": "f6a2c281713ecc586b4aef3a6bb6c361",
     "packages": [
         {
             "name": "cakephp/chronos",
@@ -307,65 +307,6 @@
                 "source": "https://github.com/cakephp/utility"
             },
             "time": "2024-02-24T04:42:47+00:00"
-        },
-        {
-            "name": "drupol/phpmerkle",
-            "version": "2.2.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/drupol/phpmerkle.git",
-                "reference": "be5a097570084a2bc6da92bec47093deffad619a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/drupol/phpmerkle/zipball/be5a097570084a2bc6da92bec47093deffad619a",
-                "reference": "be5a097570084a2bc6da92bec47093deffad619a",
-                "shasum": ""
-            },
-            "require": {
-                "ext-hash": "*",
-                "ext-json": "*",
-                "php": ">= 7.1.3"
-            },
-            "require-dev": {
-                "drupol/php-conventions": "^1",
-                "friends-of-phpspec/phpspec-code-coverage": "^4.3.2",
-                "infection/infection": "^0.11. || ^0.12.2 || ^0.13.6 || ^0.14.4 || ^0.15.0",
-                "jakub-onderka/php-parallel-lint": "^1.0",
-                "phpspec/phpspec": "^5.1.2 || ^6.1 || ^7",
-                "phpstan/phpstan": "^0.11.19",
-                "phpunit/php-code-coverage": "^6.1.4 || ^7"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "drupol\\phpmerkle\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Pol Dellaiera",
-                    "email": "pol.dellaiera@protonmail.com"
-                }
-            ],
-            "description": "A fast and dynamic Merkle tree implementation",
-            "keywords": [
-                "blockchain",
-                "cryptography",
-                "merkle",
-                "merkle tree",
-                "php",
-                "tree"
-            ],
-            "support": {
-                "issues": "https://github.com/drupol/phpmerkle/issues",
-                "source": "https://github.com/drupol/phpmerkle/tree/master"
-            },
-            "time": "2019-12-11T07:43:37+00:00"
         },
         {
             "name": "graham-campbell/result-type",

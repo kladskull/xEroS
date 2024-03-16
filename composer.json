@@ -31,7 +31,6 @@
     "ext-openssl": "*",
     "robmorgan/phinx": "*",
     "stephenhill/base58": "*",
-    "drupol/phpmerkle": "*",
     "vlucas/phpdotenv": "*",
     "symfony/yaml": "*",
     "ext-pcntl": "*"
