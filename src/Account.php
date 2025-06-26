@@ -190,7 +190,7 @@ class Account
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
         $stmt->execute();
-        $unspentTransactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $unspentTransactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($unspentTransactions as $unspentTransaction) {
             $balance = bcadd($balance, $unspentTransaction['value']);
@@ -213,7 +213,7 @@ class Account
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
         $stmt->execute();
-        $transactions = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($transactions as $transaction) {
             $key = $transaction['transaction_id'] . '-' . $transaction['tx_id'];

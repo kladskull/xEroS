@@ -44,20 +44,16 @@ class DataStore
         $stmt = DatabaseHelpers::filterBind($stmt, 'key', $key, DatabaseHelpers::TEXT);
         $stmt->execute();
 
-        $retVal = null;
+        $retVal = $default;
         $record = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         if ($record !== null) {
             $expires = $record['expires'];
 
-            if ($expires === 0) {
-                $retVal = $record['data'];
-            } elseif (time() < $expires) {
+            if ($expires === 0 || time() < $expires) {
                 $retVal = $record['data'];
             }
 
-        } else {
-            $retVal = $default;
         }
 
         return $retVal;
