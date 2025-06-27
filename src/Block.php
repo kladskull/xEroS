@@ -21,6 +21,7 @@ class Block
     private OpenSsl $openSsl;
     private PDO $db;
     private Peer $peer;
+    private DataStore $store;
     private Pow $pow;
     private Script $script;
     public Transaction $transaction;
@@ -36,6 +37,7 @@ class Block
         $this->merkle = new Merkle();
         $this->transaction = new Transaction();
         $this->transferEncoding = new TransferEncoding();
+        $this->store = new DataStore();
         $this->mempool = new Mempool();
         $this->pow = new Pow();
     }
@@ -511,8 +513,30 @@ class Block
      */
     public function checkIntegrity(): void
     {
-        // TODO: Check all blocks, and transactions and compare to external nodes
-        // - foreach block (from top to bottom) get full block, and validate it - if it fails, we request it
+        $height = $this->getCurrentHeight();
+        $startHeight = (int)$this->store->getKey('integrity_height', 1);
+
+        if ($startHeight < 1) {
+            $startHeight = 1;
+        }
+
+        for ($i = $startHeight; $i <= $height; $i++) {
+            $blockRecord = $this->getByHeight($i);
+
+            if (empty($blockRecord)) {
+                Console::log('Missing block at height ' . $i);
+                continue;
+            }
+
+            $block = $this->assembleFullBlock($blockRecord['block_id']);
+            $result = $this->validateFullBlock($block);
+
+            if (!$result['validated']) {
+                Console::log('Invalid block detected at height ' . $i . ': ' . $result['reason']);
+            }
+
+            $this->store->add('integrity_height', $i + 1);
+        }
     }
 
     /**
@@ -567,23 +591,30 @@ class Block
         $height = $this->getCurrentHeight();
 
         if ($height > 1) {
+            $start = (int)$this->store->getKey('clean_progress', $height);
 
-            /**
-             * iterate from the highest to the lowest (or lowest save)
-             * TODO: Need to store progress so we don't have to do the whole blockchain
-             */
-            $query = 'SELECT `block_id` FROM blocks WHERE orphan=1 ORDER BY `height` DESC LIMIT 1';
-            $stmt = $this->db->query($query);
-            $rows = $stmt->fetchAll();
-            $counter = 0;
+            if ($start > $height) {
+                $start = $height;
+            }
 
-            foreach ($rows as $row) {
-                $this->delete($row['block_id']);
+            for ($h = $start; $h >= 1; $h--) {
+                $query = 'SELECT `block_id` FROM blocks WHERE orphan=1 AND height=:height';
+                $stmt = $this->db->prepare($query);
+                $stmt = DatabaseHelpers::filterBind($stmt, 'height', $h, DatabaseHelpers::INT);
+                $stmt->execute();
+                $rows = $stmt->fetchAll();
+                $counter = 0;
 
-                // let's not kill the CPU
-                if ($counter++ % 100 === 0) {
-                    usleep(1);
+                foreach ($rows as $row) {
+                    $this->delete($row['block_id']);
+
+                    // let's not kill the CPU
+                    if ($counter++ % 100 === 0) {
+                        usleep(1);
+                    }
                 }
+
+                $this->store->add('clean_progress', $h - 1);
             }
         }
     }
@@ -625,17 +656,26 @@ class Block
 
             $block = !empty($selectedBlock) ? $selectedBlock : $block1;
 
-            /**
-             * iterate from the highest to the lowest (or lowest save)
-             * TODO: Need to store progress so we don't have to do the whole blockchain
-             */
             $height = (int)$block['height'];
-            $blockId = $block['block_id'];
-            $this->acceptBlock($blockId, $height);
+            $start = (int)$this->store->getKey('resolve_progress', $height);
 
-            while ($height > 1) {
-                $block = $this->getByBlockId($block['previous_block_id']);
-                $this->acceptBlock($block['block_id'], $height--);
+            if ($start > $height) {
+                $start = $height;
+            }
+
+            $currentBlock = $block;
+
+            for ($h = $start; $h >= 1; $h--) {
+                if ($h !== $height) {
+                    $currentBlock = $this->getByBlockId($currentBlock['previous_block_id']);
+                }
+
+                $this->acceptBlock($currentBlock['block_id'], $h);
+                $this->store->add('resolve_progress', $h - 1);
+
+                if ($h === 1) {
+                    break;
+                }
             }
         }
     }
