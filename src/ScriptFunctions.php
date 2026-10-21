@@ -693,7 +693,11 @@ class ScriptFunctions
         $signature = $stateMachine->getRegister($thirdValue);
         $nResult = 0;
 
-        $this->openssl->verifySignature($text, $signature, $publicKey);
+        if (is_string($text) && is_string($signature) && is_string($publicKey)
+            && $this->openssl->verifySignature($text, $signature, $publicKey)) {
+            $nResult = 1;
+        }
+
         $stateMachine->setRegister('sx', $nResult, true);
     }
 

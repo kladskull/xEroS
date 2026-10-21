@@ -90,7 +90,7 @@ class TransferEncodingTest extends TestCase
         $this->assertEquals($hex, $transformed);
     }
 
-    public function badBase58StringsProvider(): array
+    public static function badBase58StringsProvider(): array
     {
         return [
             ["O3s5UxvFBmqARZ153n6VyY"],
@@ -100,7 +100,7 @@ class TransferEncodingTest extends TestCase
         ];
     }
 
-    public function hexDataProvider(): array
+    public static function hexDataProvider(): array
     {
         return [
             ['b8fb9cd9d7993240b3e97c23d391a397'],
@@ -121,7 +121,7 @@ class TransferEncodingTest extends TestCase
         ];
     }
 
-    public function textDataProvider(): array
+    public static function textDataProvider(): array
     {
         return [
             ['This is a signed message.'],

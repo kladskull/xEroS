@@ -18,7 +18,7 @@ final class ConfigTest extends TestCase
     }
 
     #[ArrayShape(['adding zeros' => "int[]", 'zero plus one' => "int[]", 'one plus zero' => "int[]", 'one plus one' => "int[]"])]
-    public function additionProvider(): array
+    public static function additionProvider(): array
     {
         return [
             'adding zeros' => [0, 0, 0],
@@ -28,7 +28,7 @@ final class ConfigTest extends TestCase
         ];
     }
 
-    public function additionWithNegativeNumbersProvider(): array
+    public static function additionWithNegativeNumbersProvider(): array
     {
         return [
             [-1, 1, 0],

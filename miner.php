@@ -78,6 +78,13 @@ while (1) {
     $nonce = 0;
     $height = $block->getCurrentHeight() + 1;
     $candidateBlock = $block->getCandidateBlock($height, $publicKey, $privateKey);
+
+    if (empty($candidateBlock)) {
+        Console::log('Could not build a candidate block, retrying');
+        sleep(5);
+        continue;
+    }
+
     $blockHeader = $block->generateBlockHeader($candidateBlock);
 
     // inner loop, only exit on an event
@@ -105,8 +112,9 @@ while (1) {
                         Console::log('Storing new block with block id ' . $candidateBlock['block_id']);
 
                         // store and accept locally
-                        $block->add($candidateBlock);
-                        $block->acceptBlock($candidateBlock['block_id'], $candidateBlock['height']);
+                        // stored as an orphan until it is accepted
+                        $block->add($candidateBlock, false, true);
+                        $block->acceptBlock($candidateBlock['block_id'], (int)$candidateBlock['height']);
 
                         // add queue item to send it out
                         $queue->add('new_block', $candidateBlock['block_id']);

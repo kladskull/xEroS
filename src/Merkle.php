@@ -27,8 +27,10 @@ class Merkle
 
         // Extract the transaction_id from each transaction to create a new array
         // containing only the transaction IDs.
+        // the transaction id is the hash of the transaction contents, the signature is added so the root commits
+        // to it as well
         $transactionIds = array_map(function ($transaction) {
-            return $transaction['transaction_id'];
+            return $transaction['transaction_id'] . ':' . $transaction['signature'];
         }, $transactions);
 
         // Create a new Merkle_ object using the transaction IDs.

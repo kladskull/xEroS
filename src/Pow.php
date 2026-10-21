@@ -43,4 +43,57 @@ class Pow
     {
         return $this->doubleSha256($data . $nonce);
     }
+
+    /**
+     * Counts the leading zero bits of a hex encoded hash.
+     *
+     * @param string $hashHex The hex encoded hash.
+     * @return int The number of leading zero bits.
+     */
+    public function leadingZeroBits(string $hashHex): int
+    {
+        $bits = 0;
+
+        foreach (str_split(strtolower($hashHex)) as $nibble) {
+            $value = hexdec($nibble);
+
+            if ($value === 0) {
+                $bits += 4;
+                continue;
+            }
+
+            // count the zero bits in the first non zero nibble
+            $bits += 4 - strlen(decbin($value));
+            break;
+        }
+
+        return $bits;
+    }
+
+    /**
+     * Checks that a hash has at least $difficulty leading zero bits, the same rule the miner uses.
+     *
+     * @param string $hashHex The hex encoded hash.
+     * @param int $difficulty The required number of leading zero bits.
+     * @return bool True if the hash meets the difficulty.
+     */
+    public function meetsDifficulty(string $hashHex, int $difficulty): bool
+    {
+        if (strlen($hashHex) !== 64 || !ctype_xdigit($hashHex)) {
+            return false;
+        }
+
+        return $this->leadingZeroBits($hashHex) >= $difficulty;
+    }
+
+    /**
+     * The expected number of hashes needed to find a block at the given difficulty (2^difficulty).
+     *
+     * @param int $difficulty The difficulty in leading zero bits.
+     * @return string The work as a bcmath number.
+     */
+    public function blockWork(int $difficulty): string
+    {
+        return bcpow('2', (string)$difficulty, 0);
+    }
 }
