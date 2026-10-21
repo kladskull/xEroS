@@ -21,6 +21,8 @@ use function trim;
  */
 class Peer
 {
+    private const MAX_STORED_PEERS = 1000;
+
     private PDO $db;
     private DataStore $store;
 
@@ -261,6 +263,33 @@ class Peer
         return filter_var($parts[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false && $port >= 1 && $port <= 65535;
     }
 
+
+    /**
+     * A peer address another node told us about. On the live network private and reserved addresses are ignored,
+     * otherwise anyone could point nodes at machines on their own networks. The list is capped so it cannot be
+     * flooded.
+     *
+     * @param string $address
+     * @return int
+     */
+    public function addFromNetwork(string $address): int
+    {
+        $host = substr($address, 0, (int)strrpos($address, ':'));
+
+        if (Config::getEnvironment() === 'live' && filter_var(
+            $host,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false) {
+            return 0;
+        }
+
+        if ((int)$this->db->query('SELECT count(1) FROM peers')->fetchColumn() >= self::MAX_STORED_PEERS) {
+            return 0;
+        }
+
+        return $this->add($address);
+    }
 
     /**
      * @param string $address

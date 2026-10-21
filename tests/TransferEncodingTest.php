@@ -125,4 +125,20 @@ class TransferEncodingTest extends TestCase
             ['\012345'],
         ];
     }
+
+    public function testHexDecodingIsStrict(): void
+    {
+        $this->assertSame("\x01\xff", $this->transferEncoding->hexToBin('01ff'));
+        $this->assertSame("\x01\xff", $this->transferEncoding->hexToBin('01FF'));
+        $this->assertSame('', $this->transferEncoding->hexToBin(''));
+
+        foreach (['0', '01f', 'zz', '01 f', '0x01'] as $bad) {
+            try {
+                $this->transferEncoding->hexToBin($bad);
+                $this->fail('accepted ' . $bad);
+            } catch (\InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
 }

@@ -29,6 +29,7 @@ class Node
     private const SYNC_BATCH = 50;
     private const SEND_TIMEOUT = 10;
     private const DIAL_INTERVAL = 10;
+    private const DIAL_TIMEOUT = 2;
     private const SOLO_GRACE_PERIOD = 30;
     private const MEMPOOL_EVICT_INTERVAL = 60;
     private const MAX_CONNECTIONS_PER_IP = 8;
@@ -561,11 +562,15 @@ class Node
                                              */
                                             case 'peer_list_req':
                                                 Console::log('Received peer_list_req');
-                                                $peerList = $this->peer->getAll();
+                                                // addresses only, the rest of a peer row is ours
+                                                $peerList = array_map(
+                                                    static fn (array $peer): array => ['address' => (string)$peer['address']],
+                                                    $this->peer->getAll()
+                                                );
                                                 Console::log('Sent peer_list');
                                                 $this->send($client, json_encode([
                                                     'type' => 'peer_list',
-                                                    'peers' => $peerList
+                                                    'peers' => array_values($peerList)
                                                 ], JSON_THROW_ON_ERROR));
                                                 break;
 
@@ -583,7 +588,7 @@ class Node
                                                     $hostAddress = $peerAddress . ':' . $peerPort;
 
                                                     if ($this->peer->getByHostAddress($hostAddress) === null) {
-                                                        $this->peer->add($hostAddress);
+                                                        $this->peer->addFromNetwork($hostAddress);
                                                         Console::log('Sending response OK to peer_invite_req');
                                                     }
 
@@ -613,7 +618,7 @@ class Node
 
                                                 foreach (array_slice($peerList, 0, self::MAX_PEER_LIST) as $peer) {
                                                     if (is_array($peer) && is_string($peer['address'] ?? null)) {
-                                                        $this->peer->add($peer['address']);
+                                                        $this->peer->addFromNetwork($peer['address']);
                                                     }
                                                 }
                                                 break;
@@ -931,6 +936,8 @@ class Node
     {
         $self = [$listenAddress . ':' . $listenPort, '127.0.0.1:' . $listenPort, '0.0.0.0:' . $listenPort];
 
+        // one try per call, the list comes back shuffled. Connecting blocks the node, so trying every address in
+        // a list full of dead ones would freeze it.
         foreach ($this->peer->getAll(Config::getMaxPeers()) as $candidate) {
             $address = (string)$candidate['address'];
 
@@ -938,12 +945,13 @@ class Node
                 continue;
             }
 
-            $stream = @stream_socket_client('tcp://' . $address, $errno, $errstr, 3);
+            $stream = @stream_socket_client('tcp://' . $address, $errno, $errstr, self::DIAL_TIMEOUT);
 
             if ($stream === false) {
                 Console::log('Could not connect to peer ' . $address . ': ' . $errstr);
                 $this->peer->incrementFails($address);
-                continue;
+
+                return null;
             }
 
             Console::log('Connected to peer ' . $address);

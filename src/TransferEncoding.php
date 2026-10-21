@@ -3,13 +3,8 @@
 namespace Blockchain;
 
 use Exception;
+use InvalidArgumentException;
 use StephenHill\Base58;
-use function array_map;
-use function chr;
-use function dechex;
-use function hexdec;
-use function implode;
-use function ord;
 use function sprintf;
 use function str_split;
 use function strlen;
@@ -90,10 +85,7 @@ class TransferEncoding
      */
     public function binToHex(string $bin): string
     {
-        return implode(
-            '',
-            array_map(static fn($x) => sprintf("%02s", strtolower(dechex(ord($x)))), str_split($bin))
-        );
+        return bin2hex($bin);
     }
 
     /**
@@ -102,12 +94,11 @@ class TransferEncoding
      */
     public function hexToBin(string $hex): string
     {
-        $string = '';
-
-        for ($i = 0; $i < strlen($hex) - 1; $i += 2) {
-            $string .= chr(hexdec($hex[$i] . $hex[$i + 1]));
+        // anything but whole hex bytes is refused, so two different strings never decode to the same bytes
+        if (strlen($hex) % 2 !== 0 || ($hex !== '' && !ctype_xdigit($hex))) {
+            throw new InvalidArgumentException('not a hex string');
         }
 
-        return $string;
+        return (string)hex2bin($hex);
     }
 }

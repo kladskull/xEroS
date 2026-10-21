@@ -112,4 +112,32 @@ class HardeningTest extends TestCase
 
         $this->assertEquals(1, (int)$peer->getByHostAddress('10.1.2.3:7747')['blacklisted']);
     }
+
+    public function testValueThatDoublesUntilMemoryRunsOutIsStopped(): void
+    {
+        // each hexe doubles ax, 24 of them would need gigabytes and crash the node with a fatal error
+        $bomb = $this->script->encodeScript('mov abc,ax;' . str_repeat('hexe ax;', 24) . 'vtru;');
+        $before = memory_get_usage();
+
+        $this->assertFalse($this->transaction->unlockTransaction(['script' => ''], ['script' => $bomb], 'hash'));
+        $this->assertLessThan(16 * 1024 * 1024, memory_get_peak_usage() - $before + 1);
+    }
+
+    public function testStackDepthIsCapped(): void
+    {
+        $script = $this->script->encodeScript('push 1;' . str_repeat('dup;', 1000) . 'vtru;');
+
+        $this->assertLessThanOrEqual(Config::getMaxDecodedScriptLength(), strlen('push 1;' . str_repeat('dup;', 1000) . 'vtru;'));
+        $this->assertFalse($this->transaction->unlockTransaction(['script' => ''], ['script' => $script], 'hash'));
+    }
+
+    public function testNormalScriptsAreUnderTheValueCap(): void
+    {
+        $keys = (new OpenSsl())->createRsaKeyPair();
+        $machine = new StateMachine([]);
+        $machine->setRegister('ax', $keys['public_key']);
+        $machine->pushStack(str_repeat('ab', 256));
+
+        $this->assertEquals($keys['public_key'], $machine->getRegister('ax'));
+    }
 }

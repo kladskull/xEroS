@@ -327,8 +327,13 @@ class NodeTest extends TestCase
         $this->assertEquals('ok', $this->waitFor($socket, 'peer_invite_resp')['result']);
 
         $this->send($socket, ['type' => 'peer_list_req']);
-        $addresses = array_column($this->waitFor($socket, 'peer_list')['peers'], 'address');
-        $this->assertContains('127.0.0.1:17999', $addresses);
+        $peers = $this->waitFor($socket, 'peer_list')['peers'];
+        $this->assertContains('127.0.0.1:17999', array_column($peers, 'address'));
+
+        // only addresses go out, not our fail counts or ping times
+        foreach ($peers as $peer) {
+            $this->assertEquals(['address'], array_keys($peer));
+        }
 
         $this->send($socket, ['type' => 'peer_invite_req', 'port' => 70000]);
         $this->assertEquals('nok', $this->waitFor($socket, 'peer_invite_resp')['result']);
@@ -395,6 +400,38 @@ class NodeTest extends TestCase
         $log = (string)file_get_contents(self::$logFile);
         $this->assertMatchesRegularExpression('/SEND: block \(\d+ bytes\)/', $log);
         $this->assertStringNotContainsString('"transactions"', $log);
+    }
+
+    public function testDeadPeersDoNotFreezeTheNode(): void
+    {
+        // addresses that never answer, a connect to them waits for the timeout
+        $copy = new \PDO('sqlite:' . self::$dbFile);
+        $stmt = $copy->prepare(
+            'INSERT INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created`) VALUES (:a,0,0,0,0,0)'
+        );
+
+        for ($i = 1; $i <= 40; $i++) {
+            $stmt->execute([':a' => '10.255.255.' . $i . ':7747']);
+        }
+
+        try {
+            $socket = $this->ready();
+            $slowest = 0.0;
+            $end = microtime(true) + 12;
+
+            // the node dials every 10 seconds, so this covers at least one dial
+            while (microtime(true) < $end) {
+                $start = microtime(true);
+                $this->send($socket, ['type' => 'ping']);
+                $this->assertNotNull($this->waitFor($socket, 'pong', 10.0));
+                $slowest = max($slowest, microtime(true) - $start);
+                usleep(200000);
+            }
+
+            $this->assertLessThan(3.0, $slowest);
+        } finally {
+            $copy->exec("DELETE FROM peers WHERE address LIKE '10.255.255.%'");
+        }
     }
 
     public function testTooManyConnectionsFromOneAddressAreRefused(): void
