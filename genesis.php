@@ -49,7 +49,7 @@ for ($nonce = 0; ; $nonce++) {
 $genesis['nonce'] = dechex($nonce);
 $genesis['hash'] = $hash;
 $coinbase = $genesis['transactions'][0];
-$check = $transaction->validate($coinbase, 1);
+$check = Config::withEnvironment($environment, fn () => $transaction->validate($coinbase, 1));
 
 if (!$pow->verifyPow($hash, $header, $genesis['nonce']) || $check['validated'] !== true) {
     echo 'The new block does not verify: ', $check['reason'], PHP_EOL;

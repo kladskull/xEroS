@@ -53,21 +53,30 @@ class GenesisTest extends TestCase
     {
         $genesis = $this->block->genesis($environment);
         $this->assertNotEmpty($genesis);
-        $problems = $this->problems($genesis);
 
-        // live and test were mined before the block format changed and need the owner's key to redo
-        if ($environment !== 'dev' && $problems !== []) {
-            $this->markTestSkipped($environment . ' genesis needs re-mining with genesis.php: ' . implode(', ', $problems));
-        }
+        Config::withEnvironment($environment, function () use ($genesis, $environment) {
+            $this->assertEquals([], $this->problems($genesis));
+            $this->assertEquals(
+                $this->block->generateId(Config::getNetworkIdentifier(), '', $genesis['date_created'], 1, $genesis['merkle_root']),
+                $genesis['block_id']
+            );
+            $this->assertEquals(Config::getNetworkIdentifier(), $genesis['network_id']);
+            $this->assertStringStartsWith(
+                Config::getAddressHeader(),
+                $genesis['transactions'][0][Transaction::OUTPUTS][0]['address']
+            );
+        });
 
-        $this->assertEquals([], $problems);
-        $this->assertEquals(
-            $this->block->generateId(Config::getNetworkIdentifier(), '', $genesis['date_created'], 1, $genesis['merkle_root']),
-            $genesis['block_id']
-        );
         $this->assertEquals((new Merkle())->computeMerkleHash($genesis['transactions']), $genesis['merkle_root']);
         $this->assertEquals(Config::getDefaultDifficulty($environment), (int)$genesis['difficulty']);
         $this->assertGreaterThanOrEqual(Config::getGenesisDate(), $genesis['date_created']);
+    }
+
+    public function testEachNetworkHasItsOwnGenesis(): void
+    {
+        $ids = array_map(fn ($env) => $this->block->genesis($env[0])['block_id'], self::environmentProvider());
+
+        $this->assertCount(3, array_unique($ids));
     }
 
     public function testStoredGenesisIsOurs(): void

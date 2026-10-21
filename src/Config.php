@@ -11,7 +11,6 @@ class Config
     private const PRODUCT_NAME = 'Xero';
     private const PRODUCT_COPYRIGHT = 'Copyright (c)2021,2022 by Kladskull <kladskull@currazy.com>';
     private const VERSION = '0.0001';
-    private const NETWORK_IDENTIFIER = "xv01";
     private const ENVIRONMENT = "prod";
 
     // Genesis block
@@ -27,8 +26,6 @@ class Config
     // Coin
     private const DEFAULT_BLOCK_REWARD = "5000000000";
     private const MINIMUM_FEE = "10000000"; // 0.1 xc
-    private const ADDRESS_HEADER = 'Xa'; // Xa = live / xa = testnet
-    private const CHAIN_VERSION = '00'; // 00 = live, 01 = testnet
     private const MAX_CURRENCY_SUPPLY = "21000000000000000"; // Satoshi's per coin x 210,000,000
     private const MAX_TRANSACTION_SIZE = 100;
 
@@ -60,10 +57,27 @@ class Config
     private const ALLOWED_PUBLIC_HOSTS = [];
     private const ALLOWED_LOCAL_HOSTS = ['127.0.0.1'];
 
-    // Initial Peers to connect to
-    private const INITIAL_PEER_LIST = [
-        '3.97.76.137:7747',
-        '3.99.119.232:7747',
+    // Each network has its own id, address format and seed peers, so blocks, transactions and addresses from
+    // one are never valid on another
+    private const NETWORKS = [
+        'live' => [
+            'id' => 'xv01',
+            'address_header' => 'Xa',
+            'chain_version' => '00',
+            'seed_peers' => ['3.97.76.137:7747', '3.99.119.232:7747'],
+        ],
+        'test' => [
+            'id' => 'xt01',
+            'address_header' => 'xa',
+            'chain_version' => '01',
+            'seed_peers' => [],
+        ],
+        'dev' => [
+            'id' => 'xd01',
+            'address_header' => 'xd',
+            'chain_version' => '02',
+            'seed_peers' => [],
+        ],
     ];
 
     /**
@@ -71,7 +85,7 @@ class Config
      */
     public static function getAddressHeader(): string
     {
-        return self::ADDRESS_HEADER;
+        return self::NETWORKS[self::getEnvironment()]['address_header'];
     }
 
     /**
@@ -95,7 +109,7 @@ class Config
      */
     public static function getChainVersion(): string
     {
-        return self::CHAIN_VERSION;
+        return self::NETWORKS[self::getEnvironment()]['chain_version'];
     }
 
     /**
@@ -122,6 +136,30 @@ class Config
     public static function getEnvironment(): string
     {
         return self::normalizeEnvironment($_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT);
+    }
+
+    /**
+     * Runs $work as if this node were on $environment, e.g. to build another network's genesis block.
+     *
+     * @param string $environment
+     * @param callable $work
+     * @return mixed
+     */
+    public static function withEnvironment(string $environment, callable $work): mixed
+    {
+        $had = array_key_exists('ENVIRONMENT', $_ENV);
+        $previous = $_ENV['ENVIRONMENT'] ?? null;
+        $_ENV['ENVIRONMENT'] = self::normalizeEnvironment($environment);
+
+        try {
+            return $work();
+        } finally {
+            if ($had) {
+                $_ENV['ENVIRONMENT'] = $previous;
+            } else {
+                unset($_ENV['ENVIRONMENT']);
+            }
+        }
     }
 
     /**
@@ -187,7 +225,7 @@ class Config
             return array_values(array_filter(array_map('trim', explode(',', (string)$_ENV['SEED_PEERS']))));
         }
 
-        return self::INITIAL_PEER_LIST;
+        return self::NETWORKS[self::getEnvironment()]['seed_peers'];
     }
 
     /**
@@ -315,7 +353,7 @@ class Config
      */
     public static function getNetworkIdentifier(): string
     {
-        return self::NETWORK_IDENTIFIER;
+        return self::NETWORKS[self::getEnvironment()]['id'];
     }
 
     /**
