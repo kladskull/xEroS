@@ -258,4 +258,86 @@ class TransactionTest extends TestCase
         ]);
         $this->assertNull($this->transaction->getByTransactionId($block['block_id'], str_repeat('0', 64)));
     }
+
+    public function testRecompressedScriptKeepsTheSameId(): void
+    {
+        $tx = $this->validTransfer();
+        $encoding = new TransferEncoding();
+
+        // the same input script compressed another way, as a relaying node could do
+        $plain = (new Script([]))->decodeScript($tx[Transaction::INPUTS][0]['script']);
+        $other = $tx;
+        $other[Transaction::INPUTS][0]['script'] = $encoding->binToBase58(gzcompress($plain, 1));
+
+        $this->assertNotEquals($tx[Transaction::INPUTS][0]['script'], $other[Transaction::INPUTS][0]['script']);
+        $this->assertEquals($tx['transaction_id'], $this->transaction->computeId($other));
+        $this->assertTrue($this->transaction->validate($other)['validated']);
+    }
+
+    public function testChangedScriptChangesTheId(): void
+    {
+        $tx = $this->validTransfer();
+        $other = $tx;
+        $other[Transaction::OUTPUTS][0]['script'] = (new Script([]))->encodeScript('nop;');
+
+        $this->assertNotEquals($tx['transaction_id'], $this->transaction->computeId($other));
+    }
+
+    public function testScriptThatExpandsTooFarDoesNotBlowUpTheId(): void
+    {
+        $tx = $this->validTransfer();
+        $bomb = (new Script([]))->encodeScript(str_repeat('nop;', 100000));
+        $tx[Transaction::OUTPUTS][0]['script'] = $bomb;
+
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $this->transaction->computeId($tx));
+        $this->assertFalse($this->transaction->validate($this->resign($tx))['validated']);
+    }
+
+    public function testSizeIgnoresHowFieldsWereTyped(): void
+    {
+        $tx = $this->validTransfer();
+        $typed = $tx;
+        $typed['height'] = (int)$tx['height'];
+        $typed[Transaction::OUTPUTS][0]['tx_id'] = 0;
+
+        $this->assertEquals(Transaction::size($tx), Transaction::size($typed));
+        $this->assertGreaterThan(1000, Transaction::size($tx));
+    }
+
+    public function testOversizedTransactionIsRefused(): void
+    {
+        $tx = $this->validTransfer();
+        $tx['peer'] = str_repeat('a', Config::getMaxTransactionBytes());
+
+        $this->assertRefused($tx, 'transaction is larger than');
+    }
+
+    public function testOversizedBlockIsRefused(): void
+    {
+        $height = $this->block->getCurrentHeight() + 1;
+        $block = $this->block->getCandidateBlock($height, $this->owner['public_key'], $this->owner['private_key']);
+        $filler = $block['transactions'][0];
+        $filler['public_key'] = str_repeat('a', Config::getMaxTransactionBytes() - 1000);
+
+        $transactions = [$block['transactions'][0], $filler, $filler, $filler];
+        $result = $this->block->validate($block, $transactions, count($transactions));
+
+        $this->assertFalse($result['validated']);
+        $this->assertStringContainsString('block is larger than', $result['reason']);
+    }
+
+    public function testSpendLookupsUseAnIndex(): void
+    {
+        $plans = [
+            'SELECT 1 FROM transaction_outputs o JOIN blocks b ON b.block_id=o.block_id ' .
+            "WHERE o.transaction_id='x' AND o.tx_id=0 AND o.spent=0 AND b.orphan=0",
+            "SELECT 1 FROM transaction_inputs WHERE previous_transaction_id='x' AND previous_tx_out_id=0",
+            "SELECT 1 FROM transactions WHERE transaction_id='x'",
+        ];
+
+        foreach ($plans as $query) {
+            $plan = implode(' ', $this->db->query('EXPLAIN QUERY PLAN ' . $query)->fetchAll(\PDO::FETCH_COLUMN, 3));
+            $this->assertStringNotContainsString('SCAN', $plan, $query);
+        }
+    }
 }

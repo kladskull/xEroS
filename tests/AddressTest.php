@@ -121,4 +121,13 @@ class AddressTest extends TestCase
             $this->assertFalse($this->address->validateAddress($bad), $bad);
         }
     }
+
+    public function testChecksumIsFourBytesOfDoubleSha256(): void
+    {
+        $raw = hex2bin('00') . random_bytes(20);
+        $expected = substr(hash('sha256', hash('sha256', $raw, true), true), 0, 4);
+
+        $this->assertSame($expected, $this->address->getAddressChecksum($raw));
+        $this->assertSame(4, strlen($this->address->getAddressChecksum($raw)));
+    }
 }

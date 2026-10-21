@@ -40,12 +40,17 @@ class Config
     private const MAX_SCRIPT_LENGTH = 2048;
     private const MAX_DECODED_SCRIPT_LENGTH = 4096; // scripts are compressed, this caps what they expand to
 
+    // Size limits in bytes, see Transaction::size(). A full block stays well under the 4MB network packet limit.
+    private const MAX_BLOCK_SIZE = 1000000;
+    private const MAX_TRANSACTION_BYTES = 500000;
+
     // Mempool
     private const MAX_MEMPOOL_TRANSACTIONS = 5000;
     private const MEMPOOL_EXPIRY = 259200; // 3 days, unmined transactions are dropped after this
 
     // Peers
     private const MAX_PEERS = 60;
+    private const BAN_SECONDS = 86400;
     private const MAX_REBROADCASTING_PEERS = 30;
     private const PEER_REQUEST_TIMEOUT = 10;
 
@@ -298,6 +303,34 @@ class Config
     public static function getMaxDecodedScriptLength(): int
     {
         return self::MAX_DECODED_SCRIPT_LENGTH;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getMaxBlockSize(): int
+    {
+        return self::MAX_BLOCK_SIZE;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getMaxTransactionBytes(): int
+    {
+        return self::MAX_TRANSACTION_BYTES;
+    }
+
+    /**
+     * How long a misbehaving peer is banned. BAN_SECONDS in the environment overrides it.
+     *
+     * @return int
+     */
+    public static function getBanSeconds(): int
+    {
+        $seconds = $_ENV['BAN_SECONDS'] ?? getenv('BAN_SECONDS');
+
+        return is_numeric($seconds) ? (int)$seconds : self::BAN_SECONDS;
     }
 
     /**

@@ -4,6 +4,8 @@ namespace Blockchain;
 
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\NoReturn;
+use Throwable;
+
 use function count;
 use function ctype_xdigit;
 use function explode;
@@ -74,15 +76,23 @@ class Script
     /**
      * see note above
      * @param string $compressed
+     * @param int $maxLength 0 for no limit
      * @return bool|string
      */
-    public function decodeScript(string $compressed): bool|string
+    public function decodeScript(string $compressed, int $maxLength = 0): bool|string
     {
         if ($compressed === '') {
             return '';
         }
 
-        return @gzuncompress($this->transferEncoding->base58ToBin($compressed));
+        try {
+            $binary = $this->transferEncoding->base58ToBin($compressed);
+        } catch (Throwable) {
+            return false;
+        }
+
+        // false if it would expand past $maxLength
+        return @gzuncompress($binary, $maxLength);
     }
 
     /**

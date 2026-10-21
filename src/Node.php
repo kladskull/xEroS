@@ -29,6 +29,8 @@ class Node
     private const DIAL_INTERVAL = 10;
     private const SOLO_GRACE_PERIOD = 30;
     private const MEMPOOL_EVICT_INTERVAL = 60;
+    private const MAX_CONNECTIONS_PER_IP = 8;
+    private const BAN_SCORE = 100;
 
     // blocks whose parent we have not seen yet, by block id
     private array $pendingBlocks = [];
@@ -37,6 +39,10 @@ class Node
     private ?array $syncRequest = null;
     private string $state = '';
     private int $startTime = 0;
+    private array $peerIps = []; // client key => ip
+    private array $misbehaviour = []; // client key => score, the address is banned at BAN_SCORE
+    private array $banned = []; // ip => banned until
+    private bool $rejectedForTime = false;
 
     private array $clientInfoArray = [
         'version' => '0',
@@ -165,10 +171,19 @@ class Node
                 // check if there is a client trying to connect
                 if (in_array($sock, $read)) {
                     //$newSocket = socket_accept($sock);
-                    $newSocket = stream_socket_accept($sock);
-                    $clients[] = $newSocket;
+                    $newSocket = @stream_socket_accept($sock);
 
-                    Console::log('New peer connection');
+                    if ($newSocket !== false) {
+                        $ip = $this->remoteIp($newSocket);
+
+                        if ($this->allowConnection($ip, $clients)) {
+                            $clients[] = $newSocket;
+                            $this->peerIps[array_key_last($clients)] = $ip;
+                            Console::log('New peer connection');
+                        } else {
+                            fclose($newSocket);
+                        }
+                    }
 
                     // remove the listening socket from the clients-with-data array
                     $key = array_search($sock, $read);
@@ -207,6 +222,8 @@ class Node
                             if ($line === '') {
                                 continue;
                             }
+
+                            $kick = false;
 
                             // a bad packet from one peer must never stop the node
                             try {
@@ -290,7 +307,7 @@ class Node
                                              */
                                             case 'block_resp':
                                                 Console::log('Received a block response from: ' . $key);
-                                                $clientInfo[$key]['block'] = $data['result'];
+                                                $clientInfo[$key]['block'] = $this->text($data['result'] ?? '');
                                                 break;
 
                                             case 'block':
@@ -301,7 +318,13 @@ class Node
                                                     break;
                                                 }
 
+                                                $this->rejectedForTime = false;
                                                 $status = $this->handleBlock($block);
+
+                                                // a clock that is out could make an honest peer's block look bad
+                                                if ($status === 'invalid' && !$this->rejectedForTime) {
+                                                    $kick = $this->misbehave($key, 50);
+                                                }
 
                                                 $this->send($client, json_encode([
                                                     'type' => 'block_resp',
@@ -398,6 +421,12 @@ class Node
                                                 $transaction = $data['transaction'] ?? null;
 
                                                 $accepted = is_array($transaction) && $this->mempool->add($transaction);
+
+                                                // refused for a reason that has nothing to do with our chain, e.g. a bad signature
+                                                if (!$accepted && (!is_array($transaction)
+                                                        || !(new Transaction())->validate($transaction, null, false)['validated'])) {
+                                                    $kick = $this->misbehave($key, 20);
+                                                }
 
                                                 // tell the sender, a wallet waits for this
                                                 $this->send($client, json_encode([
@@ -568,8 +597,17 @@ class Node
                                         JSON_THROW_ON_ERROR)
                                     );
                                 }
+                            } catch (JsonException $e) {
+                                Console::log('Bad packet from client ' . $key . ': ' . $e->getMessage());
+                                $kick = $this->misbehave($key, 10) || $kick;
                             } catch (Throwable $e) {
                                 Console::log('Bad packet from client ' . $key . ': ' . $e->getMessage());
+                            }
+
+                            // a peer that keeps sending bad data is banned for a while
+                            if ($kick && isset($clients[$key])) {
+                                fclose($client);
+                                unset($clientInfo[$key], $clients[$key], $buffers[$key], $this->peerIps[$key]);
                             }
                         }
                     }
@@ -591,6 +629,7 @@ class Node
                 if ($connection !== null) {
                     $clients[] = $connection['stream'];
                     $outbound[array_key_last($clients)] = $connection['address'];
+                    $this->peerIps[array_key_last($clients)] = $this->remoteIp($connection['stream']);
                 }
             }
 
@@ -722,6 +761,7 @@ class Node
 
         if (!$result['validated']) {
             Console::log('Rejected block ' . $block['block_id'] . ': ' . $result['reason']);
+            $this->rejectedForTime = str_contains($result['reason'], 'block from the future');
 
             return 'invalid';
         }
@@ -755,6 +795,75 @@ class Node
         }
 
         return $status;
+    }
+
+    /**
+     * @param resource $socket
+     * @return string
+     */
+    private function remoteIp($socket): string
+    {
+        $remote = (string)stream_socket_get_name($socket, true);
+
+        return substr($remote, 0, (int)strrpos($remote, ':'));
+    }
+
+    /**
+     * Refuses banned addresses, and connections past the total or per address limit.
+     */
+    private function allowConnection(string $ip, array $clients): bool
+    {
+        if (($this->banned[$ip] ?? 0) > time()) {
+            Console::log('Refusing banned peer ' . $ip);
+
+            return false;
+        }
+
+        unset($this->banned[$ip]);
+
+        // forget connections that have closed
+        $this->peerIps = array_intersect_key($this->peerIps, $clients);
+        $this->misbehaviour = array_intersect_key($this->misbehaviour, $clients);
+
+        if (count($clients) - 1 >= Config::getMaxPeers()) {
+            Console::log('Refusing peer ' . $ip . ', too many connections');
+
+            return false;
+        }
+
+        if (count(array_keys($this->peerIps, $ip, true)) >= self::MAX_CONNECTIONS_PER_IP) {
+            Console::log('Refusing peer ' . $ip . ', too many connections from it');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Adds to a peer's misbehaviour score. Returns true when the peer is now banned and should be dropped.
+     */
+    private function misbehave(int $key, int $points): bool
+    {
+        $ip = $this->peerIps[$key] ?? '';
+
+        if ($ip === '') {
+            return false;
+        }
+
+        // scored per connection, so a few honest mistakes over many connections never add up to a ban
+        $this->misbehaviour[$key] = ($this->misbehaviour[$key] ?? 0) + $points;
+        Console::log('Peer ' . $ip . ' misbehaved, score ' . $this->misbehaviour[$key]);
+
+        if ($this->misbehaviour[$key] < self::BAN_SCORE) {
+            return false;
+        }
+
+        unset($this->misbehaviour[$key]);
+        $this->banned[$ip] = time() + Config::getBanSeconds();
+        Console::log('Banned peer ' . $ip . ' for ' . Config::getBanSeconds() . 's');
+
+        return true;
     }
 
     /**
