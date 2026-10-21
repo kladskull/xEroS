@@ -807,7 +807,16 @@ class Node
 
             return 'stale';
         }
+
         $result = $this->block->validateFullBlock($block, $extendsTip);
+
+        // the miner shares our database and may have added its own block while we checked this one, which can
+        // spend the same outputs. Then this block is a competitor of the new tip, check it as one.
+        if (!$result['validated'] && $extendsTip && $this->block->getCurrent()['block_id'] !== $tip['block_id']) {
+            Console::log('The tip moved while checking block ' . $block['block_id'] . ', checking it again');
+            $extendsTip = false;
+            $result = $this->block->validateFullBlock($block, false);
+        }
 
         if (!$result['validated']) {
             Console::log('Rejected block ' . $block['block_id'] . ': ' . $result['reason']);
@@ -823,14 +832,18 @@ class Node
         $status = 'stored';
         $stored = $this->block->getByBlockId((string)$block['block_id']);
 
-        if ($extendsTip) {
-            if ($this->block->acceptBlock($stored['block_id'], (int)$stored['height'])) {
+        if ($extendsTip && $this->block->acceptBlock($stored['block_id'], (int)$stored['height'])) {
+            $status = 'tip';
+        } else {
+            // a competing branch, or the miner moved the tip before we could accept it
+            $current = $this->block->getCurrent();
+
+            if ($current['block_id'] !== $stored['block_id']
+                && $this->block->blockSelector($current, $stored)['block_id'] === $stored['block_id']
+                && $this->block->reorganize($stored)) {
+                Console::log('Switched to a chain with more work at height ' . $stored['height']);
                 $status = 'tip';
             }
-        } elseif ($this->block->blockSelector($tip, $stored)['block_id'] === $stored['block_id']
-            && $this->block->reorganize($stored)) {
-            Console::log('Switched to a chain with more work at height ' . $stored['height']);
-            $status = 'tip';
         }
 
         // blocks that were waiting for this one
