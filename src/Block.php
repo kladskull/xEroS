@@ -33,50 +33,50 @@ class Block
      * The first block of each network. Make a new one with genesis.php and paste its output here.
      */
     private const GENESIS = [
-        'live' => [ // stale, made before the block format changed, re-mine before launch
-            'date' => 1644364863,
-            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrA' .
-                'MjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2Yj' .
-                'srrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh' .
-                '59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB',
-            'signature' => '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af' .
-                '7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a' .
-                '12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6' .
-                '858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab' .
-                '597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c' .
-                '69295c476414',
-            'nonce' => '5bd5d65',
-            'hash' => '0000000f8fd419d81b0eb5ed9512a1cc42910c94a5034bd543653edd83fcb4f3',
+        'live' => [
+            'date' => 1792595714,
+            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArBlezGICalL+Gh4wKXOCweeSYfK0t67JxRkH9uRK+WQ9F54joftt3A9O' .
+                '20qpoS5SzyAWqqSFpIHRDPLDgjm/92EVwpNfO95qcSTH1t2w539uGOk0WXYFwbhzoTfDkywGy86td3pZlJbAxJhrL7Xv6zYhgJWy' .
+                '7LBmI794o38b9n6hI8GZ6ofX4enbk/oRhrW4lRsdl1nNSJHvK2oz0FQwIYZzK3RJhVZH48/1Yb3K3pk33SLdPwCR24Oe6YzII0fv' .
+                'eW4JKq678ETnERZNUZCSj5bTnmpMMy7bTs07x7A63mIEgfM1/cP9/dvFl2q+rLuv8C3NiDMbNiuj+NbHLmpLKwIDAQAB',
+            'signature' => '0b0ed7125152fb73e3a70b76d0088a8f16188cfad4e7c696c64562231942bf90fd2f2d3aed0d3681e6d5c4b4db2257741ce3' .
+                'a254d254312509a8e86058ffe9bac951dec9491361dddcc45d387f0d974fd96b2ae3cc37e334a7de9bf24a65b09354209b1b' .
+                '82e7ac8bf8cd86d23e10bdd10007052cd023d29e81ec8e3032c510700fdc7a3dc490cb9ecdc7861f714c3e4c25e129fc89ac' .
+                '0edc5793bc413072cde0df515a983be70c40dd90adfb5e7a56a94a82905e1c1a4188bec3c5ecab8c960cecf03f9c32805949' .
+                '3ceb5a4277ec124d7860629911b1ad788cb44ee07aafb145dce978b6537cdd2a0b40cc8f3b539e222e21dc57da1ea6742c54' .
+                '393f04a3d83d',
+            'nonce' => '12af27ad',
+            'hash' => '0000000f9a991f9860529f4c3e506fda52ee39cb4f3aac5343406da8c371938c',
         ],
-        'test' => [ // stale, made before the block format changed, re-mine before launch
-            'date' => 1644364863,
-            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrA' .
-                'MjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2Yj' .
-                'srrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh' .
-                '59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB',
-            'signature' => '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af' .
-                '7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a' .
-                '12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6' .
-                '858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab' .
-                '597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c' .
-                '69295c476414',
-            'nonce' => '1192faa7',
-            'hash' => '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67',
+        'test' => [
+            'date' => 1792595714,
+            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxqAt9zKi9HSQlnsWrs8Vu3jpYukk7vaUTQ5ZpG8w5U0dsfOgintfaw2U' .
+                'CiFNXp7aUJ7BE38e6gW7iw3VRCwhAd341xy8NLgbikG3MF71LLRzcMBFgw8F8fusY2hacvE05bSWDC3PucV3UtHqrrlIijc5JwmK' .
+                'ffs6SOUSOQCOLhQqhsChtGYktAY2EmGZ3/DRWX4PQzy9ghobAbpNPq95MkvrAF0rKXDzGTYZ/HK4OKa1YLNIs1BuL0MEu2U81l1T' .
+                'fL8TQOjO5jCi7REzNRDBrr/yKIT2Xy3e0Onah/6w3KT/r9C5KO8NTUmXfkCwbBip+LBAJ1QuXWgdbC2vTSGRAwIDAQAB',
+            'signature' => '9af05619e5c4dc5aab75cd25f9f5ccb86abd5959a4de46f74679a0f0ce9d5953d1f1aaade285ddd1c4bb48e98a3ec99b57aa' .
+                'df848e0a2f622c7dd271c21acf703019a006ddba6448fbc9fbe877b4fd88f4087f016759e3dfe67d8e380582c763fb336652' .
+                '2eb42acd2ad6ba1808ce1b912368caa68532dc3fddd0649413866fc99d79bcaf49da06f46611aaf6c8421bab51d91923d02d' .
+                '1a479fa6e367fe64f5a4569edbfd8555ef88726061d5f36d84c27065563eecd5013a195692b355d069ea97e5dce59757c7c7' .
+                'b211ad6cd978e75b9ff060bc01f147ca9a3955e188c4868763ae289176c9383e4620de45e8d66dc74aecbdb7b3e414e626a6' .
+                'dbbe3a9e6a70',
+            'nonce' => '1540e27',
+            'hash' => '000000e9a1683319200a7f5bdefd21af4b3c5be0d5851b0f00c5698313743930',
         ],
         'dev' => [
-            'date' => 1792594643,
-            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAveRPU9KVhQruDQDrsO8ZFg/a3mg2HxskENSM1PONewtOkIjsCQ5iQAiA' .
-                'EmjNYiy48PRAx/xhfZucPLPIKRyWX2SimMvs1kyptVWvvx9cvCtdMuaXiDxQdiJU8DbH15OCTUKF7NyUpyJh3qBvFdh2qnBDH3jP' .
-                'N9zQFUJPsAfF0E7ZS0GHdoPHUmoS/U7f263oLwABvgohMCPSi/C/ZxBsrmSpbT59+C8YKT1A1FRAi8/Xqb93epvH+3wY9dt7oX4B' .
-                'rpx6HHPdPZ+wIvz2ErSjdNBpYmz/PXE6JtGDGJRbBfORUuMx2e8iDyYk+wJwncvuqFcefLAjJEWqdUankbleYQIDAQAB',
-            'signature' => '91a23865574151b7832787a9ac415c8057f834bc5478b6b979b4388d168302bd127f067f9221235f79428e8adda5737b0502' .
-                '357f947b268bea161944911f365923dc3e6dd9d1c15d0cee6be99c91a7231f65a79b52471d979cfc559731630cfc178e8655' .
-                '5821715e8a85b5f4979e52e98077ba569379d4e773a7b439337ae611bd11ef4ee6124a0da9117752a0229619dfc8dabb19c2' .
-                'ca739560d4e9e800d8462f13fec53e6dac77680ee2000746619b947c4f108e42a95bf2749632c9981c86e6ad88f15ee03163' .
-                '362f59962c3710561ca795557bdf0277f8970b485e81329b79645fb8c3f941fec58e23bd1181c738595c68d2ec0fc2fd6b41' .
-                '2127d1c9d573',
-            'nonce' => '7609',
-            'hash' => '0000041d0e27e05bdd4c6e48857edbb7f67d8f31ec85661868b5973309ca5bba',
+            'date' => 1792595615,
+            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtxyHsTEQyrj55Dg5p6KV5lmClUFgVPNk3Xom6TKp3VzxHwWkux4hdRqY' .
+                'MpaFurTxsGJX1UtpfI/W+mumlaLDJzgpz0hroajuyaNXUtgz9mYZsZvQ/+csKYiuN/j5oiI3+wLu41iZPjfd7wVpHfWhQZ+5l3WU' .
+                'xOr/L8LJSuyXm/wpc/bAU5YTU4QqhCclTSvWvrE+PTat6smabTYypPD7lQiTpGt6bi6Un/kRRG7lpMvbUR6Y5+axjMmJicSs+Lsf' .
+                'rLJB6oL3e1MASr3c1sC538fay5VRtv07xnKJ2bDz/dIJ16oMdsfvhg7DeooBTMEAwZzhfDFWg9Ii+2Wy5uKXMwIDAQAB',
+            'signature' => '389cba780cb68eea68ec3e0b4fecc2e72150830850d2818932cb3ee04d70fd4efb6dccfdd72ad5b96bab5fcdb1e93b15b2be' .
+                '038ea96a719de5b9b58baa1425034767200d16f930287f99765545a1c97297d21cd243e6e5df6e820804ec8d77a507c1c351' .
+                'de2171505bc1ecee02aaac12bf4b14c22935b29bcae4700e9d918f985182977a747d2803fb4c4a5e83c5e892e3cfa4648ca0' .
+                '67af4557b0abc415a5bfe1060c4e2c8a16f34926a25bee51c6f0e52598288efd02a6b8b37a8da7439579e63b000a9ba7487a' .
+                'b51ec996eeea30d69d7b5044a42fa3861d92e4bcdfafd65a5a9a2b167a98d824eb5393ed03f5d11f765b0196aca3412feb0b' .
+                '1cfee78c77f8',
+            'nonce' => '638',
+            'hash' => '000047b7ab9d5ec1a74b023b0f8c7b4456fca7f7bfd7e660ee167c2f02f79859',
         ],
     ];
 
@@ -123,7 +123,12 @@ class Block
             return [];
         }
 
-        $block = $this->assembleGenesis($environment, $fixed['date'], $fixed['public_key'], $fixed['signature']);
+        $block = Config::withEnvironment($environment, fn () => $this->assembleGenesis(
+            $environment,
+            $fixed['date'],
+            $fixed['public_key'],
+            $fixed['signature']
+        ));
         $block['nonce'] = $fixed['nonce'];
         $block['hash'] = $fixed['hash'];
 
@@ -141,11 +146,15 @@ class Block
      */
     public function createGenesis(string $environment, int $date, string $publicKey, string $privateKey): array
     {
-        $publicKeyRaw = $this->openSsl->stripPem($publicKey);
-        $transaction = $this->genesisTransaction($date, $publicKeyRaw);
-        $signature = $this->transaction->signTransaction($transaction, $publicKey, $privateKey);
+        $environment = Config::normalizeEnvironment($environment);
 
-        return $this->assembleGenesis(Config::normalizeEnvironment($environment), $date, $publicKeyRaw, $signature);
+        return Config::withEnvironment($environment, function () use ($environment, $date, $publicKey, $privateKey) {
+            $publicKeyRaw = $this->openSsl->stripPem($publicKey);
+            $transaction = $this->genesisTransaction($date, $publicKeyRaw);
+            $signature = $this->transaction->signTransaction($transaction, $publicKey, $privateKey);
+
+            return $this->assembleGenesis($environment, $date, $publicKeyRaw, $signature);
+        });
     }
 
     /**

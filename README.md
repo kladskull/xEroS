@@ -49,6 +49,12 @@ php send.php <address> <amount>   # pay someone through the running node
 vendor/bin/phpunit --bootstrap bootstrap.php tests
 ```
 
+## Networks
+`ENVIRONMENT` in `.env` picks the network: `live`, `test` or `dev`. Each has its own network id, genesis block and
+address format (`Xa...` live, `xa...` test, `xd...` dev), so nodes, blocks, transactions and addresses never cross
+between them. Live uses `xero.db`, the others `xero-test.db` and `xero-dev.db` (`./phinx migrate -e production` or
+`-e testing` for those).
+
 ## Genesis blocks
 Each network's first block is fixed in `Block::GENESIS`. To make a new one, mine it with the key that gets the first
 reward and paste the output into `Block::GENESIS`:

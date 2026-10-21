@@ -666,7 +666,8 @@ class ScriptTest extends TestCase
         $script = new Script([]);
         $script->loadScript($program);
 
-        $script->run(false);
+        // a known live address
+        Config::withEnvironment('live', fn () => $script->run(false));
 
         $sm = $script->debugGetStateMachine();
         $this->assertEquals('Xa14BDGV11UKCHhjSQcHc4cfSky1dfkWPfnD', $sm->getRegister('ax'));
