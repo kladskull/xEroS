@@ -102,4 +102,37 @@ class PeerTest extends TestCase
         $this->assertTrue(ctype_alnum($id));
         $this->assertLessThanOrEqual(40, strlen($id));
     }
+
+    public function testLiveIgnoresPrivateAddressesFromOtherPeers(): void
+    {
+        $added = Config::withEnvironment('live', fn () => [
+            '10.0.0.5:7747' => $this->peer->addFromNetwork('10.0.0.5:7747'),
+            '192.168.1.2:7747' => $this->peer->addFromNetwork('192.168.1.2:7747'),
+            '127.0.0.1:7747' => $this->peer->addFromNetwork('127.0.0.1:7747'),
+            '0.0.0.0:7747' => $this->peer->addFromNetwork('0.0.0.0:7747'),
+            '8.8.8.8:7747' => $this->peer->addFromNetwork('8.8.8.8:7747'),
+        ]);
+
+        $this->assertEquals(0, $added['10.0.0.5:7747']);
+        $this->assertEquals(0, $added['192.168.1.2:7747']);
+        $this->assertEquals(0, $added['127.0.0.1:7747']);
+        $this->assertEquals(0, $added['0.0.0.0:7747']);
+        $this->assertGreaterThan(0, $added['8.8.8.8:7747']);
+
+        // test and dev networks run on one machine or a LAN, so local addresses are fine there
+        $this->assertGreaterThan(0, Config::withEnvironment('dev', fn () => $this->peer->addFromNetwork('127.0.0.1:7748')));
+    }
+
+    public function testStoredPeerListIsCapped(): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO peers (`address`,`reserve`,`last_ping`,`blacklisted`,`fails`,`date_created`) VALUES (:a,0,0,0,0,0)'
+        );
+
+        for ($i = 0; $i < 1000; $i++) {
+            $stmt->execute([':a' => '203.0.' . intdiv($i, 250) . '.' . ($i % 250 + 1) . ':7747']);
+        }
+
+        $this->assertEquals(0, $this->peer->addFromNetwork('198.51.100.7:7747'));
+    }
 }

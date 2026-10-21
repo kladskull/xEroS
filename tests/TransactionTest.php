@@ -147,7 +147,7 @@ class TransactionTest extends TestCase
         $cases = [
             'invalid address in output' => ['address', 'Xanope'],
             'output script is invalid' => ['script', str_repeat('A', Config::getMaxScriptLength() + 1)],
-            'Invalid lock_height' => ['lock_height', '-1'],
+            'not in the stored format' => ['lock_height', '-1'],
         ];
 
         foreach ($cases as $reason => [$field, $value]) {
@@ -315,7 +315,9 @@ class TransactionTest extends TestCase
     public function testOversizedBlockIsRefused(): void
     {
         $height = $this->block->getCurrentHeight() + 1;
-        $block = $this->block->getCandidateBlock($height, $this->owner['public_key'], $this->owner['private_key']);
+        $block = $this->mine(
+            $this->block->getCandidateBlock($height, $this->owner['public_key'], $this->owner['private_key'])
+        );
         $filler = $block['transactions'][0];
         $filler['public_key'] = str_repeat('a', Config::getMaxTransactionBytes() - 1000);
 
@@ -391,6 +393,76 @@ class TransactionTest extends TestCase
             $result = $this->block->validateFullBlock($this->mine($block));
 
             $this->assertSame(!$allowed, str_contains($result['reason'], 'block from the future'), $ahead . 's');
+        }
+    }
+
+    public function testFieldsMustBeInTheirStoredForm(): void
+    {
+        // each of these validated before but came back from the database different, with a different id
+        $cases = [
+            ['date_created', fn (array $tx) => $tx['date_created'] . 'x'],
+            ['date_created', fn (array $tx) => ' ' . $tx['date_created']],
+            ['height', fn (array $tx) => '0' . $tx['height']],
+        ];
+
+        foreach ($cases as [$field, $change]) {
+            $tx = $this->validTransfer();
+            $tx[$field] = $change($tx);
+            $result = $this->transaction->validate($this->resign($tx));
+
+            $this->assertFalse($result['validated'], $field . ' ' . var_export($tx[$field], true));
+            $this->tearDown();
+            $this->setUp();
+        }
+
+        // resign() puts the key back, so sign this one by hand
+        $tx = $this->validTransfer();
+        $tx['public_key'] .= "\n";
+        $tx['transaction_id'] = $this->transaction->computeId($tx);
+        $tx['signature'] = $this->transaction->signTransaction($tx, $this->owner['public_key'], $this->owner['private_key']);
+        $this->assertRefused($tx, 'public_key must be base64');
+
+        $tx = $this->validTransfer();
+        $tx[Transaction::INPUTS][0]['previous_tx_out_id'] = '00';
+        $this->assertRefused($this->resign($tx), 'not in the stored format');
+
+        $tx = $this->validTransfer();
+        $tx[Transaction::OUTPUTS][0]['lock_height'] = '0 ';
+        $this->assertRefused($this->resign($tx), 'not in the stored format');
+    }
+
+    public function testCanonicalNumbers(): void
+    {
+        foreach (['0', '7', '1700000000', 0, 42] as $good) {
+            $this->assertTrue(Transaction::isCanonicalNumber($good), var_export($good, true));
+        }
+
+        foreach (['', '07', '-1', ' 1', '1 ', "1\n", '1.0', '1e3', -1, 1.5, null, true] as $bad) {
+            $this->assertFalse(Transaction::isCanonicalNumber($bad), var_export($bad, true));
+        }
+    }
+
+    public function testBlockHeaderMustBeInItsStoredForm(): void
+    {
+        $height = $this->block->getCurrentHeight() + 1;
+        $block = $this->mine(
+            $this->block->getCandidateBlock($height, $this->owner['public_key'], $this->owner['private_key'])
+        );
+        $this->assertTrue($this->block->validateFullBlock($block)['validated']);
+
+        $cases = [
+            'height' => $block['height'] . ' ',
+            'date_created' => '0' . $block['date_created'],
+            'difficulty' => (string)$block['difficulty'] . 'x',
+            'nonce' => '-' . $block['nonce'],
+            'hash' => strtoupper($block['hash']),
+            'block_id' => $block['block_id'] . "\n",
+        ];
+
+        foreach ($cases as $field => $value) {
+            $changed = $block;
+            $changed[$field] = $value;
+            $this->assertFalse($this->block->validateFullBlock($changed)['validated'], $field);
         }
     }
 }

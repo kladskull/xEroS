@@ -99,19 +99,6 @@ class Block
     }
 
     /**
-     * @param int $height
-     * @return int
-     */
-    public static function filterBlockHeight(int $height): int
-    {
-        if ($height <= 0 || $height > self::MAX_LIFETIME_BLOCKS) {
-            $height = 1;
-        }
-
-        return $height;
-    }
-
-    /**
      * The genesis block for an environment, built the same way as any other block from the fixed values above.
      *
      * @param string $environment
@@ -497,6 +484,24 @@ class Block
             }
         }
 
+        // header fields must already be in the form they are stored in, otherwise the block read back from the
+        // database would hash differently and peers fetching it from us would reject it
+        foreach (['date_created', 'height', 'difficulty', 'transaction_count'] as $field) {
+            if (!Transaction::isCanonicalNumber($block[$field])) {
+                return $this->returnValidateResult('"' . $field . '" must be a whole number,', false);
+            }
+        }
+
+        foreach (['block_id', 'merkle_root', 'hash'] as $field) {
+            if (!is_string($block[$field]) || preg_match('/^[0-9a-f]{64}$/D', $block[$field]) !== 1) {
+                return $this->returnValidateResult('"' . $field . '" must be 64 lowercase hex characters,', false);
+            }
+        }
+
+        if (!is_string($block['nonce']) || preg_match('/^[0-9a-f]{1,16}$/D', $block['nonce']) !== 1) {
+            return $this->returnValidateResult('"nonce" must be lowercase hex,', false);
+        }
+
         $reason = '';
         $result = true;
         $height = (int)$block['height'];
@@ -702,34 +707,6 @@ class Block
      * This function goes through all blocks and makes sure that all the records are sound.
      * @return void
      */
-    public function checkIntegrity(): void
-    {
-        $height = $this->getCurrentHeight();
-        $startHeight = (int)$this->store->getKey('integrity_height', 1);
-
-        if ($startHeight < 1) {
-            $startHeight = 1;
-        }
-
-        for ($i = $startHeight; $i <= $height; $i++) {
-            $blockRecord = $this->getByHeight($i);
-
-            if (empty($blockRecord)) {
-                Console::log('Missing block at height ' . $i);
-                continue;
-            }
-
-            $block = $this->assembleFullBlock($blockRecord['block_id']);
-            $result = $this->validateFullBlock($block);
-
-            if (!$result['validated']) {
-                Console::log('Invalid block detected at height ' . $i . ': ' . $result['reason']);
-            }
-
-            $this->store->add('integrity_height', $i + 1);
-        }
-    }
-
     /**
      * This function determines if the two given blocks are at a fork
      *
@@ -748,82 +725,6 @@ class Block
         }
 
         return $block1['block_id'] !== $block2['block_id'];
-    }
-
-    /**
-     * This cleans the blockchain by removing all orphan blocks & transactions. This should be called
-     * AFTER resolveForks() so that you don't delete the wrong blocks.
-     *
-     * @return void
-     */
-    public function cleanBlockchain(): void
-    {
-        /**
-         * Get the highest height and work down
-         */
-        // get top 2 blocks by height
-        $height = $this->getCurrentHeight();
-
-        if ($height > 1) {
-            $start = (int)$this->store->getKey('clean_progress', $height);
-
-            if ($start > $height) {
-                $start = $height;
-            }
-
-            for ($h = $start; $h >= 1; $h--) {
-                $query = 'SELECT `block_id` FROM blocks WHERE orphan=1 AND height=:height';
-                $stmt = $this->db->prepare($query);
-                $stmt = DatabaseHelpers::filterBind($stmt, 'height', $h, DatabaseHelpers::INT);
-                $stmt->execute();
-                $rows = $stmt->fetchAll();
-                $counter = 0;
-
-                foreach ($rows as $row) {
-                    $this->delete($row['block_id']);
-
-                    // let's not kill the CPU
-                    if ($counter++ % 100 === 0) {
-                        usleep(1);
-                    }
-                }
-
-                $this->store->add('clean_progress', $h - 1);
-            }
-        }
-    }
-
-    /**
-     * This just tests if our highest block is an orphan
-     *
-     * @return bool
-     */
-    public function isCurrentHeightOrphan(): bool
-    {
-        $query = 'SELECT `orphan` FROM blocks ORDER BY `height` DESC LIMIT 1';
-        $stmt = $this->db->query($query);
-
-        return (bool)$stmt->fetchColumn();
-    }
-
-    /**
-     * Switches to the stored chain with the most work if it isn't the active one.
-     *
-     * @return void
-     */
-    public function resolveForks(): void
-    {
-        $tip = $this->getCurrent();
-        $stmt = $this->db->query('SELECT `block_id` FROM blocks WHERE `orphan`=1 ORDER BY `height` DESC LIMIT 50');
-
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $candidate = $this->getByBlockId($row['block_id']);
-
-            if (!empty($tip) && $this->blockSelector($tip, $candidate)['block_id'] === $candidate['block_id']
-                && $this->reorganize($candidate)) {
-                $tip = $this->getCurrent();
-            }
-        }
     }
 
     /**
@@ -899,7 +800,7 @@ class Block
 
         $targetModulus = (3600 / Config::getDesiredBlockTime()) * 24 * 365;
         $reductions = bcdiv($strHeight, (string)$targetModulus, 0);
-        $nSubsidy = Config::getDefaultBlockReward(); // 100 coins
+        $nSubsidy = Config::getDefaultBlockReward(); // 50 coins
 
         if (bccomp($reductions, "0") === 1) {
             $reductions = (int)$reductions;

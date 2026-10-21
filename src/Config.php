@@ -27,7 +27,10 @@ class Config
     private const DEFAULT_BLOCK_REWARD = "5000000000";
     private const MINIMUM_FEE = "10000000"; // 0.1 xc
     private const FEE_PER_KB = "1000000"; // 0.01 xc for every started 1000 bytes, see Transaction::minimumFee()
-    private const MAX_CURRENCY_SUPPLY = "21000000000000000"; // Satoshi's per coin x 210,000,000
+    // Not enforced. The reward starts at 50 and drops 4% a year (Block::getRewardValue) until it is about 1 coin a
+    // block, then stays there. That is about 65M coins after 100 years and 52,560 more each year after, so this
+    // 210M figure is not reached for about 2,900 years.
+    private const MAX_CURRENCY_SUPPLY = "21000000000000000";
     private const MAX_TRANSACTION_SIZE = 100;
 
     // mining

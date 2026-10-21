@@ -3,6 +3,8 @@
 namespace Blockchain;
 
 use JetBrains\PhpStorm\NoReturn;
+use RuntimeException;
+
 use function array_pop;
 use function count;
 use function str_pad;
@@ -13,6 +15,9 @@ use function str_pad;
  */
 class StateMachine
 {
+    private const MAX_VALUE_LENGTH = 8192;
+    private const MAX_STACK_DEPTH = 1000;
+
     private array $script = [];
 
     private int $executableOperations;
@@ -265,6 +270,8 @@ class StateMachine
     #[NoReturn]
     public function setRegister(string $register, string|int|bool $value, bool $system = false): void
     {
+        $this->checkSize($value);
+
         if ($this->isRegister($register)) {
             if ($register === 'ax') {
                 $this->registers_ax = $value;
@@ -295,7 +302,28 @@ class StateMachine
     #[NoReturn]
     public function pushStack(string $value): void
     {
+        $this->checkSize($value);
+
+        if (count($this->stack) >= self::MAX_STACK_DEPTH) {
+            throw new RuntimeException('script stack is full');
+        }
+
         $this->stack[] = $value;
+    }
+
+    /**
+     * Some operations grow a value, hexe doubles it, so a short script could otherwise build a value big enough
+     * to exhaust memory and crash the node. Anything a real script holds (keys, signatures, hashes, addresses,
+     * numbers) is far below this.
+     *
+     * @param string|int|bool $value
+     * @return void
+     */
+    private function checkSize(string|int|bool $value): void
+    {
+        if (is_string($value) && strlen($value) > self::MAX_VALUE_LENGTH) {
+            throw new RuntimeException('script value is larger than ' . self::MAX_VALUE_LENGTH . ' bytes');
+        }
     }
 
     /**

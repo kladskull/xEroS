@@ -106,6 +106,73 @@ class Transaction
     }
 
     /**
+     * A whole number written the one way it is stored: digits, no sign, no leading zeros.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function isCanonicalNumber(mixed $value): bool
+    {
+        return (is_int($value) && $value >= 0)
+            || (is_string($value) && preg_match('/^(0|[1-9][0-9]*)$/D', $value) === 1);
+    }
+
+    /**
+     * Every field must already be in the form the database stores it in. The database trims text and strips
+     * characters from ids and numbers, so anything else would come back from storage with a different id, and
+     * peers fetching the block from us would reject it.
+     *
+     * @param array $transaction
+     * @return string the problem, empty if there is none
+     */
+    public static function formatProblem(array $transaction): string
+    {
+        $hex64 = static fn ($value): bool => is_string($value) && preg_match('/^[0-9a-f]{64}$/D', $value) === 1;
+        $base58 = static fn ($value): bool => is_string($value)
+            && preg_match('/^[1-9A-HJ-NP-Za-km-z]*$/D', $value) === 1;
+
+        foreach (['date_created', 'height'] as $field) {
+            if (!self::isCanonicalNumber($transaction[$field])) {
+                return '"' . $field . '" must be a whole number,';
+            }
+        }
+
+        if (!$hex64($transaction['transaction_id'])) {
+            return 'transaction_id must be 64 lowercase hex characters,';
+        }
+
+        if (!is_string($transaction['public_key'])
+            || preg_match('#^[A-Za-z0-9+/=]+$#D', $transaction['public_key']) !== 1) {
+            return 'public_key must be base64,';
+        }
+
+        if (!is_string($transaction['signature']) || !ctype_xdigit($transaction['signature'])) {
+            return 'signature must be hex,';
+        }
+
+        foreach ($transaction[self::INPUTS] as $txIn) {
+            if (!is_array($txIn) || !self::isCanonicalNumber($txIn['tx_id'] ?? null)
+                || !$hex64($txIn['previous_transaction_id'] ?? null)
+                || !self::isCanonicalNumber($txIn['previous_tx_out_id'] ?? null)
+                || !$base58($txIn['script'] ?? null)) {
+                return 'an input is not in the stored format,';
+            }
+        }
+
+        foreach ($transaction[self::OUTPUTS] as $txOut) {
+            if (!is_array($txOut) || !self::isCanonicalNumber($txOut['tx_id'] ?? null)
+                || !self::isCanonicalNumber($txOut['value'] ?? null)
+                || !self::isCanonicalNumber($txOut['lock_height'] ?? null)
+                || !is_string($txOut['address'] ?? null) || !ctype_alnum($txOut['address'])
+                || !$base58($txOut['script'] ?? null)) {
+                return 'an output is not in the stored format,';
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * The smallest fee for a transaction of $size bytes: a fee for every started 1000 bytes, and never less than
      * the flat minimum. Large transactions pay more, so filling blocks is not cheap.
      *
@@ -447,6 +514,12 @@ class Transaction
 
         if (self::size($transaction) > Config::getMaxTransactionBytes()) {
             return $fail('transaction is larger than ' . Config::getMaxTransactionBytes() . ' bytes,');
+        }
+
+        $formatProblem = self::formatProblem($transaction);
+
+        if ($formatProblem !== '') {
+            return $fail($formatProblem);
         }
 
         $height ??= (new Block())->getCurrentHeight() + 1;
