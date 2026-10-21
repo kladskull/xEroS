@@ -29,54 +29,57 @@ class Block
     public Transaction $transaction;
     private TransferEncoding $transferEncoding;
 
+    // bytes kept free for the coinbase when a block is filled from the mempool
+    private const COINBASE_ROOM = 10000;
+
     /**
      * The first block of each network. Make a new one with genesis.php and paste its output here.
      */
     private const GENESIS = [
         'live' => [
-            'date' => 1792595714,
+            'date' => 1792604821,
             'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArBlezGICalL+Gh4wKXOCweeSYfK0t67JxRkH9uRK+WQ9F54joftt3A9O' .
                 '20qpoS5SzyAWqqSFpIHRDPLDgjm/92EVwpNfO95qcSTH1t2w539uGOk0WXYFwbhzoTfDkywGy86td3pZlJbAxJhrL7Xv6zYhgJWy' .
                 '7LBmI794o38b9n6hI8GZ6ofX4enbk/oRhrW4lRsdl1nNSJHvK2oz0FQwIYZzK3RJhVZH48/1Yb3K3pk33SLdPwCR24Oe6YzII0fv' .
                 'eW4JKq678ETnERZNUZCSj5bTnmpMMy7bTs07x7A63mIEgfM1/cP9/dvFl2q+rLuv8C3NiDMbNiuj+NbHLmpLKwIDAQAB',
-            'signature' => '0b0ed7125152fb73e3a70b76d0088a8f16188cfad4e7c696c64562231942bf90fd2f2d3aed0d3681e6d5c4b4db2257741ce3' .
-                'a254d254312509a8e86058ffe9bac951dec9491361dddcc45d387f0d974fd96b2ae3cc37e334a7de9bf24a65b09354209b1b' .
-                '82e7ac8bf8cd86d23e10bdd10007052cd023d29e81ec8e3032c510700fdc7a3dc490cb9ecdc7861f714c3e4c25e129fc89ac' .
-                '0edc5793bc413072cde0df515a983be70c40dd90adfb5e7a56a94a82905e1c1a4188bec3c5ecab8c960cecf03f9c32805949' .
-                '3ceb5a4277ec124d7860629911b1ad788cb44ee07aafb145dce978b6537cdd2a0b40cc8f3b539e222e21dc57da1ea6742c54' .
-                '393f04a3d83d',
-            'nonce' => '12af27ad',
-            'hash' => '0000000f9a991f9860529f4c3e506fda52ee39cb4f3aac5343406da8c371938c',
+            'signature' => '8344981d9b939d170d8c1f506a449c60dee13068c138339e30ba474973e027285252269ab006ffbf248bff2b3b7039f3a27a' .
+                '9c85433b4f9ced3c4ef30b03a5bcc63d2113706b0418b7edfbff10512efa771b4677626078a4ccca0b97ecd24704692f9406' .
+                '57e0e19db7dbb8d9daea8afb23a9b66f4dd1ddc171ed1213658a42c4bcf48a34720165aaae617b16f4a2bd9345fe00c5e6b3' .
+                'dd5924a02b728d9c51c9a769461e1367af7fc90d20641095e949518ff928a35fc350815fb18bd2090dcebd5c0feb749fa64b' .
+                '85aacbf9bccf1532ab3403e41d44d0d0749e63e6b4e5da4212ee65d65a4b2e18873226fa81125bb244aff83317d317a839e4' .
+                '18b4c63123f2',
+            'nonce' => '85067e4',
+            'hash' => '0000000546a81614053c4bcb263a0a76494ed2c0af10ce3e05552b8308d3a0a1',
         ],
         'test' => [
-            'date' => 1792595714,
+            'date' => 1792604822,
             'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxqAt9zKi9HSQlnsWrs8Vu3jpYukk7vaUTQ5ZpG8w5U0dsfOgintfaw2U' .
                 'CiFNXp7aUJ7BE38e6gW7iw3VRCwhAd341xy8NLgbikG3MF71LLRzcMBFgw8F8fusY2hacvE05bSWDC3PucV3UtHqrrlIijc5JwmK' .
                 'ffs6SOUSOQCOLhQqhsChtGYktAY2EmGZ3/DRWX4PQzy9ghobAbpNPq95MkvrAF0rKXDzGTYZ/HK4OKa1YLNIs1BuL0MEu2U81l1T' .
                 'fL8TQOjO5jCi7REzNRDBrr/yKIT2Xy3e0Onah/6w3KT/r9C5KO8NTUmXfkCwbBip+LBAJ1QuXWgdbC2vTSGRAwIDAQAB',
-            'signature' => '9af05619e5c4dc5aab75cd25f9f5ccb86abd5959a4de46f74679a0f0ce9d5953d1f1aaade285ddd1c4bb48e98a3ec99b57aa' .
-                'df848e0a2f622c7dd271c21acf703019a006ddba6448fbc9fbe877b4fd88f4087f016759e3dfe67d8e380582c763fb336652' .
-                '2eb42acd2ad6ba1808ce1b912368caa68532dc3fddd0649413866fc99d79bcaf49da06f46611aaf6c8421bab51d91923d02d' .
-                '1a479fa6e367fe64f5a4569edbfd8555ef88726061d5f36d84c27065563eecd5013a195692b355d069ea97e5dce59757c7c7' .
-                'b211ad6cd978e75b9ff060bc01f147ca9a3955e188c4868763ae289176c9383e4620de45e8d66dc74aecbdb7b3e414e626a6' .
-                'dbbe3a9e6a70',
-            'nonce' => '1540e27',
-            'hash' => '000000e9a1683319200a7f5bdefd21af4b3c5be0d5851b0f00c5698313743930',
+            'signature' => '6e06bc9e2573af3fd5de9bf012baf13934a5a9496fdf7ea667c28a444ab0c56f16a8b26fa670a74030b06d2734fe4cd07df4' .
+                'cdd275cabde7b709a9ab4737af6d55507584ed9041f5e676d4439812e2d8771bfeaa5c6ee09415f5a40072c7b0a4048fc995' .
+                'd767f45f0825e252e1244787b09b6bd24890c4ca568d4636e0e8f70cbe0a797ada488d5c81bd7e1a2d338a406de5d19c762a' .
+                'd90f3137af48c9d52d00baad193f5c68fadd70aacd1a6a2282f868c3f161ba6ce9ca4502a1ff1e299f038626f0e0a03788b4' .
+                '051a98177a57c44e08b5b09c6c570a13eb3bd8a6e8b7b2b9335c7bedab110833e4c3f4228d57a6e2fa211135814b055ea96e' .
+                'a89fdf6ad6d8',
+            'nonce' => '29812b6',
+            'hash' => '00000064243f3ccb1e6207df01ffe1290bbcbc1c89d554d4b03de34933be4c35',
         ],
         'dev' => [
-            'date' => 1792595615,
+            'date' => 1792604821,
             'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtxyHsTEQyrj55Dg5p6KV5lmClUFgVPNk3Xom6TKp3VzxHwWkux4hdRqY' .
                 'MpaFurTxsGJX1UtpfI/W+mumlaLDJzgpz0hroajuyaNXUtgz9mYZsZvQ/+csKYiuN/j5oiI3+wLu41iZPjfd7wVpHfWhQZ+5l3WU' .
                 'xOr/L8LJSuyXm/wpc/bAU5YTU4QqhCclTSvWvrE+PTat6smabTYypPD7lQiTpGt6bi6Un/kRRG7lpMvbUR6Y5+axjMmJicSs+Lsf' .
                 'rLJB6oL3e1MASr3c1sC538fay5VRtv07xnKJ2bDz/dIJ16oMdsfvhg7DeooBTMEAwZzhfDFWg9Ii+2Wy5uKXMwIDAQAB',
-            'signature' => '389cba780cb68eea68ec3e0b4fecc2e72150830850d2818932cb3ee04d70fd4efb6dccfdd72ad5b96bab5fcdb1e93b15b2be' .
-                '038ea96a719de5b9b58baa1425034767200d16f930287f99765545a1c97297d21cd243e6e5df6e820804ec8d77a507c1c351' .
-                'de2171505bc1ecee02aaac12bf4b14c22935b29bcae4700e9d918f985182977a747d2803fb4c4a5e83c5e892e3cfa4648ca0' .
-                '67af4557b0abc415a5bfe1060c4e2c8a16f34926a25bee51c6f0e52598288efd02a6b8b37a8da7439579e63b000a9ba7487a' .
-                'b51ec996eeea30d69d7b5044a42fa3861d92e4bcdfafd65a5a9a2b167a98d824eb5393ed03f5d11f765b0196aca3412feb0b' .
-                '1cfee78c77f8',
-            'nonce' => '638',
-            'hash' => '000047b7ab9d5ec1a74b023b0f8c7b4456fca7f7bfd7e660ee167c2f02f79859',
+            'signature' => '430f837ad09cfb6dfc1480f1259b9730c373d9cce0259a3f143636f6d8a44c57d9fadad5acdd7ce87e5c00510ce5a40bf9be' .
+                '2fd525c809dd2aee4976da4341babba3a50773c8f08fd57179f287cde2114b1a45f18154555a2e96b1f1e1bab37d88cba9c3' .
+                '73ad83549bdafc7deccb5452dc87b984866968a2e3e23829534b462af9636af9406878d4430261f58b98a662f63e1cba0b67' .
+                '8bc28e12c36edf3a40453d200d0c6bf5372c222157e2f9a3ae6d0c46c3e505eb7da43155d9068450553fefe75073fff09a7e' .
+                'd6d9526082bc51e0f20d6a51741a45251f19d691a00d80ccf963362a3d5fa8470c08848691f5b3ed0a5c12a3e0f7531d5ffe' .
+                '3488f67a2441',
+            'nonce' => '15c9a',
+            'hash' => '0000846ff2c1c83a30c9409e983693aea51c4f95adb914642eaa34035a776114',
         ],
     ];
 
@@ -179,7 +182,16 @@ class Block
         $spent = [];
         $fees = '0';
 
+        // leave room for the coinbase
+        $room = Config::getMaxBlockSize() - self::COINBASE_ROOM;
+
         foreach ($transactions as $tx) {
+            $size = Transaction::size($tx);
+
+            if ($size > $room) {
+                continue;
+            }
+
             $result = $this->transaction->validate($tx, $height);
 
             if ($result['validated'] !== true) {
@@ -203,6 +215,7 @@ class Block
 
             $fees = bcadd($fees, $result['fee']);
             $validTransactions[] = $tx;
+            $room -= $size;
         }
 
         // pay to public Key hash
@@ -563,6 +576,18 @@ class Block
         if ($transactionCount !== count($transactions)) {
             $reason .= 'transaction count mismatch,';
             $result = false;
+        }
+
+        $blockSize = 0;
+
+        foreach ($transactions as $transaction) {
+            $blockSize += is_array($transaction) ? Transaction::size($transaction) : 0;
+        }
+
+        if ($blockSize > Config::getMaxBlockSize()) {
+            $reason .= 'block is larger than ' . Config::getMaxBlockSize() . ' bytes,';
+
+            return $this->returnValidateResult($reason, false);
         }
 
         $transactionIds = [];

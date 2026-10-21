@@ -670,7 +670,7 @@ class ScriptTest extends TestCase
         Config::withEnvironment('live', fn () => $script->run(false));
 
         $sm = $script->debugGetStateMachine();
-        $this->assertEquals('Xa14BDGV11UKCHhjSQcHc4cfSky1dfkWPfnD', $sm->getRegister('ax'));
+        $this->assertEquals('Xa14BDGV11UKCHhjSQcHc4cfSky1dfmFdM8h', $sm->getRegister('ax'));
     }
 
     public function testVerificationOfAddressFromPublicKey(): void

@@ -50,7 +50,7 @@ class Transaction
                 (string)($txIn['tx_id'] ?? ''),
                 (string)($txIn['previous_transaction_id'] ?? ''),
                 (string)($txIn['previous_tx_out_id'] ?? ''),
-                $withInputScripts ? (string)($txIn['script'] ?? '') : '',
+                $withInputScripts ? $this->scriptDigest((string)($txIn['script'] ?? '')) : '',
             ];
         }
 
@@ -61,7 +61,7 @@ class Transaction
                 (string)($txOut['tx_id'] ?? ''),
                 (string)($txOut['address'] ?? ''),
                 (string)($txOut['value'] ?? ''),
-                (string)($txOut['script'] ?? ''),
+                $this->scriptDigest((string)($txOut['script'] ?? '')),
                 (string)($txOut['lock_height'] ?? ''),
             ];
         }
@@ -76,6 +76,50 @@ class Transaction
             $inputs,
             $outputs,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The size of a transaction in bytes, counted the same way on every node whatever JSON it arrived in.
+     *
+     * @param array $transaction
+     * @return int
+     */
+    public static function size(array $transaction): int
+    {
+        $text = static fn ($value): string => is_scalar($value) ? (string)$value : '';
+        $parts = [];
+
+        foreach (['version', 'date_created', 'height', 'peer', 'public_key', 'signature'] as $field) {
+            $parts[] = $text($transaction[$field] ?? '');
+        }
+
+        foreach ([self::INPUTS, self::OUTPUTS] as $section) {
+            foreach (is_array($transaction[$section] ?? null) ? $transaction[$section] : [] as $tx) {
+                foreach (['tx_id', 'previous_transaction_id', 'previous_tx_out_id', 'address', 'value', 'script',
+                             'lock_height'] as $field) {
+                    $parts[] = is_array($tx) ? $text($tx[$field] ?? '') : '';
+                }
+            }
+        }
+
+        return strlen(implode(',', $parts));
+    }
+
+    /**
+     * Scripts are compressed and the same script can be compressed in more than one way, so ids and signatures
+     * cover the script itself. Otherwise anyone relaying a transaction could change its id.
+     *
+     * @param string $encoded
+     * @return string
+     */
+    private function scriptDigest(string $encoded): string
+    {
+        $decoded = strlen($encoded) > Config::getMaxScriptLength()
+            ? false
+            : (new Script([]))->decodeScript($encoded, Config::getMaxDecodedScriptLength());
+
+        // a script that does not decode is refused by validate(), it still needs a stable digest
+        return $decoded === false ? 'x' . hash('sha256', $encoded) : hash('sha256', $decoded);
     }
 
     /**
@@ -385,6 +429,10 @@ class Transaction
         if (!isset($transaction[self::OUTPUTS]) || !is_array($transaction[self::OUTPUTS])
             || count($transaction[self::OUTPUTS]) === 0) {
             return $fail('at least one output is required,');
+        }
+
+        if (self::size($transaction) > Config::getMaxTransactionBytes()) {
+            return $fail('transaction is larger than ' . Config::getMaxTransactionBytes() . ' bytes,');
         }
 
         $height ??= (new Block())->getCurrentHeight() + 1;

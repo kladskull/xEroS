@@ -30,6 +30,7 @@ class NodeTest extends TestCase
         $env = getenv();
         $env['DB_FILE'] = self::$dbFile;
         $env['SEED_PEERS'] = '';
+        $env['BAN_SECONDS'] = '2';
         self::$process = proc_open(
             [PHP_BINARY, 'xero.php', '127.0.0.1', (string)self::$port],
             [0 => ['pipe', 'r'], 1 => ['file', self::$logFile, 'a'], 2 => ['file', self::$logFile, 'a']],
@@ -331,6 +332,61 @@ class NodeTest extends TestCase
 
         $this->send($socket, ['type' => 'peer_invite_req', 'port' => 70000]);
         $this->assertEquals('nok', $this->waitFor($socket, 'peer_invite_resp')['result']);
+    }
+
+    public function testTooManyConnectionsFromOneAddressAreRefused(): void
+    {
+        $open = [];
+
+        for ($i = 0; $i < 8; $i++) {
+            $open[] = $this->ready();
+        }
+
+        $extra = $this->connect();
+        $this->assertTrue($this->isClosed($extra, 2.0));
+
+        // once some close there is room again
+        foreach ($open as $socket) {
+            fclose($socket);
+        }
+
+        usleep(500000);
+        $socket = $this->ready();
+        $this->send($socket, ['type' => 'ping']);
+        $this->assertNotNull($this->waitFor($socket, 'pong'));
+    }
+
+    public function testPeerSendingBadDataIsBanned(): void
+    {
+        $socket = $this->ready();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->send($socket, '{not json');
+        }
+
+        $this->assertTrue($this->isClosed($socket));
+
+        // a new connection from the same address is refused while the ban lasts
+        $again = $this->connect();
+        $this->assertTrue($this->isClosed($again, 2.0));
+
+        // the test node bans for 2 seconds
+        sleep(3);
+        $socket = $this->ready();
+        $this->send($socket, ['type' => 'ping']);
+        $this->assertNotNull($this->waitFor($socket, 'pong'));
+    }
+
+    public function testAFewHonestMistakesDoNotBan(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $socket = $this->ready();
+            $this->send($socket, '{not json');
+            $this->send($socket, ['type' => 'mempool_transaction', 'transaction' => 'x']);
+            $this->send($socket, ['type' => 'ping']);
+            $this->assertNotNull($this->waitFor($socket, 'pong'), 'connection ' . $i);
+            fclose($socket);
+        }
     }
 
     public function testNodeLoggedNoFatalErrors(): void

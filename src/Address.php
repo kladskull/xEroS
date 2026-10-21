@@ -34,7 +34,8 @@ class Address
      */
     public function getAddressChecksum(string $addressRaw): string
     {
-        return substr(hash('sha256', $addressRaw), 0, 4);
+        // 4 bytes (32 bits), so about one mistyped address in 4 billion passes
+        return substr(hash('sha256', hash('sha256', $addressRaw, true), true), 0, 4);
     }
 
     /**
