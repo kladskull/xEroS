@@ -122,7 +122,9 @@ class OpenSsl
     public function signAndVerifyData(string $textToSign, string $publicPemKey, string $privatePemKey): string
     {
         // create signature
-        openssl_sign($textToSign, $signature, $privatePemKey, OPENSSL_ALGO_SHA256);
+        if (!@openssl_sign($textToSign, $signature, $privatePemKey, OPENSSL_ALGO_SHA256)) {
+            throw new RuntimeException('Cannot sign the data, the private key is not valid.');
+        }
 
         //verify signature
         $result = openssl_verify($textToSign, $signature, $publicPemKey, "sha256WithRSAEncryption");

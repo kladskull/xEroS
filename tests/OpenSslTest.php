@@ -94,4 +94,12 @@ class OpenSslTest extends TestCase
             ['\012345'],
         ];
     }
+
+    public function testSigningWithABadKeyThrows(): void
+    {
+        $keys = $this->openssl->createRsaKeyPair();
+
+        $this->expectException(\RuntimeException::class);
+        $this->openssl->signAndVerifyData('text', $keys['public_key'], 'not a key');
+    }
 }

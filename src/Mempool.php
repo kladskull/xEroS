@@ -380,7 +380,7 @@ class Mempool
      */
     private function stripRow(array $rows): array
     {
-        foreach ($rows as $key => $row) {
+        foreach (array_keys($rows) as $key) {
             unset($rows[$key]['id'], $rows[$key]['transaction_id'], $rows[$key]['spent']);
         }
 

@@ -92,7 +92,8 @@ class NetworkTest extends TestCase
             Config::withEnvironment($before === 'live' ? 'test' : 'live', function () {
                 throw new RuntimeException('boom');
             });
-        } catch (RuntimeException) {
+        } catch (RuntimeException $e) {
+            $this->assertEquals('boom', $e->getMessage());
         }
 
         $this->assertEquals($before, Config::getEnvironment());

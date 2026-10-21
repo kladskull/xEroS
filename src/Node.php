@@ -212,7 +212,7 @@ class Node
                             try {
                                 $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
 
-                                if (is_array($data) && isset($data['type'])) {
+                                if (is_array($data) && isset($data['type']) && is_string($data['type'])) {
                                     // a connection can send data before the main loop has set it up, set it up now so nothing is lost
                                     if (!isset($clientInfo[$key])) {
                                         $clientInfo[$key] = $this->clientInfoArray;
@@ -252,7 +252,7 @@ class Node
                                                 break;
 
                                             case 'error':
-                                                Console::log('Received error: ' . (string)($data['message'] ?? ''));
+                                                Console::log('Received error: ' . $this->text($data['message'] ?? ''));
                                                 break;
 
                                             default:
@@ -371,7 +371,7 @@ class Node
                                                 break;
 
                                             case 'height':
-                                                $height = $data['height'] ?: 0;
+                                                $height = (int)($data['height'] ?? 0);
                                                 Console::log('Received a height of ' . $height . ' request from: ' . $key);
                                                 $clientInfo[$key]['height'] = $height;
                                                 break;
@@ -384,13 +384,13 @@ class Node
                                                 $currentHeight = $this->block->getCurrentHeight();
                                                 $this->send($client, json_encode([
                                                     'type' => 'mempool_size',
-                                                    'height' => $this->mempool->getMempoolCount($currentHeight)
+                                                    'mempool_size' => $this->mempool->getMempoolCount($currentHeight)
                                                 ], JSON_THROW_ON_ERROR));
                                                 break;
 
                                             case 'mempool_size':
                                                 Console::log('Received a mempool response from: ' . $key);
-                                                $clientInfo[$key]['mempool_size'] = (int)$data['mempool_size'];
+                                                $clientInfo[$key]['mempool_size'] = (int)($data['mempool_size'] ?? 0);
                                                 break;
 
                                             case 'mempool_transaction':
@@ -477,7 +477,7 @@ class Node
 
                                             case 'version':
                                                 Console::log('Received peer version');
-                                                $clientInfo[$key]['version'] = $data['version'];
+                                                $clientInfo[$key]['version'] = (string)($data['version'] ?? '');
                                                 break;
 
                                             case 'version_req':
@@ -537,8 +537,7 @@ class Node
                                                 break;
 
                                             case 'peer_invite_resp':
-                                                $result = $data['result'];
-                                                Console::log('Peer invite response: ' . $result);
+                                                Console::log('Peer invite response: ' . $this->text($data['result'] ?? ''));
                                                 break;
 
                                             case 'peer_list':
@@ -555,8 +554,7 @@ class Node
                                              * misc
                                              */
                                             case 'error':
-                                                $message = $data['message'];
-                                                Console::log('Received error: ' . $message);
+                                                Console::log('Received error: ' . $this->text($data['message'] ?? ''));
                                                 break;
 
                                             default:
@@ -757,6 +755,14 @@ class Node
         }
 
         return $status;
+    }
+
+    /**
+     * A peer value safe to log, whatever type was sent.
+     */
+    private function text(mixed $value): string
+    {
+        return is_scalar($value) ? substr((string)$value, 0, 200) : gettype($value);
     }
 
     /**

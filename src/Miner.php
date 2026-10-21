@@ -48,9 +48,14 @@ class Miner
     public function hashOutput(float $hashesPerSecond): string
     {
         $magnitudes = ['hps', 'Khps', 'Mhps', 'Ghps', 'Thps', 'Phps', 'Ehps'];
-        $mag = log($hashesPerSecond, 1000);
 
-        return sprintf('%.2f%s', $hashesPerSecond / (1000 ** ((int)$mag)), $magnitudes[(int)$mag]);
+        if ($hashesPerSecond < 1) {
+            return sprintf('%.2f%s', max($hashesPerSecond, 0), $magnitudes[0]);
+        }
+
+        $mag = min((int)log($hashesPerSecond, 1000), count($magnitudes) - 1);
+
+        return sprintf('%.2f%s', $hashesPerSecond / (1000 ** $mag), $magnitudes[$mag]);
     }
 
     /**
@@ -83,7 +88,7 @@ class Miner
 
         $displayFreq = 1000000;
 
-        if ($_ENV['ENVIRONMENT'] !== 'live' && $_ENV['ENVIRONMENT'] !== 'production') {
+        if (Config::getEnvironment() !== 'live') {
             $displayFreq = 25000;
         }
 
