@@ -231,7 +231,8 @@ class Block
         $coinbase = [
             'date_created' => $date,
             'public_key' => $publicKeyRaw,
-            'peer' => $this->peer->getUniquePeerId(),
+            // a fixed value, a per machine id here would link every block one machine mines
+            'peer' => 'miner',
             'version' => TransactionVersion::COINBASE,
             'height' => $height,
             Transaction::INPUTS => [],
@@ -542,7 +543,8 @@ class Block
         }
 
         // ensure a sane time
-        if ((int)$block['date_created'] > time() + 60) {
+        // as in Bitcoin, the median time rule keeps miners honest, this only guards against far off clocks
+        if ((int)$block['date_created'] > time() + Config::getMaxFutureBlockTime()) {
             $reason .= 'block from the future,';
             $result = false;
         }
@@ -1481,6 +1483,35 @@ class Block
     }
 
     /**
+     * True if a block built on $parent would be on the active chain or a branch that left it no more than
+     * Config::getMaxReorgDepth() blocks below our tip. Blocks on older branches are not worth storing: they could
+     * never become the chain, and mining them early in the chain is cheap.
+     *
+     * @param array $parent
+     * @return bool
+     */
+    public function isWithinReorgDepth(array $parent): bool
+    {
+        $limit = $this->getCurrentHeight() - Config::getMaxReorgDepth();
+        $current = $parent;
+
+        // walk back to where the branch meets the active chain
+        while ((int)$current['orphan'] !== 0) {
+            if ((int)$current['height'] <= $limit || (string)$current['previous_block_id'] === '') {
+                return false;
+            }
+
+            $current = $this->getByBlockId((string)$current['previous_block_id']);
+
+            if (empty($current)) {
+                return false;
+            }
+        }
+
+        return (int)$current['height'] >= $limit;
+    }
+
+    /**
      * Makes the chain ending at $newTip the active chain. Active blocks above the fork point are reversed, then
      * the new branch is fully validated and accepted from the bottom up. It all happens in one database
      * transaction, so if any block on the branch fails the old chain is left exactly as it was.
@@ -1509,6 +1540,13 @@ class Block
         }
 
         $forkHeight = (int)$current['height'];
+
+        if ($this->getCurrentHeight() - $forkHeight > Config::getMaxReorgDepth()) {
+            Console::log('Refusing to reorganize past ' . Config::getMaxReorgDepth() . ' blocks');
+
+            return false;
+        }
+
         $this->reversedTransactions = [];
 
         // inside someone else's transaction a savepoint gives us the same all or nothing behaviour

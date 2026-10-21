@@ -12,10 +12,26 @@ echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
 $usage = "usage:\n" .
     "  php send.php balance\n" .
+    "  php send.php encrypt     encrypt the stored private keys with WALLET_PASSPHRASE\n" .
     "  php send.php <address> <amount in coins> [node ip] [node port]\n\n" .
     "Pays from the newest account (the one the miner uses) through a running node.\n";
 
-$account = (new Account())->getNewestAccount();
+if (($argv[1] ?? '') === 'encrypt') {
+    try {
+        echo 'Encrypted ', (new Account())->encryptStoredKeys(Config::getWalletPassphrase()), ' private keys.', PHP_EOL;
+        exit(0);
+    } catch (Throwable $e) {
+        echo $e->getMessage(), PHP_EOL;
+        exit(1);
+    }
+}
+
+try {
+    $account = (new Account())->getNewestAccount();
+} catch (Throwable $e) {
+    echo $e->getMessage(), PHP_EOL;
+    exit(1);
+}
 
 if ($account === null) {
     echo "No account yet, run the miner once to create one.\n";

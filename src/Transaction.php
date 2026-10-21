@@ -106,6 +106,20 @@ class Transaction
     }
 
     /**
+     * The smallest fee for a transaction of $size bytes: a fee for every started 1000 bytes, and never less than
+     * the flat minimum. Large transactions pay more, so filling blocks is not cheap.
+     *
+     * @param int $size
+     * @return string
+     */
+    public static function minimumFee(int $size): string
+    {
+        $bySize = bcmul((string)intdiv($size + 999, 1000), Config::getFeePerKb());
+
+        return bccomp($bySize, Config::getMinimumTransactionFee()) > 0 ? $bySize : Config::getMinimumTransactionFee();
+    }
+
+    /**
      * Scripts are compressed and the same script can be compressed in more than one way, so ids and signatures
      * cover the script itself. Otherwise anyone relaying a transaction could change its id.
      *
@@ -618,8 +632,10 @@ class Transaction
 
         $fee = bcsub($totalInputs, $totalOutputs);
 
-        if (bccomp($fee, Config::getMinimumTransactionFee()) < 0) {
-            $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
+        $minimumFee = self::minimumFee(self::size($transaction));
+
+        if (bccomp($fee, $minimumFee) < 0) {
+            $reason .= 'fee (' . $fee . ') is less than minimum (' . $minimumFee . '),';
             $result = false;
         }
 

@@ -37,7 +37,7 @@ class Account
         $stmt = DatabaseHelpers::filterBind($stmt, 'id', $id, DatabaseHelpers::INT);
         $stmt->execute();
 
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $this->unlock($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
     }
 
     /**
@@ -49,7 +49,7 @@ class Account
             'ORDER BY id DESC LIMIT 1';
         $stmt = $this->db->query($query);
 
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $this->unlock($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
     }
 
     /**
@@ -64,7 +64,7 @@ class Account
         $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::TEXT);
         $stmt->execute();
 
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $this->unlock($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
     }
 
     /**
@@ -79,7 +79,101 @@ class Account
         $stmt = DatabaseHelpers::filterBind($stmt, 'public_key_raw', $publicKeyRaw, DatabaseHelpers::TEXT);
         $stmt->execute();
 
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $this->unlock($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
+    }
+
+    /**
+     * Private keys are stored encrypted when WALLET_PASSPHRASE is set. This hands back the row with the key
+     * decrypted, in memory only.
+     *
+     * @param array|null $account
+     * @return array|null
+     */
+    private function unlock(?array $account): ?array
+    {
+        if ($account === null || !self::isEncrypted((string)$account['private_key'])) {
+            return $account;
+        }
+
+        $account['private_key'] = self::decryptKey((string)$account['private_key'], Config::getWalletPassphrase());
+
+        return $account;
+    }
+
+    /**
+     * @param string $privateKey PEM
+     * @return bool
+     */
+    public static function isEncrypted(string $privateKey): bool
+    {
+        return str_contains($privateKey, 'ENCRYPTED PRIVATE KEY');
+    }
+
+    /**
+     * @param string $privateKey PEM
+     * @param string $passphrase
+     * @return string encrypted PEM
+     */
+    public static function encryptKey(string $privateKey, string $passphrase): string
+    {
+        $key = openssl_pkey_get_private($privateKey);
+
+        if ($key === false || !openssl_pkey_export($key, $encrypted, $passphrase, [
+                'encrypt_key_cipher' => OPENSSL_CIPHER_AES_256_CBC,
+            ])) {
+            throw new RuntimeException('cannot encrypt the private key');
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * @param string $privateKey encrypted PEM
+     * @param string $passphrase
+     * @return string PEM
+     */
+    public static function decryptKey(string $privateKey, string $passphrase): string
+    {
+        if ($passphrase === '') {
+            throw new RuntimeException('the wallet is encrypted, set WALLET_PASSPHRASE');
+        }
+
+        $key = @openssl_pkey_get_private($privateKey, $passphrase);
+
+        if ($key === false || !openssl_pkey_export($key, $plain)) {
+            throw new RuntimeException('cannot decrypt the private key, check WALLET_PASSPHRASE');
+        }
+
+        return $plain;
+    }
+
+    /**
+     * Encrypts every stored private key that is not encrypted yet. Returns how many were changed.
+     *
+     * @param string $passphrase
+     * @return int
+     */
+    public function encryptStoredKeys(string $passphrase): int
+    {
+        if ($passphrase === '') {
+            throw new RuntimeException('set WALLET_PASSPHRASE first');
+        }
+
+        $rows = $this->db->query('SELECT `id`,`private_key` FROM accounts')->fetchAll(PDO::FETCH_ASSOC);
+        $update = $this->db->prepare('UPDATE accounts SET private_key=:private_key WHERE id=:id');
+        $count = 0;
+
+        foreach ($rows as $row) {
+            if (!self::isEncrypted((string)$row['private_key'])) {
+                $update->execute([
+                    ':private_key' => self::encryptKey((string)$row['private_key'], $passphrase),
+                    ':id' => $row['id'],
+                ]);
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     /**
@@ -96,6 +190,11 @@ class Account
 
             $keys = $this->openSsl->createRsaKeyPair();
             $address = $this->address->create($keys['public_key']);
+            $passphrase = Config::getWalletPassphrase();
+
+            if ($passphrase !== '') {
+                $keys['private_key'] = self::encryptKey($keys['private_key'], $passphrase);
+            }
             $dateCreated = time();
 
             // prepare the statement and execute
