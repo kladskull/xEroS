@@ -52,12 +52,19 @@ foreach ($argv as $arg) {
 }
 
 // use the newest key pair
-$acct = $account->getNewestAccount();
-if ($acct === null || $createKeypair) {
-    // do we need to create a new key pair?
-    $id = $account->create();
-    $acct = $account->get($id);
-    Console::log('new key pair created');
+try {
+    $acct = $account->getNewestAccount();
+
+    if ($acct === null || $createKeypair) {
+        // do we need to create a new key pair?
+        $id = $account->create();
+        $acct = $account->get($id);
+        Console::log('new key pair created');
+    }
+} catch (Throwable $e) {
+    // an encrypted wallet without the right WALLET_PASSPHRASE
+    Console::log($e->getMessage());
+    exit(1);
 }
 $publicKey = $acct['public_key'];
 $privateKey = $acct['private_key'];

@@ -42,7 +42,11 @@ php xero.php            # the node, connects to peers and syncs the chain
 php miner.php           # mines on top of the node's chain, creates a key pair on first run
 php send.php balance    # spendable coins for the miner's key
 php send.php <address> <amount>   # pay someone through the running node
+php send.php encrypt    # encrypt stored private keys with WALLET_PASSPHRASE
 ```
+
+Set `WALLET_PASSPHRASE` to keep private keys encrypted in the database. Give it in the environment when starting
+the node and miner (`WALLET_PASSPHRASE=... php miner.php`) rather than writing it in `.env` next to the database.
 
 ## Tests
 ```

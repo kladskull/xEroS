@@ -334,6 +334,69 @@ class NodeTest extends TestCase
         $this->assertEquals('nok', $this->waitFor($socket, 'peer_invite_resp')['result']);
     }
 
+    public function testBlocksAreSentInRuns(): void
+    {
+        // bare blocks 2 to 61 in the node's database, removed again at the end
+        $copy = new \PDO('sqlite:' . self::$dbFile);
+        $genesis = (new Block())->getByHeight(1);
+        $stmt = $copy->prepare(
+            'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
+            '`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan`,`accepted`) VALUES ' .
+            "(:n,:b,:p,1,:h,'0',16,'',0,'','',0,1)"
+        );
+        $previous = $genesis['block_id'];
+
+        for ($height = 2; $height <= 61; $height++) {
+            $stmt->execute([':n' => Config::getNetworkIdentifier(), ':b' => 'run' . $height, ':p' => $previous, ':h' => $height]);
+            $previous = 'run' . $height;
+        }
+
+        try {
+            $socket = $this->ready();
+
+            $this->send($socket, ['type' => 'block_req', 'height' => 2, 'count' => 5]);
+            $heights = [];
+
+            for ($i = 0; $i < 5; $i++) {
+                $heights[] = (int)$this->waitFor($socket, 'block')['block']['height'];
+            }
+
+            $this->assertEquals([2, 3, 4, 5, 6], $heights);
+
+            // capped at 50, and it stops at the tip
+            $this->send($socket, ['type' => 'block_req', 'height' => 2, 'count' => 500]);
+            $received = 0;
+
+            while ($this->waitFor($socket, 'block', 1.0) !== null) {
+                $received++;
+            }
+
+            $this->assertEquals(50, $received);
+
+            $this->send($socket, ['type' => 'block_req', 'height' => 58, 'count' => 50]);
+            $received = 0;
+
+            while ($this->waitFor($socket, 'block', 1.0) !== null) {
+                $received++;
+            }
+
+            $this->assertEquals(4, $received);
+        } finally {
+            $copy->exec("DELETE FROM blocks WHERE block_id LIKE 'run%'");
+        }
+    }
+
+    public function testLogShowsPacketTypesNotContents(): void
+    {
+        $socket = $this->ready();
+        $this->send($socket, ['type' => 'block_req', 'height' => 1]);
+        $this->waitFor($socket, 'block');
+
+        $log = (string)file_get_contents(self::$logFile);
+        $this->assertMatchesRegularExpression('/SEND: block \(\d+ bytes\)/', $log);
+        $this->assertStringNotContainsString('"transactions"', $log);
+    }
+
     public function testTooManyConnectionsFromOneAddressAreRefused(): void
     {
         $open = [];

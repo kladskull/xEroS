@@ -26,6 +26,7 @@ class Config
     // Coin
     private const DEFAULT_BLOCK_REWARD = "5000000000";
     private const MINIMUM_FEE = "10000000"; // 0.1 xc
+    private const FEE_PER_KB = "1000000"; // 0.01 xc for every started 1000 bytes, see Transaction::minimumFee()
     private const MAX_CURRENCY_SUPPLY = "21000000000000000"; // Satoshi's per coin x 210,000,000
     private const MAX_TRANSACTION_SIZE = 100;
 
@@ -39,6 +40,12 @@ class Config
     private const MAX_LOOPS = 100;
     private const MAX_SCRIPT_LENGTH = 2048;
     private const MAX_DECODED_SCRIPT_LENGTH = 4096; // scripts are compressed, this caps what they expand to
+
+    // the chain never switches to a branch that left it more than this many blocks below the tip
+    private const MAX_REORG_DEPTH = 144;
+
+    // a block may be dated this far ahead of our clock
+    private const MAX_FUTURE_BLOCK_TIME = 7200;
 
     // Size limits in bytes, see Transaction::size(). A full block stays well under the 4MB network packet limit.
     private const MAX_BLOCK_SIZE = 1000000;
@@ -308,6 +315,22 @@ class Config
     /**
      * @return int
      */
+    public static function getMaxReorgDepth(): int
+    {
+        return self::MAX_REORG_DEPTH;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getMaxFutureBlockTime(): int
+    {
+        return self::MAX_FUTURE_BLOCK_TIME;
+    }
+
+    /**
+     * @return int
+     */
     public static function getMaxBlockSize(): int
     {
         return self::MAX_BLOCK_SIZE;
@@ -319,6 +342,19 @@ class Config
     public static function getMaxTransactionBytes(): int
     {
         return self::MAX_TRANSACTION_BYTES;
+    }
+
+    /**
+     * Encrypts the private keys in the accounts table when set. Best given in the environment when the node
+     * starts rather than written in .env next to the database.
+     *
+     * @return string
+     */
+    public static function getWalletPassphrase(): string
+    {
+        $passphrase = $_ENV['WALLET_PASSPHRASE'] ?? getenv('WALLET_PASSPHRASE');
+
+        return is_string($passphrase) ? $passphrase : '';
     }
 
     /**
@@ -371,6 +407,14 @@ class Config
     public static function getMaxUnspentTransactionCount(): int
     {
         return self::MAX_UNSPENT_PER_TRANSACTION;
+    }
+
+    /**
+     * @return string
+     */
+    public static function getFeePerKb(): string
+    {
+        return self::FEE_PER_KB;
     }
 
     /**

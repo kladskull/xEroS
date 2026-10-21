@@ -134,4 +134,29 @@ class DifficultyTest extends TestCase
 
         $this->assertEquals(20, $this->block->getNextDifficulty($tip));
     }
+
+    public function testBranchesThatSplitTooLongAgoAreRefused(): void
+    {
+        $tip = $this->buildChain(200, 60, 20);
+        $stmt = $this->db->prepare(
+            'INSERT INTO blocks (`network_id`,`block_id`,`previous_block_id`,`date_created`,`height`,`nonce`,' .
+            '`difficulty`,`merkle_root`,`transaction_count`,`previous_hash`,`hash`,`orphan`,`accepted`) VALUES ' .
+            "(:n,:b,:p,1,:h,'0',20,'',1,'','',1,0)"
+        );
+
+        // side blocks hanging off the active chain at heights 50 and 100
+        foreach ([50, 100] as $height) {
+            $stmt->execute([':n' => Config::getNetworkIdentifier(), ':b' => 'side' . $height,
+                ':p' => 'd' . $height, ':h' => $height + 1]);
+        }
+
+        $limit = 200 - Config::getMaxReorgDepth();
+        $this->assertTrue($this->block->isWithinReorgDepth($tip));
+        $this->assertSame(100 >= $limit, $this->block->isWithinReorgDepth($this->block->getByBlockId('side100')));
+        $this->assertFalse($this->block->isWithinReorgDepth($this->block->getByBlockId('side50')));
+
+        // and the chain never reorganizes onto one
+        $this->assertFalse($this->block->reorganize($this->block->getByBlockId('side50')));
+        $this->assertEquals($tip['block_id'], $this->block->getCurrent()['block_id']);
+    }
 }

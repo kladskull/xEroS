@@ -26,6 +26,8 @@ class Node
     private const MAX_PEER_LIST = 100;
     private const MAX_PENDING_BLOCKS = 500;
     private const SYNC_REQUEST_TIMEOUT = 30;
+    private const SYNC_BATCH = 50;
+    private const SEND_TIMEOUT = 10;
     private const DIAL_INTERVAL = 10;
     private const SOLO_GRACE_PERIOD = 30;
     private const MEMPOOL_EVICT_INTERVAL = 60;
@@ -72,12 +74,40 @@ class Node
     #[NoReturn]
     public function send($client, string $data): void
     {
+        // log the type only, a block can be megabytes
+        $type = preg_match('/"type":"([a-z_]+)"/', substr($data, 0, 64), $match) ? $match[1] : '?';
+        Console::log('SEND: ' . $type . ' (' . strlen($data) . ' bytes)');
+
         // add a newline for back-to-back sends
-        Console::log('SEND: ' . trim($data));
         $data = trim($data) . "\n";
 
-        if (is_resource($client) && fwrite($client, $data, strlen($data)) === false) {
-            Console::log('Cannot write to socket');
+        if (!is_resource($client)) {
+            return;
+        }
+
+        // a large packet may only partly fit in the socket buffer, keep writing until it is all sent
+        $deadline = microtime(true) + self::SEND_TIMEOUT;
+
+        while ($data !== '' && microtime(true) < $deadline) {
+            $written = @fwrite($client, $data);
+
+            if ($written === false || ($written === 0 && feof($client))) {
+                Console::log('Cannot write to socket');
+
+                return;
+            }
+
+            $data = (string)substr($data, $written);
+
+            if ($data !== '') {
+                $read = $except = null;
+                $write = [$client];
+                @stream_select($read, $write, $except, 0, 100000);
+            }
+        }
+
+        if ($data !== '') {
+            Console::log('Timed out sending to socket, ' . strlen($data) . ' bytes not sent');
         }
     }
 
@@ -337,13 +367,18 @@ class Node
                                                         'type' => 'block_req',
                                                         'block_id' => (string)$block['previous_block_id'],
                                                     ], JSON_THROW_ON_ERROR));
-                                                    $this->syncRequest = ['key' => $key, 'time' => time()];
+                                                    $this->syncRequest = ['key' => $key, 'time' => time(), 'until' => 0];
                                                     break;
                                                 }
 
-                                                // the answer we were waiting for has arrived
+                                                // a batch keeps arriving from the sync peer, wait for the rest of it
                                                 if ($this->syncRequest !== null && $this->syncRequest['key'] === $key) {
-                                                    $this->syncRequest = null;
+                                                    if ($status !== 'invalid' && $status !== 'stale'
+                                                        && $this->block->getCurrentHeight() < $this->syncRequest['until']) {
+                                                        $this->syncRequest['time'] = time();
+                                                    } else {
+                                                        $this->syncRequest = null;
+                                                    }
                                                 }
 
                                                 // tell everyone else about a new tip
@@ -367,21 +402,25 @@ class Node
                                                 Console::log('Received a block request from: ' . $key);
                                                 $blockId = $data['block_id'] ?? null;
                                                 $height = (int)($data['height'] ?? 0);
+                                                $count = 1;
 
                                                 if (is_string($blockId) && $blockId !== '') {
                                                     $block = $this->block->getByBlockId($blockId);
                                                 } elseif ($height !== 0) {
+                                                    // a syncing node can ask for a run of blocks
+                                                    $count = max(1, min(self::SYNC_BATCH, (int)($data['count'] ?? 1)));
                                                     $block = $this->block->getByHeight($height);
                                                 } else {
                                                     $block = $this->block->getCurrent();
                                                 }
 
-                                                // only answer with blocks we have
-                                                if (!empty($block)) {
+                                                // only answer with blocks we have, in order
+                                                for ($i = 0; $i < $count && !empty($block); $i++) {
                                                     $this->send($client, json_encode([
                                                         'type' => 'block',
                                                         'block' => $this->block->assembleFullBlock($block['block_id'])
                                                     ], JSON_THROW_ON_ERROR));
+                                                    $block = $this->block->getByHeight($height + $i + 1);
                                                 }
                                                 break;
 
@@ -757,6 +796,12 @@ class Node
         // branch gets that check if the branch ever becomes the chain
         $tip = $this->block->getCurrent();
         $extendsTip = $parent['block_id'] === $tip['block_id'];
+
+        if (!$extendsTip && !$this->block->isWithinReorgDepth($parent)) {
+            Console::log('Ignoring block ' . $block['block_id'] . ' on a branch that split off too long ago');
+
+            return 'stale';
+        }
         $result = $this->block->validateFullBlock($block, $extendsTip);
 
         if (!$result['validated']) {
@@ -946,12 +991,15 @@ class Node
         }
 
         if ($bestKey !== null && $this->syncRequest === null) {
-            Console::log('Requesting block ' . ($localHeight + 1) . ' of ' . $bestHeight . ' from client: ' . $bestKey);
+            $count = min(self::SYNC_BATCH, $bestHeight - $localHeight);
+            Console::log('Requesting blocks ' . ($localHeight + 1) . ' to ' . ($localHeight + $count) . ' of ' .
+                $bestHeight . ' from client: ' . $bestKey);
             $this->send($clients[$bestKey], json_encode([
                 'type' => 'block_req',
                 'height' => $localHeight + 1,
+                'count' => $count,
             ], JSON_THROW_ON_ERROR));
-            $this->syncRequest = ['key' => $bestKey, 'time' => time()];
+            $this->syncRequest = ['key' => $bestKey, 'time' => time(), 'until' => $localHeight + $count];
         }
 
         if ($bestKey !== null) {

@@ -117,13 +117,48 @@ class Wallet
      * @param array $account an accounts row
      * @param string $toAddress
      * @param string $amount base units
-     * @param string|null $fee base units, the minimum fee if null
+     * @param string|null $fee base units, the smallest fee the transaction's size allows if null
      * @return array
      */
     public function createTransfer(array $account, string $toAddress, string $amount, ?string $fee = null): array
     {
-        $fee ??= Config::getMinimumTransactionFee();
+        if ($fee !== null) {
+            $tx = $this->build($account, $toAddress, $amount, $fee);
+            $minimum = Transaction::minimumFee(Transaction::size($tx));
 
+            if (bccomp($fee, $minimum) < 0) {
+                throw new RuntimeException('the fee must be at least ' . $minimum . ' for this transaction');
+            }
+
+            return $tx;
+        }
+
+        // the fee depends on the size, and the size on how many outputs the fee makes us spend
+        $fee = Config::getMinimumTransactionFee();
+
+        for ($i = 0; $i < 5; $i++) {
+            $tx = $this->build($account, $toAddress, $amount, $fee);
+            $minimum = Transaction::minimumFee(Transaction::size($tx));
+
+            if (bccomp($fee, $minimum) >= 0) {
+                return $tx;
+            }
+
+            $fee = $minimum;
+        }
+
+        throw new RuntimeException('could not settle on a fee');
+    }
+
+    /**
+     * @param array $account
+     * @param string $toAddress
+     * @param string $amount
+     * @param string $fee
+     * @return array
+     */
+    private function build(array $account, string $toAddress, string $amount, string $fee): array
+    {
         if (!$this->address->validateAddress($toAddress)) {
             throw new RuntimeException('invalid address: ' . $toAddress);
         }

@@ -340,4 +340,57 @@ class TransactionTest extends TestCase
             $this->assertStringNotContainsString('SCAN', $plan, $query);
         }
     }
+
+    public function testMinimumFeeGrowsWithSize(): void
+    {
+        $flat = Config::getMinimumTransactionFee();
+
+        $this->assertEquals($flat, Transaction::minimumFee(500));
+        $this->assertEquals($flat, Transaction::minimumFee(10000));
+        $this->assertEquals(bcmul('11', Config::getFeePerKb()), Transaction::minimumFee(10001));
+        $this->assertEquals(bcmul('200', Config::getFeePerKb()), Transaction::minimumFee(200000));
+    }
+
+    public function testLargeTransactionPayingTheFlatFeeIsRefused(): void
+    {
+        $tx = $this->validTransfer();
+        $output = $tx[Transaction::OUTPUTS][0];
+        $count = 80;
+        $tx[Transaction::OUTPUTS] = [];
+
+        // the same total paid out over many outputs, so only the fee rule can fail
+        for ($i = 0; $i < $count; $i++) {
+            $tx[Transaction::OUTPUTS][] = array_merge($output, [
+                'tx_id' => (string)$i,
+                'value' => $i === 0
+                    ? bcsub($this->spendAmount(), (string)($count - 1))
+                    : '1',
+            ]);
+        }
+
+        $tx = $this->resign($tx);
+        $this->assertGreaterThan(10000, Transaction::size($tx));
+        $this->assertRefused($tx, 'less than minimum');
+    }
+
+    public function testBlockAnHourAheadIsFineButNotThreeHours(): void
+    {
+        $height = $this->block->getCurrentHeight() + 1;
+        $base = $this->block->getCandidateBlock($height, $this->owner['public_key'], $this->owner['private_key']);
+
+        foreach ([3600 => true, 3 * 3600 => false] as $ahead => $allowed) {
+            $block = $base;
+            $block['date_created'] = time() + $ahead;
+            $block['block_id'] = $this->block->generateId(
+                Config::getNetworkIdentifier(),
+                $block['previous_block_id'],
+                $block['date_created'],
+                $height,
+                $block['merkle_root']
+            );
+            $result = $this->block->validateFullBlock($this->mine($block));
+
+            $this->assertSame(!$allowed, str_contains($result['reason'], 'block from the future'), $ahead . 's');
+        }
+    }
 }
