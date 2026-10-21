@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: [ '8.4', '8.5' ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: bcmath, curl, mbstring, pdo_sqlite, sqlite3, xml, zip, sockets, zlib, openssl, pcntl
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress
+
+      - run: cp .env_sample .env
+
+      - run: ./phinx migrate
+
+      - run: vendor/bin/phpunit --bootstrap bootstrap.php tests

@@ -11,7 +11,7 @@ class Queue
 {
     private PDO $db;
 
-    public function __construct(PDO $db = null)
+    public function __construct(?PDO $db = null)
     {
         if ($db == null) {
             $db = Database::getInstance();

@@ -48,6 +48,21 @@ class Mempool
                 return false;
             }
 
+            if ($this->getMempoolCount(PHP_INT_MAX) >= Config::getMaxMempoolTransactions()) {
+                Console::log('Mempool is full');
+
+                return false;
+            }
+
+            // a transaction for a far off height would sit here and never be mined
+            if ((int)$transaction['height'] > (new Block())->getCurrentHeight() + 1) {
+                return false;
+            }
+
+            if ((int)$transaction['date_created'] < time() - Config::getMempoolExpiry()) {
+                return false;
+            }
+
             // first seen wins, a second transaction spending the same output is not accepted
             foreach ($transaction[Transaction::INPUTS] as $txIn) {
                 if ($this->isOutputSpent($txIn['previous_transaction_id'], (int)$txIn['previous_tx_out_id'])) {
@@ -150,6 +165,35 @@ class Mempool
         }
 
         return true;
+    }
+
+    /**
+     * Drops transactions that are too old or no longer valid on the active chain, e.g. their inputs were spent
+     * by a block. Returns how many were removed.
+     *
+     * @param int $height the height of the next block
+     * @return int
+     */
+    public function evictStale(int $height): int
+    {
+        $stmt = $this->db->prepare('SELECT `transaction_id`,`date_created`,`peer`,`height`,`version`,' .
+            '`signature`,`public_key` FROM mempool_transactions ORDER BY `date_created`, `id`');
+        $stmt->execute();
+        $expiry = time() - Config::getMempoolExpiry();
+        $evicted = 0;
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $transaction) {
+            $transaction[self::INPUTS] = $this->stripRow($this->getTransactionInputs($transaction['transaction_id']));
+            $transaction[self::OUTPUTS] = $this->stripRow($this->getTransactionOutputs($transaction['transaction_id']));
+
+            if ((int)$transaction['date_created'] < $expiry
+                || $this->transaction->validate($transaction, $height)['validated'] !== true) {
+                $this->delete($transaction['transaction_id']);
+                $evicted++;
+            }
+        }
+
+        return $evicted;
     }
 
     /**

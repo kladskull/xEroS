@@ -1,7 +1,7 @@
 # Xeros
 
 ![GitHub](https://img.shields.io/github/license/kladskull/xeros?style=flat)
-[![Build Status](https://app.travis-ci.com/kladskull/xeros.svg?branch=main)](https://app.travis-ci.com/kladskull/xeros)
+[![Tests](https://github.com/kladskull/xEroS/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/kladskull/xEroS/actions/workflows/tests.yml)
 [![Code Intelligence Status](https://scrutinizer-ci.com/g/kladskull/xeros/badges/code-intelligence.svg?b=main)](https://scrutinizer-ci.com/code-intelligence)
 
 Xeros is a digital currency that allows instant payments to anyone, anywhere. Xeros has been written completely in PHP
@@ -19,23 +19,43 @@ in the next month or two - once I have some higher priority tasks are done in th
 project.
 
 ## Install
+Needs PHP 8.4 or newer.
 ```
 apt update -y && apt upgrade -y
 apt install -y software-properties-common
 add-apt-repository -y ppa:ondrej/php
 apt update
-apt install -y unzip curl 
-apt install -y php8.1 php8.1-common php8.1-sqlite3 php8.1-xml php8.1-xmlrpc php8.1-curl php8.1-cli php8.1-mbstring php8.1-bcmath php8.1-zip
-php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-php -r "if (hash_file('sha384', 'composer-setup.php') === '906a84df04cea2aa72f40b5f787e49f22d4c2f19492ac310e8cba5b96ac8b64115ac402c8cd292b8a03482574915d1a8') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
-php composer-setup.php
-php -r "unlink('composer-setup.php');"
-sudo mv composer.phar /usr/local/bin/composer
+apt install -y unzip curl
+apt install -y php8.4-cli php8.4-common php8.4-sqlite3 php8.4-xml php8.4-curl php8.4-mbstring php8.4-bcmath php8.4-zip
+```
+Install composer from https://getcomposer.org/download/, then:
+```
 cd xeros
 cp .env_sample .env
 composer install
 ./phinx migrate
 ```
+
+## Running
+```
+php xero.php            # the node, connects to peers and syncs the chain
+php miner.php           # mines on top of the node's chain, creates a key pair on first run
+php send.php balance    # spendable coins for the miner's key
+php send.php <address> <amount>   # pay someone through the running node
+```
+
+## Tests
+```
+vendor/bin/phpunit --bootstrap bootstrap.php tests
+```
+
+## Genesis blocks
+Each network's first block is fixed in `Block::GENESIS`. To make a new one, mine it with the key that gets the first
+reward and paste the output into `Block::GENESIS`:
+```
+php genesis.php live /path/to/private.key
+```
+Nodes on that network then need a new database.
 
 ## Change log
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.

@@ -2,10 +2,14 @@
 
 namespace Blockchain;
 
+use Throwable;
+
 use function hash;
+use function hash_equals;
 use function hex2bin;
 use function rtrim;
 use function str_starts_with;
+use function strlen;
 use function substr;
 
 /**
@@ -13,6 +17,8 @@ use function substr;
  */
 class Address
 {
+    private const BINARY_LENGTH = 25;
+
     private TransferEncoding $transferEncoding;
     private OpenSsl $openssl;
 
@@ -76,22 +82,37 @@ class Address
     }
 
     /**
+     * An address is the header, then base58 of version (1 byte) + ripemd160 (20 bytes) + checksum (4 bytes).
+     *
      * @param string $address
      * @return bool
      */
     public function validateAddress(string $address): bool
     {
-        if (!str_starts_with($address, Config::getAddressHeader())) {
+        $header = Config::getAddressHeader();
+
+        if (!str_starts_with($address, $header) || strlen($address) > 64) {
             return false;
         }
 
-        $b58Part = substr($address, 2); // Bc
-        $binaryAddress = $this->transferEncoding->decodeBase58($b58Part);
+        try {
+            $binaryAddress = $this->transferEncoding->decodeBase58(substr($address, strlen($header)));
+        } catch (Throwable) {
+            return false;
+        }
+
+        if (strlen($binaryAddress) !== self::BINARY_LENGTH) {
+            return false;
+        }
+
+        // an address from another chain (testnet vs live) is not valid here
+        if ($binaryAddress[0] !== hex2bin(Config::getChainVersion())) {
+            return false;
+        }
+
         $checkSum = substr($binaryAddress, -4);
-        $binaryAddressForChecksum = substr($binaryAddress, 0, -4);
+        $generatedCheckSum = $this->getAddressChecksum(substr($binaryAddress, 0, -4));
 
-        $generatedCheckSum = $this->getAddressChecksum($binaryAddressForChecksum);
-
-        return ($generatedCheckSum === $checkSum);
+        return hash_equals($generatedCheckSum, $checkSum);
     }
 }

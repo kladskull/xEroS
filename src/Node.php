@@ -28,6 +28,7 @@ class Node
     private const SYNC_REQUEST_TIMEOUT = 30;
     private const DIAL_INTERVAL = 10;
     private const SOLO_GRACE_PERIOD = 30;
+    private const MEMPOOL_EVICT_INTERVAL = 60;
 
     // blocks whose parent we have not seen yet, by block id
     private array $pendingBlocks = [];
@@ -148,6 +149,7 @@ class Node
         $buffers = [];
         $outbound = []; // client key => peer address, for connections we opened
         $lastDial = 0;
+        $lastEvict = time();
         $this->startTime = time();
 
         while (1) {
@@ -395,8 +397,17 @@ class Node
                                                 Console::log('Received a new mempool transaction from: ' . $key);
                                                 $transaction = $data['transaction'] ?? null;
 
+                                                $accepted = is_array($transaction) && $this->mempool->add($transaction);
+
+                                                // tell the sender, a wallet waits for this
+                                                $this->send($client, json_encode([
+                                                    'type' => 'mempool_transaction_result',
+                                                    'transaction_id' => (string)($transaction['transaction_id'] ?? ''),
+                                                    'accepted' => $accepted,
+                                                ], JSON_THROW_ON_ERROR));
+
                                                 // only relay transactions we accepted
-                                                if (is_array($transaction) && $this->mempool->add($transaction)) {
+                                                if ($accepted) {
                                                     foreach ($clients as $c) {
                                                         // don't send to self or current client
                                                         if ($server === $c || $client === $c) {
@@ -433,7 +444,7 @@ class Node
                                                         'hash' => $currentBlock['hash'],
                                                         'height' => $this->block->getCurrentHeight(),
                                                         'recommendation' => $state,
-                                                        'difficulty' => $this->block->getDifficulty(),
+                                                        'difficulty' => $this->block->getNextDifficulty($currentBlock),
                                                     ], JSON_THROW_ON_ERROR));
                                                 } else {
                                                     $this->send($client, json_encode([
@@ -586,6 +597,20 @@ class Node
             }
 
             $this->syncStep($clients, $clientInfo);
+
+            // drop mempool transactions that blocks have made invalid, or that are too old
+            if (time() - $lastEvict >= self::MEMPOOL_EVICT_INTERVAL) {
+                $lastEvict = time();
+                try {
+                    $evicted = $this->mempool->evictStale($this->block->getCurrentHeight() + 1);
+
+                    if ($evicted > 0) {
+                        Console::log('Evicted ' . $evicted . ' stale mempool transactions');
+                    }
+                } catch (Throwable $e) {
+                    Console::log('Mempool eviction failed: ' . $e->getMessage());
+                }
+            }
 
             // handshakes, pings, etc
             $propagationBlocks = [];

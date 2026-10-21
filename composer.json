@@ -18,7 +18,7 @@
     }
   ],
   "require": {
-    "php": ">=8.1",
+    "php": ">=8.4",
     "ext-bcmath": "*",
     "ext-curl": "*",
     "ext-mbstring": "*",
@@ -29,15 +29,15 @@
     "ext-sockets": "*",
     "ext-zlib": "*",
     "ext-openssl": "*",
-    "robmorgan/phinx": "*",
-    "stephenhill/base58": "*",
-    "vlucas/phpdotenv": "*",
-    "symfony/yaml": "*",
+    "robmorgan/phinx": "^0.16.12",
+    "stephenhill/base58": "^2.1",
+    "vlucas/phpdotenv": "^5.7",
+    "symfony/yaml": "^8.1",
     "ext-pcntl": "*"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
-    "phpunit/phpunit": "*"
+    "phpunit/phpunit": "^13.4"
   },
   "autoload": {
     "psr-4": {
@@ -58,6 +58,6 @@
     "cs-fix": "phpcbf -np app/ src/ tests/",
     "stan": "phpstan analyse src/",
     "stan-setup": "cp composer.json composer.backup && composer require --dev phpstan/phpstan:^0.12 && mv composer.backup composer.json",
-    "test": "phpunit --colors=always"
+    "test": "phpunit --colors=always --bootstrap bootstrap.php tests"
   }
 }

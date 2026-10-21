@@ -2,66 +2,69 @@
 
 namespace Blockchain;
 
-use Exception;
-
 include 'bootstrap.php';
-
-$block = new Block();
-$miner = new Miner();
-$pow = new Pow();
-$nonce = 0;
 
 echo PHP_EOL, Config::getProductName(), ' Genesis Miner ', PHP_EOL;
 echo Config::getProductCopyright(), PHP_EOL, PHP_EOL;
 
-$env = $_ENV['ENVIRONMENT'] ?? 'dev';
-Console::log('Working on chain: ' . $env);
-
-// use the newest key pair
-$account = new Account();
-$acct = $account->getNewestAccount();
-if ($acct === null) {
-    // do we need to create a new key pair?
-    $id = $account->create();
-    $acct = $account->get($id);
-    Console::log('new key pair created');
+if (count($argv) < 3) {
+    echo "usage: php genesis.php <live|test|dev> <private key file>\n\n";
+    echo "Mines a new genesis block paid to the key and prints the values to paste into Block::GENESIS.\n";
+    exit(1);
 }
-$publicKey = $acct['public_key'];
-$privateKey = $acct['private_key'];
 
-$candidateBlock = $block->genesis($env, $publicKey, $privateKey);
-$blockHeader = $block->generateBlockHeader($candidateBlock);
+$environment = Config::normalizeEnvironment($argv[1]);
+$privateKey = @file_get_contents($argv[2]);
+$keyResource = $privateKey === false ? false : openssl_pkey_get_private($privateKey);
 
-while (1) {
-    try {
-        $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], 1, $nonce, false);
-        if ($result['result'] === true) {
-            break;
-        }
+if ($keyResource === false) {
+    echo 'Cannot read a private key from ', $argv[2], PHP_EOL;
+    exit(1);
+}
 
-        $nonce = $result['nonce'];
+$publicKey = openssl_pkey_get_details($keyResource)['key'];
+$block = new Block();
+$pow = new Pow();
+$transaction = new Transaction();
 
-    } catch (Exception $e) {
-        echo $e->getMessage(), "\n";
-        exit(1);
+$genesis = $block->createGenesis($environment, time(), $publicKey, $privateKey);
+$header = $block->generateBlockHeader($genesis);
+$difficulty = (int)$genesis['difficulty'];
+
+Console::log('Mining the ' . $environment . ' genesis block at difficulty ' . $difficulty);
+$start = microtime(true);
+
+for ($nonce = 0; ; $nonce++) {
+    $hash = bin2hex($pow->calculate($header, dechex($nonce)));
+
+    if ($pow->meetsDifficulty($hash, $difficulty)) {
+        break;
+    }
+
+    if ($nonce > 0 && $nonce % 1000000 === 0) {
+        Console::log(number_format($nonce) . ' hashes');
     }
 }
 
-$candidateBlock['hash'] = $result['hash'];
-$candidateBlock['nonce'] = dechex($result['nonce']);
+$genesis['nonce'] = dechex($nonce);
+$genesis['hash'] = $hash;
+$coinbase = $genesis['transactions'][0];
+$check = $transaction->validate($coinbase, 1);
 
-$reason = $block->validateFullBlock($candidateBlock);
-print_r($candidateBlock);
-print_r($reason);
-
-echo "\nFound in " . number_format($result['hashes'], 0) . " Hashes\n";
-echo "Nonce: {$result['nonce']}\n";
-echo "Hash: {$result['hash']}\n\n";
-
-$verified = $pow->verifyPow($result['hash'], $blockHeader, dechex($result['nonce']));
-if ($verified) {
-    echo "--> Hash verified\n";
-} else {
-    echo "--X Hash mismatch\n";
+if (!$pow->verifyPow($hash, $header, $genesis['nonce']) || $check['validated'] !== true) {
+    echo 'The new block does not verify: ', $check['reason'], PHP_EOL;
+    exit(1);
 }
 
+Console::log('Found in ' . number_format($nonce + 1) . ' hashes, ' . round(microtime(true) - $start, 1) . 's');
+
+echo PHP_EOL, "Paste this into Block::GENESIS, then start from a new database:", PHP_EOL, PHP_EOL;
+echo "        '", $environment, "' => [", PHP_EOL;
+echo "            'date' => ", $genesis['date_created'], ",", PHP_EOL;
+echo "            'public_key' => '", $coinbase['public_key'], "',", PHP_EOL;
+echo "            'signature' => '", $coinbase['signature'], "',", PHP_EOL;
+echo "            'nonce' => '", $genesis['nonce'], "',", PHP_EOL;
+echo "            'hash' => '", $genesis['hash'], "',", PHP_EOL;
+echo "        ],", PHP_EOL, PHP_EOL;
+echo 'Block id: ', $genesis['block_id'], PHP_EOL;
+echo 'Paid to:  ', $coinbase[Transaction::OUTPUTS][0]['address'], PHP_EOL;

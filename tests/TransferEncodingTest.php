@@ -4,6 +4,7 @@ namespace Blockchain;
 
 use Exception;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class TransferEncodingTest extends TestCase
@@ -16,11 +17,10 @@ class TransferEncodingTest extends TestCase
     }
 
     /**
-     * (add multiple functions below)
-     * @dataProvider textDataProvider
-     * @dataProvider hexDataProvider
      * @throws Exception
      */
+    #[DataProvider('textDataProvider')]
+    #[DataProvider('hexDataProvider')]
     public function testEncodeDecodeBase58Strings(string $text): void
     {
         $b58 = $this->transferEncoding->encodeBase58($text);
@@ -29,10 +29,9 @@ class TransferEncodingTest extends TestCase
     }
 
     /**
-     * (add multiple functions below)
-     * @dataProvider hexDataProvider
      * @throws Exception
      */
+    #[DataProvider('hexDataProvider')]
     public function testEncodeDecodeBase58Binary(string $hex): void
     {
         $b58 = $this->transferEncoding->encodeBase58(hex2bin($hex));
@@ -41,10 +40,9 @@ class TransferEncodingTest extends TestCase
     }
 
     /**
-     * (add multiple functions below)
-     * @dataProvider hexDataProvider
      * @throws Exception
      */
+    #[DataProvider('hexDataProvider')]
     public function testIsBase58(string $hex): void
     {
         $this->assertTrue($this->transferEncoding->isBase58($this->transferEncoding->binToBase58($hex)));
@@ -59,19 +57,16 @@ class TransferEncodingTest extends TestCase
     }
 
     /**
-     * (add multiple functions below)
-     * @dataProvider badBase58StringsProvider
      * @throws Exception
      */
+    #[DataProvider('badBase58StringsProvider')]
     public function testDecodeBase58WithInvalidCharacters(string $base58): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->transferEncoding->decodeBase58($base58);
     }
 
-    /**
-     * @dataProvider hexDataProvider
-     */
+    #[DataProvider('hexDataProvider')]
     public function testBinToBase58($hex): void
     {
         $binary = hex2bin($hex);
@@ -80,9 +75,7 @@ class TransferEncodingTest extends TestCase
         $this->assertEquals($binary, $transformed);
     }
 
-    /**
-     * @dataProvider hexDataProvider
-     */
+    #[DataProvider('hexDataProvider')]
     public function testHexToBase58($hex): void
     {
         $base58 = $this->transferEncoding->binToBase58($hex);

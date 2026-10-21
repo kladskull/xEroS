@@ -43,6 +43,10 @@ class Config
     private const MAX_SCRIPT_LENGTH = 2048;
     private const MAX_DECODED_SCRIPT_LENGTH = 4096; // scripts are compressed, this caps what they expand to
 
+    // Mempool
+    private const MAX_MEMPOOL_TRANSACTIONS = 5000;
+    private const MEMPOOL_EXPIRY = 259200; // 3 days, unmined transactions are dropped after this
+
     // Peers
     private const MAX_PEERS = 60;
     private const MAX_REBROADCASTING_PEERS = 30;
@@ -111,16 +115,38 @@ class Config
     }
 
     /**
+     * The network this node runs on: live, test or dev. Unknown names are treated as live.
+     *
+     * @return string
+     */
+    public static function getEnvironment(): string
+    {
+        return self::normalizeEnvironment($_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT);
+    }
+
+    /**
+     * @param string $environment
+     * @return string
+     */
+    public static function normalizeEnvironment(string $environment): string
+    {
+        return match (strtolower(trim($environment))) {
+            'dev', 'development' => 'dev',
+            'test', 'testnet' => 'test',
+            default => 'live',
+        };
+    }
+
+    /**
+     * @param string|null $environment defaults to this node's
      * @return int
      */
-    public static function getDefaultDifficulty(): int
+    public static function getDefaultDifficulty(?string $environment = null): int
     {
-        $env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
-
-        return match ($env) {
+        return match (self::normalizeEnvironment($environment ?? self::getEnvironment())) {
             'dev' => self::DEFAULT_DEV_DIFFICULTY,
             'test' => self::DEFAULT_TEST_DIFFICULTY,
-        default => self::DEFAULT_LIVE_DIFFICULTY,
+            default => self::DEFAULT_LIVE_DIFFICULTY,
         };
     }
 
@@ -129,25 +155,10 @@ class Config
      */
     public static function getDbEnvironment(): string
     {
-        $return = '';
-        $env = $_ENV['ENVIRONMENT'] ?? self::ENVIRONMENT;
-        switch ($env) {
-            case 'live':
-                $return = 'live';
-                break;
+        // matches phinx.php: live is xero.db, the others are xero-dev.db and xero-test.db
+        $environment = self::getEnvironment();
 
-            case 'dev':
-                $return = 'dev';
-                break;
-
-            case 'test':
-                $return = 'test';
-                break;
-
-            default:
-                break;
-        }
-        return $return;
+        return $environment === 'live' ? '' : $environment;
     }
 
     /**
@@ -249,6 +260,22 @@ class Config
     public static function getMaxDecodedScriptLength(): int
     {
         return self::MAX_DECODED_SCRIPT_LENGTH;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getMaxMempoolTransactions(): int
+    {
+        return self::MAX_MEMPOOL_TRANSACTIONS;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getMempoolExpiry(): int
+    {
+        return self::MEMPOOL_EXPIRY;
     }
 
     /**
