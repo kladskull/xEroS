@@ -66,16 +66,26 @@ Console::log('detected ' . PHP_OS . ' as the OS');
 
 // if there is no state, we're likely needing to sync from the network
 $store = new DataStore();
-$state = $store->getKey('state', '');
-if ($state !== 'mine' && $forceMining === false) {
-    Console::log('Synchronization is required before mining may begin');
-    exit(0);
-}
+// wait for the node to finish syncing before mining
+$waitForSync = static function () use ($store, $forceMining): void {
+    $logged = 0;
+
+    while ($forceMining === false && $store->getKey('state', '') !== State::MINE) {
+        if (time() - $logged >= 30) {
+            Console::log('Waiting for the node to finish syncing before mining');
+            $logged = time();
+        }
+
+        sleep(2);
+    }
+};
+$waitForSync();
 
 $env = $_ENV['ENVIRONMENT'] ?? 'dev';
 Console::log('Working on chain: ' . $env);
 
 while (1) {
+    $waitForSync();
     $nonce = 0;
     $height = $block->getCurrentHeight() + 1;
     $candidateBlock = $block->getCandidateBlock($height, $publicKey, $privateKey);
@@ -93,8 +103,8 @@ while (1) {
         // assembled the block, now find a hash
         $result = $miner->mineBlock($blockHeader, $candidateBlock['difficulty'], $height, $nonce);
 
-        // something changed
-        if ($result['result'] === false && empty($result['nonce'])) {
+        // the chain moved on, build a new candidate
+        if ($result['result'] === false) {
             break;
         }
 
@@ -103,6 +113,12 @@ while (1) {
             $candidateBlock['nonce'] = dechex($result['nonce']);
             $candidateBlock['hash'] = $result['hash'];
             $verified = $pow->verifyPow($result['hash'], $blockHeader, dechex($result['nonce']));
+
+            // a block arrived while we were hashing, ours would only compete with it
+            if ($verified && $block->getCurrentHeight() !== $height - 1) {
+                Console::log('Chain moved on while mining, discarding the block');
+                break;
+            }
 
             if ($verified) {
                 Console::log('Block proof of work accepted for new block');
@@ -119,12 +135,16 @@ while (1) {
 
                         // add queue item to send it out
                         $queue->add('new_block', $candidateBlock['block_id']);
-                        break;
+                    } else {
+                        Console::log('Mined block failed validation: ' . $result['reason']);
                     }
                 } catch (Throwable $e) {
                     Console::log('Exception in miner: ' . $e->getMessage());
                 }
             }
+
+            // found or not, start again on a fresh candidate
+            break;
         }
     }
 }

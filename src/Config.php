@@ -171,6 +171,11 @@ class Config
      */
     public static function getInitialPeers(): array
     {
+        // SEED_PEERS in .env replaces the built in list, e.g. SEED_PEERS=10.0.0.5:7747,10.0.0.6:7747
+        if (isset($_ENV['SEED_PEERS'])) {
+            return array_values(array_filter(array_map('trim', explode(',', (string)$_ENV['SEED_PEERS']))));
+        }
+
         return self::INITIAL_PEER_LIST;
     }
 

@@ -35,6 +35,9 @@ class Database
                 chmod($path, 0600);
                 self::$instance = new PDO('sqlite:' . $path);
                 self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+                // the node and the miner share the file, wait for a lock instead of failing
+                self::$instance->setAttribute(PDO::ATTR_TIMEOUT, 10);
             } catch (PDOException $e) {
                 Console::log($e->getMessage());
             }

@@ -156,7 +156,8 @@ class Block
         $difficulty = $this->getNextDifficulty($prevBlock);
         $transactions = $this->mempool->getAllTransactions($height);
 
-        $date = time();
+        // must be after the median time of the blocks before it, which can run ahead of the clock briefly
+        $date = max(time(), $this->getMedianTimePast($prevBlock) + 1);
         $publicKeyRaw = $this->openSsl->stripPem($publicKey);
 
         // keep the valid mempool transactions, never spending the same output twice in one block
@@ -425,12 +426,12 @@ class Block
      * @return array
      */
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
-    public function validateFullBlock(array $block): array
+    public function validateFullBlock(array $block, bool $checkSpends = true): array
     {
         $transactions = $block['transactions'];
         unset($block['transactions']);
 
-        return $this->validate($block, $transactions, $block['transaction_count']);
+        return $this->validate($block, $transactions, (int)$block['transaction_count'], $checkSpends);
     }
 
     /**
@@ -455,8 +456,12 @@ class Block
      * @throws Exception
      */
     #[ArrayShape(['validated' => "bool", 'reason' => "string"])]
-    public function validate(array $block, array $transactions, int $transactionCount): array
-    {
+    public function validate(
+        array $block,
+        array $transactions,
+        int $transactionCount,
+        bool $checkSpends = true
+    ): array {
         foreach (['network_id', 'block_id', 'previous_block_id', 'date_created', 'height', 'difficulty',
                      'merkle_root', 'transaction_count', 'previous_hash', 'hash', 'nonce'] as $field) {
             if (!isset($block[$field]) || !is_scalar($block[$field])) {
@@ -571,7 +576,7 @@ class Block
                 $coinbase = $transaction;
             }
 
-            $transactionReason = $t->validate($transaction, $height);
+            $transactionReason = $t->validate($transaction, $height, $checkSpends);
 
             if (!$transactionReason['validated']) {
                 $reason .= 'transaction validate failed: ' . $transactionReason['reason'] . ', ';
@@ -597,7 +602,7 @@ class Block
         if ($coinbaseRecords !== 1) {
             $reason .= 'blocks must have exactly 1 coinbase record,';
             $result = false;
-        } else {
+        } elseif ($checkSpends) {
             // the coinbase may claim the reward plus the fees, but no more
             $coinbaseTotal = '0';
 
@@ -761,49 +766,21 @@ class Block
     }
 
     /**
-     * This goes from TOP to BOTTOM and resolves all forks. It chooses the highest height to start with.
+     * Switches to the stored chain with the most work if it isn't the active one.
+     *
      * @return void
      */
     public function resolveForks(): void
     {
-        /**
-         * We need to make sure that the two highest blocks are not competing blocks
-         */
-        // get top 2 blocks by height
-        $query = 'SELECT `block_id`,`height` FROM blocks ORDER BY `height` DESC LIMIT 2';
-        $stmt = $this->db->query($query);
-        $rows = $stmt->fetchAll();
+        $tip = $this->getCurrent();
+        $stmt = $this->db->query('SELECT `block_id` FROM blocks WHERE `orphan`=1 ORDER BY `height` DESC LIMIT 50');
 
-        if (is_array($rows) && count($rows) === 2) {
-            // check to see if there are two competing blocks at the same height
-            $block1 = $this->getByBlockId($rows[0]['block_id']);
-            $block2 = $this->getByBlockId($rows[1]['block_id']);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $candidate = $this->getByBlockId($row['block_id']);
 
-            // resolve
-            $selectedBlock = $this->blockSelector($block1, $block2);
-
-            $block = !empty($selectedBlock) ? $selectedBlock : $block1;
-
-            $height = (int)$block['height'];
-            $start = (int)$this->store->getKey('resolve_progress', $height);
-
-            if ($start > $height) {
-                $start = $height;
-            }
-
-            $currentBlock = $block;
-
-            for ($h = $start; $h >= 1; $h--) {
-                if ($h !== $height) {
-                    $currentBlock = $this->getByBlockId($currentBlock['previous_block_id']);
-                }
-
-                $this->acceptBlock($currentBlock['block_id'], $h);
-                $this->store->add('resolve_progress', $h - 1);
-
-                if ($h === 1) {
-                    break;
-                }
+            if (!empty($tip) && $this->blockSelector($tip, $candidate)['block_id'] === $candidate['block_id']
+                && $this->reorganize($candidate)) {
+                $tip = $this->getCurrent();
             }
         }
     }
@@ -1136,9 +1113,9 @@ class Block
                 ],
                 [
                     'name' => 'nonce',
-                    'value' => $block['nonce'],
-                    'type' => DatabaseHelpers::INT,
-                    'max_length' => 20,
+                    'value' => (string)$block['nonce'],
+                    'type' => DatabaseHelpers::ALPHA_NUMERIC,
+                    'max_length' => 128,
                 ],
                 [
                     'name' => 'difficulty',
@@ -1386,7 +1363,7 @@ class Block
                         ],
                         [
                             'name' => 'hash',
-                            'value' => $txOut['hash'],
+                            'value' => (string)($txOut['hash'] ?? ''),
                             'type' => DatabaseHelpers::TEXT,
                             'max_length' => 8192,
                         ]
@@ -1424,8 +1401,8 @@ class Block
     }
 
     /**
-     * This function effectively processes a block and all of its transactions, and makes it active. Any other
-     * block at the same height is reversed first. Calling it on a block that is already active does nothing.
+     * This function effectively processes a block and all of its transactions, and makes it active. The block
+     * must extend the current tip. Calling it on a block that is already active does nothing.
      *
      * @param string $blockId
      * @param int $height
@@ -1444,23 +1421,23 @@ class Block
         }
 
         $ownsTransaction = !$this->db->inTransaction();
-        $this->reversedTransactions = [];
+
+        if ($ownsTransaction) {
+            $this->reversedTransactions = [];
+        }
 
         try {
             if ($ownsTransaction) {
                 $this->db->beginTransaction();
             }
 
-            // reverse every other active block at this height
-            $stmt = $this->db->prepare(
-                'SELECT `block_id` FROM blocks WHERE `height`=:height AND `block_id`!=:block_id AND `orphan`=0'
-            );
-            $stmt = DatabaseHelpers::filterBind($stmt, 'height', $height, DatabaseHelpers::INT);
-            $stmt = DatabaseHelpers::filterBind($stmt, 'block_id', $blockId, DatabaseHelpers::ALPHA_NUMERIC, 64);
-            $stmt->execute();
+            // a block can only extend the current tip, checked inside the transaction so another process can't
+            // move the tip in between. Switching to another branch goes through reorganize()
+            $tip = $this->getCurrent();
+            $isGenesis = $height === 1 && (string)$block['previous_block_id'] === '';
 
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $competitor) {
-                $this->reverseBlock($competitor['block_id']);
+            if (!$isGenesis && (empty($tip) || $tip['block_id'] !== $block['previous_block_id'])) {
+                throw new RuntimeException('block ' . $blockId . ' does not extend the current tip');
             }
 
             $this->setBlockState($blockId, 0, 0);
@@ -1537,6 +1514,101 @@ class Block
             foreach ($this->reversedTransactions as $transaction) {
                 $this->mempool->add($transaction);
             }
+        }
+
+        return true;
+    }
+
+    /**
+     * Makes the chain ending at $newTip the active chain. Active blocks above the fork point are reversed, then
+     * the new branch is fully validated and accepted from the bottom up. It all happens in one database
+     * transaction, so if any block on the branch fails the old chain is left exactly as it was.
+     *
+     * @param array $newTip a stored block
+     * @return bool
+     */
+    public function reorganize(array $newTip): bool
+    {
+        // collect the branch back to the first block on the active chain
+        $branch = [];
+        $current = $newTip;
+
+        while (!empty($current) && !((int)$current['orphan'] === 0 && $this->isAccepted($current['block_id']))) {
+            array_unshift($branch, $current);
+
+            if ((string)$current['previous_block_id'] === '') {
+                return false;
+            }
+
+            $current = $this->getByBlockId((string)$current['previous_block_id']);
+        }
+
+        if (empty($current)) {
+            return false;
+        }
+
+        $forkHeight = (int)$current['height'];
+        $this->reversedTransactions = [];
+
+        // inside someone else's transaction a savepoint gives us the same all or nothing behaviour
+        $ownsTransaction = !$this->db->inTransaction();
+
+        try {
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            } else {
+                $this->db->exec('SAVEPOINT reorganize');
+            }
+
+            // undo the active chain above the fork, top down
+            $stmt = $this->db->prepare(
+                'SELECT `block_id` FROM blocks WHERE `orphan`=0 AND `height`>:height ORDER BY `height` DESC'
+            );
+            $stmt = DatabaseHelpers::filterBind($stmt, 'height', $forkHeight, DatabaseHelpers::INT);
+            $stmt->execute();
+
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if (!$this->reverseBlock($row['block_id'])) {
+                    throw new RuntimeException('could not reverse block ' . $row['block_id']);
+                }
+            }
+
+            // apply the new branch, bottom up, checking every spend against the state it builds on
+            foreach ($branch as $branchBlock) {
+                $full = $this->assembleFullBlock($branchBlock['block_id']);
+                $result = $this->validateFullBlock($full);
+
+                if (!$result['validated']) {
+                    throw new RuntimeException('branch block ' . $branchBlock['block_id'] . ' is invalid: ' .
+                        $result['reason']);
+                }
+
+                if (!$this->acceptBlock($branchBlock['block_id'], (int)$branchBlock['height'])) {
+                    throw new RuntimeException('could not accept branch block ' . $branchBlock['block_id']);
+                }
+            }
+
+            if ($ownsTransaction) {
+                $this->db->commit();
+            } else {
+                $this->db->exec('RELEASE SAVEPOINT reorganize');
+            }
+        } catch (Throwable $e) {
+            Console::log('Reorganize failed, keeping the current chain: ' . $e->getMessage());
+
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            } elseif (!$ownsTransaction) {
+                $this->db->exec('ROLLBACK TO SAVEPOINT reorganize');
+                $this->db->exec('RELEASE SAVEPOINT reorganize');
+            }
+
+            return false;
+        }
+
+        // put transactions from the old chain back in the mempool, ones now in the new chain are refused
+        foreach ($this->reversedTransactions as $transaction) {
+            $this->mempool->add($transaction);
         }
 
         return true;

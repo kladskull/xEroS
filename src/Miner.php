@@ -72,7 +72,8 @@ class Miner
         $start = time();
 
         if ($startingNonce == 0) {
-            $startingNonce = rand(0, 18346744073709551615);
+            // leave head room so the nonce never overflows into a float
+            $startingNonce = random_int(1, PHP_INT_MAX >> 1);
         }
 
         $nonce = $startingNonce;
@@ -163,7 +164,7 @@ class Miner
                         'hash' => '',
                         'hashes' => $hashes,
                         'elapsed_time' => $elapsed,
-                        'result' => true,
+                        'result' => false,
                     ];
                 }
             }

@@ -509,12 +509,99 @@ class ConsensusTest extends TestCase
         $candidate = $this->block->getCandidateBlock(2, $this->thief['public_key'], $this->thief['private_key']);
         $competitor = $this->mine($candidate);
         $this->assertTrue($this->block->add($competitor, false, true));
-        $this->assertTrue($this->block->acceptBlock($competitor['block_id'], 2));
+
+        // a sibling can't be accepted directly, only through a reorganize
+        $this->assertFalse($this->block->acceptBlock($competitor['block_id'], 2));
+        $this->assertTrue($this->block->reorganize($this->block->getByBlockId($competitor['block_id'])));
 
         $this->assertFalse($this->block->isAccepted($first['block_id']));
         $this->assertNull($this->transaction->getUnspentOutput($this->coinbaseOf($first)['transaction_id'], 0));
         $this->assertNotNull(
             $this->transaction->getUnspentOutput($this->coinbaseOf($competitor)['transaction_id'], 0)
         );
+    }
+
+    /**
+     * Rebuilds a candidate on top of a given parent, so tests can grow a side branch.
+     */
+    private function candidateOn(array $parent, array $keys, array $transactions = []): array
+    {
+        $candidate = $this->block->getCandidateBlock(
+            (int)$parent['height'] + 1,
+            $keys['public_key'],
+            $keys['private_key']
+        );
+        $coinbase = $this->coinbaseOf($candidate);
+        $all = Transaction::sort(array_merge([$coinbase], $transactions));
+
+        $candidate['previous_block_id'] = $parent['block_id'];
+        $candidate['previous_hash'] = $parent['hash'];
+        $candidate['date_created'] = max(time(), (int)$parent['date_created'] + 1);
+        $candidate['transactions'] = $all;
+        $candidate['transaction_count'] = count($all);
+        $candidate['merkle_root'] = (new Merkle())->computeMerkleHash($all);
+        $candidate['block_id'] = $this->block->generateId(
+            Config::getNetworkIdentifier(),
+            $parent['block_id'],
+            $candidate['date_created'],
+            (int)$parent['height'] + 1,
+            $candidate['merkle_root']
+        );
+
+        return $this->mine($candidate);
+    }
+
+    public function testReorganizeSwitchesToTheHeavierBranch(): void
+    {
+        $genesis = $this->block->getByHeight(1);
+        $main = $this->mineNextBlock($this->owner);
+
+        // a two block branch from genesis beats the one block chain
+        $side2 = $this->candidateOn($genesis, $this->thief);
+        $this->assertTrue($this->block->validateFullBlock($side2, false)['validated']);
+        $this->assertTrue($this->block->add($side2, false, true));
+        $side3 = $this->candidateOn($this->block->getByBlockId($side2['block_id']), $this->thief);
+        $this->assertTrue($this->block->validateFullBlock($side3, false)['validated']);
+        $this->assertTrue($this->block->add($side3, false, true));
+
+        $this->assertTrue($this->block->reorganize($this->block->getByBlockId($side3['block_id'])));
+
+        $this->assertEquals(3, $this->block->getCurrentHeight());
+        $this->assertEquals($side3['block_id'], $this->block->getCurrent()['block_id']);
+        $this->assertFalse($this->block->isAccepted($main['block_id']));
+        $this->assertNull($this->transaction->getUnspentOutput($this->coinbaseOf($main)['transaction_id'], 0));
+        $this->assertNotNull($this->transaction->getUnspentOutput($this->coinbaseOf($side2)['transaction_id'], 0));
+    }
+
+    public function testFailedReorganizeKeepsTheOldChain(): void
+    {
+        $genesis = $this->block->getByHeight(1);
+        $coinbase = $this->fundOwner();
+        $main = $this->block->getCurrent();
+
+        // the branch spends an output that only exists on the main chain
+        $spend = $this->transfer([[$coinbase['transaction_id'], 0]], $this->owner, $this->spendAmount(), $this->owner);
+        $side2 = $this->candidateOn($genesis, $this->thief);
+        $this->assertTrue($this->block->add($side2, false, true));
+        $side3 = $this->candidateOn($this->block->getByBlockId($side2['block_id']), $this->thief, [$spend]);
+        $this->assertTrue($this->block->validateFullBlock($side3, false)['validated']);
+        $this->assertTrue($this->block->add($side3, false, true));
+
+        $this->assertFalse($this->block->reorganize($this->block->getByBlockId($side3['block_id'])));
+        $this->assertTrue($this->block->validateFullBlock($this->block->assembleFullBlock($side2['block_id']), false)['validated']);
+
+        $this->assertEquals($main['block_id'], $this->block->getCurrent()['block_id']);
+        $this->assertTrue($this->block->isAccepted($main['block_id']));
+        $this->assertNotNull($this->transaction->getUnspentOutput($coinbase['transaction_id'], 0));
+    }
+
+    public function testStoredBlockStillValidates(): void
+    {
+        $block = $this->mineNextBlock($this->owner);
+        $reloaded = $this->block->assembleFullBlock($block['block_id']);
+
+        $this->assertEquals($block['nonce'], $reloaded['nonce']);
+        $result = $this->block->validateFullBlock($reloaded, false);
+        $this->assertTrue($result['validated'], $result['reason']);
     }
 }
