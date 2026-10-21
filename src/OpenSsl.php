@@ -154,10 +154,15 @@ class OpenSsl
             $publicPemKey = $this->formatPem($publicPemKey, false);
         }
 
-        //verify signature
-        $result = openssl_verify($textToSign, hex2bin($signature), $publicPemKey, "sha256WithRSAEncryption");
+        // the signature must be hex
+        if ($signature === '' || strlen($signature) % 2 !== 0 || !ctype_xdigit($signature)) {
+            return false;
+        }
 
-        if ($result === -1) {
+        //verify signature
+        $result = @openssl_verify($textToSign, hex2bin($signature), $publicPemKey, "sha256WithRSAEncryption");
+
+        if ($result === -1 || $result === false) {
             return false;
         }
 

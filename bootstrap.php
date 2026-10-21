@@ -52,7 +52,9 @@ $app->checkMigrations();
 $block = new Block();
 
 if ($block->getCurrentHeight() === 0) {
-    $block->add($block->genesis($_ENV['ENVIRONMENT'], '', ''), false);
+    $genesisBlock = $block->genesis($_ENV['ENVIRONMENT'], '', '');
+    $block->add($genesisBlock, false);
+    $block->acceptBlock($genesisBlock['block_id'], 1);
 }
 
 // if there is no state, we're likely needing to sync from the network

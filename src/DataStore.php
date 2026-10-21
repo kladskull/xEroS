@@ -72,7 +72,11 @@ class DataStore
         }
 
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             $query = 'INSERT OR REPLACE INTO key_value_store (`key`,`data`,`expires`) VALUES (:key,:data,:expires);';
             $stmt = $this->db->prepare($query);
@@ -82,11 +86,15 @@ class DataStore
             $stmt->execute();
             $id = (int)$this->db->lastInsertId();
 
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
         } catch (Exception $e) {
             Console::log('Error storing key: ' . $e->getMessage());
             $id = 0;
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollback();
+            }
         }
 
         return $id;
@@ -100,7 +108,11 @@ class DataStore
     {
         $result = false;
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             // delete the block
             $query = 'DELETE FROM key_value_store WHERE `id` = :id;';
@@ -113,11 +125,15 @@ class DataStore
             );
             $stmt->execute();
 
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
             $result = true;
         } catch (Exception $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollback();
+            }
         }
 
         return $result;
@@ -131,7 +147,11 @@ class DataStore
     {
         $result = false;
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             // delete the block
             $query = 'DELETE FROM key_value_store WHERE `key` = :key;';
@@ -145,11 +165,15 @@ class DataStore
             );
             $stmt->execute();
 
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
             $result = true;
         } catch (Exception $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollback();
+            }
         }
 
         return $result;

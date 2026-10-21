@@ -6,6 +6,7 @@ use Exception;
 use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Pure;
 use PDO;
+use Throwable;
 use function bcadd;
 use function bccomp;
 use function bin2hex;
@@ -33,19 +34,97 @@ class Transaction
     }
 
     /**
-     * @param int $date
-     * @param string $blockId
-     * @param string $publicKeyRaw
+     * Builds the canonical text of a transaction. Every consensus field is included, json_encode keeps the
+     * fields separated so two different transactions can never produce the same text.
+     *
+     * @param array $transaction
+     * @param bool $withInputScripts false when building the text that input scripts sign
      * @return string
      */
-    #[Pure]
-    public function generateId(int $date, string $blockId, string $publicKeyRaw): string
+    public function canonicalText(array $transaction, bool $withInputScripts): string
     {
-        return bin2hex(
-            $this->pow->doubleSha256(
-                $date . $blockId . $publicKeyRaw
-            )
+        $inputs = [];
+
+        foreach (self::sortTx($transaction[self::INPUTS] ?? []) as $txIn) {
+            $inputs[] = [
+                (string)($txIn['tx_id'] ?? ''),
+                (string)($txIn['previous_transaction_id'] ?? ''),
+                (string)($txIn['previous_tx_out_id'] ?? ''),
+                $withInputScripts ? (string)($txIn['script'] ?? '') : '',
+            ];
+        }
+
+        $outputs = [];
+
+        foreach (self::sortTx($transaction[self::OUTPUTS] ?? []) as $txOut) {
+            $outputs[] = [
+                (string)($txOut['tx_id'] ?? ''),
+                (string)($txOut['address'] ?? ''),
+                (string)($txOut['value'] ?? ''),
+                (string)($txOut['script'] ?? ''),
+                (string)($txOut['lock_height'] ?? ''),
+            ];
+        }
+
+        return json_encode([
+            Config::getNetworkIdentifier(),
+            (string)($transaction['version'] ?? ''),
+            (string)($transaction['date_created'] ?? ''),
+            (string)($transaction['height'] ?? ''),
+            (string)($transaction['peer'] ?? ''),
+            (string)($transaction['public_key'] ?? ''),
+            $inputs,
+            $outputs,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The transaction id is the hash of the whole transaction, so the merkle root commits to its contents.
+     *
+     * @param array $transaction
+     * @return string
+     */
+    public function computeId(array $transaction): string
+    {
+        return bin2hex($this->pow->doubleSha256($this->canonicalText($transaction, true)));
+    }
+
+    /**
+     * The hash that input scripts and the transaction signature sign. Input scripts are left out because they
+     * carry the signatures.
+     *
+     * @param array $transaction
+     * @return string
+     */
+    public function signatureHash(array $transaction): string
+    {
+        return bin2hex($this->pow->doubleSha256($this->canonicalText($transaction, false)));
+    }
+
+    /**
+     * Finds an unspent output on the active chain.
+     *
+     * @param string $transactionId
+     * @param int $txId
+     * @return array|null
+     */
+    public function getUnspentOutput(string $transactionId, int $txId): array|null
+    {
+        $query = 'SELECT o.`block_id`,o.`transaction_id`,o.`tx_id`,o.`address`,o.`value`,o.`script`,' .
+            'o.`lock_height`,o.`hash` FROM transaction_outputs o INNER JOIN blocks b ON b.`block_id`=o.`block_id` ' .
+            'WHERE b.`orphan`=0 AND o.`spent`=0 AND o.`transaction_id`=:transaction_id AND o.`tx_id`=:tx_id LIMIT 1';
+        $stmt = $this->db->prepare($query);
+        $stmt = DatabaseHelpers::filterBind(
+            stmt: $stmt,
+            fieldName: 'transaction_id',
+            value: $transactionId,
+            pdoType: DatabaseHelpers::ALPHA_NUMERIC,
+            maxLength: 64
         );
+        $stmt = DatabaseHelpers::filterBind($stmt, 'tx_id', $txId, DatabaseHelpers::INT);
+        $stmt->execute();
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     /**
@@ -221,7 +300,7 @@ class Transaction
     {
         $returnTransactions = [];
         $query = 'SELECT `id`,`block_id`,`transaction_id`,`date_created`,`peer`,`height`,`version`,`signature`' .
-            ',`public_key` FROM transactions WHERE `block_id` = :block_id LIMIT 1';
+            ',`public_key` FROM transactions WHERE `block_id` = :block_id';
         $stmt = $this->db->prepare($query);
         $stmt = DatabaseHelpers::filterBind(
             $stmt,
@@ -232,7 +311,7 @@ class Transaction
         );
         $stmt->execute();
 
-        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: null;
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($transactions as $transaction) {
             // attach the details
@@ -274,80 +353,46 @@ class Transaction
     }
 
     /**
+     * Validates a transaction against the active chain.
+     *
      * @param array $transaction
-     * @return string
-     */
-    public function calculateMinerFee(array $transaction): string
-    {
-        $totalInputs = "0";
-
-        if (isset($transaction[self::INPUTS])) {
-            foreach ($transaction[self::INPUTS] as $txIn) {
-                $previousTransaction = $this->getByTransactionId(
-                    $transaction['block_id'],
-                    $txIn['previous_transaction_id']
-                );
-
-                if ($previousTransaction !== null) {
-                    // add if the value is unspent
-                    $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
-
-                    if ((int)$unspent['spent'] === 0) {
-                        $totalInputs = bcadd($totalInputs, $unspent['value']);
-                    }
-                }
-            }
-        }
-
-        $totalOutputs = "0";
-
-        if (isset($transaction[self::OUTPUTS])) {
-            foreach ($transaction[self::OUTPUTS] as $txOut) {
-                // add values
-                $totalOutputs = bcadd($totalOutputs, $txOut['value']);
-            }
-        }
-
-        // report the fee
-        return BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
-    }
-
-    /**
-     * @param array $transaction
+     * @param int|null $height the height of the block the transaction is going into, defaults to the next block
      * @return array
      * @throws Exception
      */
-    #[ArrayShape(['validated' => "false", 'reason' => "string"])]
-    public function validate(array $transaction): array
+    #[ArrayShape(['validated' => "bool", 'reason' => "string", 'fee' => "string"])]
+    public function validate(array $transaction, ?int $height = null): array
     {
-        $result = true;
-        $reason = '';
         $address = new Address();
         $openSsl = new OpenSsl();
 
-        if (!isset($transaction['date_created'])) {
-            $reason .= '"date_created" is a missing,';
-            $result = false;
+        $fail = static function (string $reason): array {
+            return ['validated' => false, 'reason' => $reason, 'fee' => '0'];
+        };
+
+        foreach (['transaction_id', 'date_created', 'public_key', 'signature', 'version', 'height', 'peer'] as $field) {
+            if (!isset($transaction[$field]) || !is_scalar($transaction[$field])) {
+                return $fail('"' . $field . '" is missing,');
+            }
         }
 
-        if (!isset($transaction['public_key'])) {
-            $reason .= '"public_key_raw" is a missing,';
-            $result = false;
+        if (!isset($transaction[self::INPUTS]) || !is_array($transaction[self::INPUTS])) {
+            return $fail(self::INPUTS . ' is missing,');
         }
 
-        if (!isset($transaction['signature'])) {
-            $reason .= 'signature is missing,';
-            $result = false;
+        if (!isset($transaction[self::OUTPUTS]) || !is_array($transaction[self::OUTPUTS])
+            || count($transaction[self::OUTPUTS]) === 0) {
+            return $fail('at least one output is required,');
         }
 
-        if (!isset($transaction['transaction_id'])) {
-            $reason .= 'transaction_id is a missing,';
-            $result = false;
-        }
+        $height ??= (new Block())->getCurrentHeight() + 1;
+        $version = (string)$transaction['version'];
+        $isCoinbase = $version === TransactionVersion::COINBASE;
+        $result = true;
+        $reason = '';
 
-        // must have at least one unspent output
-        if (!isset($transaction[self::OUTPUTS])) {
-            $reason .= 'unspent output transactions are a missing,';
+        if ($version !== TransactionVersion::COINBASE && $version !== TransactionVersion::TRANSFER) {
+            $reason .= 'unknown version,';
             $result = false;
         }
 
@@ -361,160 +406,164 @@ class Transaction
             $result = false;
         }
 
-        if (!isset($transaction['version'])) {
-            $reason .= 'missing version in the transaction,';
-            $result = false;
-        }
-
-        if (!isset($transaction['height'])) {
-            $reason .= 'missing height in the transaction,';
-            $result = false;
-        }
-
-        if (strlen($transaction['peer']) > 40) {
+        if (strlen((string)$transaction['peer']) > 40) {
             $reason .= '"peer" is too long, must be 40 or less,';
             $result = false;
         }
 
         // no transactions before the genesis
-        if ($transaction['date_created'] < Config::getGenesisDate()) {
+        if ((int)$transaction['date_created'] < Config::getGenesisDate()) {
             $reason .= 'date created is before genesis block ' .
                 $transaction['date_created'] . ' < ' . Config::getGenesisDate() . ',';
             $result = false;
         }
 
-        // validate signature
-        $signatureText = $this->generateSignatureText($transaction);
+        // tx_ids must be 0..n-1 with no duplicates, otherwise sorting would silently drop entries
+        foreach ([self::INPUTS, self::OUTPUTS] as $section) {
+            $ids = [];
+
+            foreach ($transaction[$section] as $tx) {
+                $ids[] = (string)($tx['tx_id'] ?? '');
+            }
+
+            if ($ids !== [] && array_diff(array_map('strval', range(0, count($ids) - 1)), $ids) !== []) {
+                $reason .= $section . ' tx_id values must run from 0 with no gaps or duplicates,';
+                $result = false;
+            }
+        }
+
+        // the id must be the hash of the contents
+        if ($transaction['transaction_id'] !== $this->computeId($transaction)) {
+            $reason .= 'transaction_id does not match the transaction contents,';
+            $result = false;
+        }
+
+        $signatureHash = $this->signatureHash($transaction);
 
         if (!$openSsl->verifySignature(
-            $signatureText,
-            $transaction['signature'],
-            $openSsl->formatPem($transaction['public_key'], false)
+            $signatureHash,
+            (string)$transaction['signature'],
+            $openSsl->formatPem((string)$transaction['public_key'], false)
         )) {
             $reason .= 'Invalid signature,';
             $result = false;
         }
 
-        $totalInputs = "0";
-
-        if (isset($transaction[self::INPUTS])) {
-            foreach ($transaction[self::INPUTS] as $txIn) {
-                if (!isset($txIn['previous_transaction_id'])) {
-                    $reason .= 'transaction_id: (' . $transaction['transaction_id'] .
-                        ') is a missing an unspent transaction,';
-                    $result = false;
-                }
-
-                if (!isset($txIn['previous_tx_out_id'])) {
-                    $reason .= 'transaction_id: (' . $transaction['transaction_id'] .
-                        ') is a missing an unspent transaction index,';
-                    $result = false;
-                }
-
-                $previousTransaction = $this->getByTransactionId(
-                    $transaction['block_id'],
-                    $txIn['previous_transaction_id']
-                );
-
-                if ($previousTransaction !== null) {
-                    if (!isset($previousTransaction[self::OUTPUTS][(int)$txIn['previous_tx_out_id']])) {
-                        $reason .= 'previous_tx_out_id: (' . $txIn['previous_tx_out_id'] . ') does not exist,';
-                        $result = false;
-                    }
-
-                    // add if the value is unspent
-                    $unspent = $previousTransaction[self::OUTPUTS][$txIn['tx_id']];
-
-                    if ((int)$unspent['spent'] === 0) {
-                        $totalInputs = bcadd($totalInputs, $unspent['value']);
-                    }
-
-                    if (strlen($txIn['script']) > Config::getMaxScriptLength()) {
-                        $reason .= 'uncompressed script is larger than the max allowed,';
-                        $result = false;
-                    }
-                } else {
-                    $reason .= 'previous transaction_id: (' . $txIn['transaction_id'] .
-                        ') is a missing on a spent transaction,';
-                    $result = false;
-                }
-            }
-        }
-
-        $totalOutputs = "0";
+        $totalOutputs = '0';
 
         foreach ($transaction[self::OUTPUTS] as $txOut) {
-            if (!$address->validateAddress($txOut['address'])) {
-                $reason .= 'invalid address in unspent: ' . $txOut['address'] . ',';
+            $value = (string)($txOut['value'] ?? '');
+            $lockHeight = (string)($txOut['lock_height'] ?? '');
+
+            if (!$address->validateAddress((string)($txOut['address'] ?? ''))) {
+                $reason .= 'invalid address in output,';
                 $result = false;
             }
 
-            if (!isset($txOut['tx_id'])) {
-                $reason .= 'missing tx_id in unspent,';
-                $result = false;
-            }
-
-            if (strlen($txOut['script']) > Config::getMaxScriptLength()) {
+            if (strlen((string)($txOut['script'] ?? '')) > Config::getMaxScriptLength()) {
                 $reason .= 'uncompressed script is larger than the max allowed,';
                 $result = false;
             }
 
-            if ((int)$txOut['lock_height'] < 0) {
+            if (!ctype_digit($lockHeight)) {
                 $reason .= 'Invalid lock_height value,';
                 $result = false;
-            }
-
-            if ((int)$txOut['lock_height'] === 0 && ((int)$txOut['lock_height'] > (int)$transaction['height'])) {
-                $reason .= 'Height is greater than the lock height value,';
+            } elseif ($isCoinbase && (int)$lockHeight < (int)$transaction['height'] + Config::getLockHeight()) {
+                $reason .= 'coinbase outputs must be locked for ' . Config::getLockHeight() . ' blocks,';
                 $result = false;
             }
 
-            if (bccomp($txOut['value'], "0") <= 0) {
-                $reason .= 'value of unspent is less than or equal to 0,';
+            if (!ctype_digit($value) || bccomp($value, '0') <= 0) {
+                $reason .= 'output value must be a whole number greater than 0,';
                 $result = false;
+                continue;
             }
 
-            // add values
-            $totalOutputs = bcadd($totalOutputs, $txOut['value']);
+            $totalOutputs = bcadd($totalOutputs, $value);
         }
 
-        // non-coinbase - the inputs must be greater or equal to the outputs
-        if (($transaction['version'] !== TransactionVersion::COINBASE) && bccomp($totalInputs, $totalOutputs) < 0) {
-            $reason .= 'the inputs are less than the outputs),';
+        if ($isCoinbase) {
+            if (count($transaction[self::INPUTS]) !== 0) {
+                $reason .= 'the coinbase cannot have inputs,';
+                $result = false;
+            }
+
+            if ((int)$transaction['height'] !== $height) {
+                $reason .= 'the coinbase height must match the block height,';
+                $result = false;
+            }
+
+            // the reward and fees are checked against the whole block in Block::validate()
+            return ['validated' => $result, 'reason' => $reason, 'fee' => '0'];
+        }
+
+        if (count($transaction[self::INPUTS]) === 0) {
+            $reason .= 'a transfer needs at least one input,';
             $result = false;
         }
 
-        // coinbase - the inputs must be zero, and the outputs must be > 0
-        if (($transaction['version'] === TransactionVersion::COINBASE) && bccomp($totalInputs, "0") !== 0) {
-            $reason .= 'the coinbase inputs must be zero,';
+        $totalInputs = '0';
+        $seen = [];
+
+        foreach ($transaction[self::INPUTS] as $txIn) {
+            $previousId = (string)($txIn['previous_transaction_id'] ?? '');
+            $previousOut = (string)($txIn['previous_tx_out_id'] ?? '');
+
+            if ($previousId === '' || !ctype_digit($previousOut)) {
+                $reason .= 'input is missing its previous output,';
+                $result = false;
+                continue;
+            }
+
+            // the same output may only be spent once
+            $outpoint = $previousId . ':' . $previousOut;
+
+            if (isset($seen[$outpoint])) {
+                $reason .= 'output ' . $outpoint . ' is spent twice,';
+                $result = false;
+                continue;
+            }
+
+            $seen[$outpoint] = true;
+
+            if (strlen((string)($txIn['script'] ?? '')) > Config::getMaxScriptLength()) {
+                $reason .= 'uncompressed script is larger than the max allowed,';
+                $result = false;
+                continue;
+            }
+
+            $unspent = $this->getUnspentOutput($previousId, (int)$previousOut);
+
+            if ($unspent === null) {
+                $reason .= 'output ' . $outpoint . ' does not exist or is already spent,';
+                $result = false;
+                continue;
+            }
+
+            if ($height < (int)$unspent['lock_height']) {
+                $reason .= 'output ' . $outpoint . ' is locked until height ' . $unspent['lock_height'] . ',';
+                $result = false;
+                continue;
+            }
+
+            // the spender must satisfy the output's script
+            if (!$this->unlockTransaction($txIn, $unspent, $signatureHash)) {
+                $reason .= 'cannot unlock output ' . $outpoint . ',';
+                $result = false;
+                continue;
+            }
+
+            $totalInputs = bcadd($totalInputs, (string)$unspent['value']);
+        }
+
+        $fee = bcsub($totalInputs, $totalOutputs);
+
+        if (bccomp($fee, Config::getMinimumTransactionFee()) < 0) {
+            $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
             $result = false;
         }
 
-        // check for an appropriate fee
-        if ($transaction['version'] !== TransactionVersion::COINBASE) {
-            $fee = BcmathExtensions::bcabs(bcsub($totalInputs, $totalOutputs));
-
-            if (bccomp($fee, Config::getMinimumTransactionFee(), 0) < 0) {
-                $reason .= 'fee (' . $fee . ') is less than minimum (' . Config::getMinimumTransactionFee() . '),';
-                $result = false;
-            }
-        }
-
-        // check reward - can be less, but not more
-        if ($transaction['version'] === TransactionVersion::COINBASE) {
-            $block = new Block();
-            $reward = $block->getRewardValue($transaction['height']);
-
-            if (bccomp($totalOutputs, $block->getRewardValue($transaction['height']), 0) > 0) {
-                $reason .= 'Reward ' . $totalOutputs . ' is greater than expected ' . $reward . ',';
-                $result = false;
-            }
-        }
-
-        return [
-            'validated' => $result,
-            'reason' => $reason,
-        ];
+        return ['validated' => $result, 'reason' => $reason, 'fee' => $result ? $fee : '0'];
     }
 
     /**
@@ -574,24 +623,7 @@ class Transaction
      */
     public function generateSignatureText(array $transaction): string
     {
-        $txInData = '';
-        $transaction[self::INPUTS] = self::sortTx($transaction[self::INPUTS]);
-
-        foreach ($transaction[self::INPUTS] as $txIn) {
-            $txInData .= $txIn['tx_id'] . $txIn['previous_transaction_id'] . $txIn['previous_tx_out_id'] .
-                $txIn['script'];
-        }
-
-        $txOutData = '';
-        $transaction[self::OUTPUTS] = self::sortTx($transaction[self::OUTPUTS]);
-
-        foreach ($transaction[self::OUTPUTS] as $txOut) {
-            $txInData .= $txOut['tx_id'] . $txOut['address'] . $txOut['value'] . $txOut['script'] .
-                $txOut['lock_height'];
-        }
-
-        return $transaction['transaction_id'] . $transaction['date_created'] . $transaction['public_key'] .
-            $transaction['peer'] . $transaction['height'] . $transaction['version'] . $txInData . $txOutData;
+        return $this->signatureHash($transaction);
     }
 
     /**
@@ -617,18 +649,32 @@ class Transaction
     }
 
     /**
+     * Runs the spender's input script followed by the output's locking script. The input script may only push
+     * data, so it cannot change the outcome of the locking script.
+     *
      * @param array $input
      * @param array $output
+     * @param string $signatureHash the signature hash of the spending transaction
      * @return bool
      */
-    public function unlockTransaction(array $input, array $output): bool
+    public function unlockTransaction(array $input, array $output, string $signatureHash): bool
     {
-        $container = [
-            '<hash>' => $output['hash'], // outputs transaction hash
-        ];
+        $script = new Script(['<hash>' => $signatureHash]);
 
-        $script = new Script($container);
-        $script->loadScript($script->decodeScript($input['script']) . $script->decodeScript($output['script']));
+        try {
+            $inputScript = $script->decodeScript((string)($input['script'] ?? ''));
+            $outputScript = $script->decodeScript((string)($output['script'] ?? ''));
+        } catch (Throwable) {
+            return false;
+        }
+
+        if ($inputScript === false || $outputScript === false || !$script->isPushOnly($inputScript)) {
+            return false;
+        }
+
+        if (!$script->loadScript($inputScript . $outputScript)) {
+            return false;
+        }
 
         return $script->run(false);
     }

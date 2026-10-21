@@ -9,6 +9,7 @@ use function ctype_xdigit;
 use function explode;
 use function gzcompress;
 use function gzuncompress;
+use function in_array;
 use function str_contains;
 use function str_replace;
 use function str_starts_with;
@@ -77,7 +78,29 @@ class Script
      */
     public function decodeScript(string $compressed): bool|string
     {
-        return gzuncompress($this->transferEncoding->base58ToBin($compressed));
+        if ($compressed === '') {
+            return '';
+        }
+
+        return @gzuncompress($this->transferEncoding->base58ToBin($compressed));
+    }
+
+    /**
+     * True if the script only puts data on the stack. Input scripts must be push only, otherwise the spender
+     * could run verification commands of their own ahead of the output's locking script.
+     *
+     * @param string $script
+     * @return bool
+     */
+    public function isPushOnly(string $script): bool
+    {
+        foreach ($this->parseScript($script) as $operation) {
+            if (!in_array($operation['command'], ['push', 'dup', 'nop'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -95,10 +118,10 @@ class Script
                 break;
             }
 
-            // if at any point the sx register is false, we are done
+            // if at any point a verification fails, we are done and the script fails
             $sxRegister = $this->stateMachine->getRegister('sx');
 
-            if ($sxRegister === -1) {
+            if ($sxRegister === 0) {
                 break;
             }
         }

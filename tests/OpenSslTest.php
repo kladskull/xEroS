@@ -83,7 +83,7 @@ class OpenSslTest extends TestCase
         $this->assertTrue($this->openssl->verifySignature($text, $signature, $public_key));
     }
 
-    public function textDataProvider(): array
+    public static function textDataProvider(): array
     {
         return [
             ['This is a signed message.'],
