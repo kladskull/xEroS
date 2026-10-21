@@ -200,49 +200,54 @@ class Account
     }
 
     /**
+     * Unspent outputs paid to $address on the active chain, locked ones included.
+     *
      * @param string $address
      * @return string
      */
     public function getBalance(string $address): string
     {
-        $balance = "0";
-        $query = 'SELECT `value` FROM transaction_outputs WHERE `address` = :address';
-        $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
-        $stmt->execute();
-        $unspentTransactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $this->db->prepare(
+            'SELECT o.`value` FROM transaction_outputs o JOIN blocks b ON b.block_id=o.block_id ' .
+            'WHERE o.`address`=:address AND o.spent=0 AND b.orphan=0'
+        );
+        $stmt->execute([':address' => $address]);
+        $balance = '0';
 
-        foreach ($unspentTransactions as $unspentTransaction) {
-            $balance = bcadd($balance, $unspentTransaction['value']);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $value) {
+            $balance = bcadd($balance, (string)$value);
         }
 
         return $balance;
     }
 
     /**
+     * The balance once the mempool is mined: plus what is on the way in, minus what is being spent.
+     *
      * @param string $address
      * @return string
      */
     public function getPendingBalance(string $address): string
     {
-        // get the current balance
         $balance = $this->getBalance($address);
 
-        // get all the mempool transactions for the address
-        $query = 'SELECT `transaction_id`,`tx_id`,`value` FROM mempool_outputs WHERE `address` = :address';
-        $stmt = $this->db->prepare($query);
-        $stmt = DatabaseHelpers::filterBind($stmt, 'address', $address, DatabaseHelpers::ALPHA_NUMERIC, 40);
-        $stmt->execute();
-        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $this->db->prepare('SELECT `value` FROM mempool_outputs WHERE `address`=:address');
+        $stmt->execute([':address' => $address]);
 
-        foreach ($transactions as $transaction) {
-            $key = $transaction['transaction_id'] . '-' . $transaction['tx_id'];
-            $transactions[$key] = $transaction['value'];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $value) {
+            $balance = bcadd($balance, (string)$value);
         }
 
-        // add the pending to the balance
-        foreach ($transactions as $value) {
-            $balance = bcadd($balance, $value);
+        $stmt = $this->db->prepare(
+            'SELECT o.`value` FROM mempool_inputs i ' .
+            'JOIN transaction_outputs o ON o.transaction_id=i.previous_transaction_id AND o.tx_id=i.previous_tx_out_id ' .
+            'JOIN blocks b ON b.block_id=o.block_id ' .
+            'WHERE o.`address`=:address AND o.spent=0 AND b.orphan=0'
+        );
+        $stmt->execute([':address' => $address]);
+
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $value) {
+            $balance = bcsub($balance, (string)$value);
         }
 
         return $balance;

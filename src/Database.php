@@ -27,6 +27,13 @@ class Database
 
                 $path = APP_DIR . strtolower(Config::getProductName()) . $configEnv . '.db';
 
+                // DB_FILE points a node at another database, e.g. to run two nodes from one checkout
+                $override = $_ENV['DB_FILE'] ?? getenv('DB_FILE');
+
+                if (is_string($override) && $override !== '') {
+                    $path = $override;
+                }
+
                 // the accounts table holds private keys, keep the file readable by this user only
                 if (!file_exists($path)) {
                     touch($path);

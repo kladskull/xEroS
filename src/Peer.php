@@ -42,12 +42,12 @@ class Peer
 
             if (PHP_OS === 'Linux') {
                 // append whatever we can get from the commands below to add salt to the IP
-                $data = trim(file_get_contents('/etc/machine-id'));
-                $data .= trim(file_get_contents('/var/lib/dbus/machine-id'));
+                $data = trim((string)@file_get_contents('/etc/machine-id'));
+                $data .= trim((string)@file_get_contents('/var/lib/dbus/machine-id'));
             }
 
             if (PHP_OS === 'Darwin' || PHP_OS === 'Linux') {
-                $data .= exec('whoami');
+                $data .= (string)exec('whoami');
             }
 
             // tie it to an IP address
@@ -251,9 +251,14 @@ class Peer
      */
     private function isValidAddress(string $address): bool
     {
-        // Strict validation of peer address format
-        $pattern = '/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}:[1-9][0-9]{0,4}$/';
-        return (bool)preg_match($pattern, $address);
+        // an IPv4 address and a port, e.g. 10.0.0.5:7747
+        if (!preg_match('/^([0-9.]+):([0-9]{1,5})$/', $address, $parts)) {
+            return false;
+        }
+
+        $port = (int)$parts[2];
+
+        return filter_var($parts[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false && $port >= 1 && $port <= 65535;
     }
 
 
