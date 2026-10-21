@@ -24,6 +24,18 @@ class Node
     // the largest packet a peer may send before a newline, anything bigger closes the connection
     private const MAX_PACKET_SIZE = 4194304;
     private const MAX_PEER_LIST = 100;
+    private const MAX_PENDING_BLOCKS = 500;
+    private const SYNC_REQUEST_TIMEOUT = 30;
+    private const DIAL_INTERVAL = 10;
+    private const SOLO_GRACE_PERIOD = 30;
+
+    // blocks whose parent we have not seen yet, by block id
+    private array $pendingBlocks = [];
+
+    // the block request we are waiting on while syncing
+    private ?array $syncRequest = null;
+    private string $state = '';
+    private int $startTime = 0;
 
     private array $clientInfoArray = [
         'version' => '0',
@@ -134,6 +146,9 @@ class Node
         $clients = [$sock];
         $clientInfo = [];
         $buffers = [];
+        $outbound = []; // client key => peer address, for connections we opened
+        $lastDial = 0;
+        $this->startTime = time();
 
         while (1) {
             $read = $clients;
@@ -196,87 +211,72 @@ class Node
                                 $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
 
                                 if (is_array($data) && isset($data['type'])) {
-                                    // only allow uninitialized connections access to these commands
-                                    if (isset($clientInfo[$key]['init']) && $clientInfo[$key]['init'] < 2) {
+                                    // a connection can send data before the main loop has set it up, set it up now so nothing is lost
+                                    if (!isset($clientInfo[$key])) {
+                                        $clientInfo[$key] = $this->clientInfoArray;
+                                        $clientInfo[$key]['last_ping'] = time();
+                                        $this->sendHandshake($client);
+                                    }
+
+                                    // until both sides have shaken hands only these commands are handled
+                                    if ($clientInfo[$key]['init'] < 2) {
                                         switch ($data['type']) {
                                             case 'handshake':
                                                 Console::log('Received handshake');
+                                                $network = (string)($data['network'] ?? '');
+                                                $version = (string)($data['version'] ?? '');
 
-                                                if (Config::getNetworkIdentifier() !== ($data['network'] ?: '')) {
-                                                    Console::log('Incompatible client <net_id>');
-                                                    $this->send(
-                                                        $client,
-                                                        json_encode(
-                                                            ['type' => 'error', 'message' => 'wrong network id'],
-                                                            JSON_THROW_ON_ERROR
-                                                        )
-                                                    );
+                                                if (Config::getNetworkIdentifier() !== $network
+                                                    || !is_numeric($version) || bccomp($version, Config::getVersion(), 4) < 0) {
+                                                    Console::log('Incompatible client');
+                                                    $this->send($client, json_encode(
+                                                        ['type' => 'error', 'message' => 'wrong network id or incompatible version'],
+                                                        JSON_THROW_ON_ERROR
+                                                    ));
                                                     fclose($client);
-                                                    unset($clientInfo[$key], $clients[$key]);
+                                                    unset($clientInfo[$key], $clients[$key], $buffers[$key]);
+                                                    break;
                                                 }
 
-                                                if (bccomp($data['version'] ?: '', Config::getVersion(), 4) < 0) {
-                                                    Console::log('Incompatible client <version>');
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'error',
-                                                        'message' => 'incompatible version'
-                                                    ], JSON_THROW_ON_ERROR));
-                                                    fclose($client);
-                                                    unset($clientInfo[$key], $clients[$key]);
-                                                }
-
-                                                // store values
-                                                $clientInfo[$key]['network'] = $data['network'];
-                                                $clientInfo[$key]['version'] = $data['version'];
-
-                                                // we have a handshake, allow more commands
-                                                $clientInfo[$key]['init'] = 1;
-                                                $this->send($client, json_encode(
-                                                    ['type' => 'handshake_ok'],
-                                                    JSON_THROW_ON_ERROR
-                                                ));
+                                                $clientInfo[$key]['network'] = $network;
+                                                $clientInfo[$key]['version'] = $version;
+                                                $clientInfo[$key]['got_handshake'] = true;
+                                                $this->send($client, json_encode(['type' => 'handshake_ok'], JSON_THROW_ON_ERROR));
                                                 break;
 
                                             case 'handshake_ok':
                                                 Console::log('Received positive handshake response');
-
-                                                // request a peer list
-                                                $this->send($client, json_encode([
-                                                    'type' => 'peer_list_req'
-                                                ], JSON_THROW_ON_ERROR));
-
-                                                //  send our peer details
-                                                $this->send($client, json_encode([
-                                                    'type' => 'peer_invite_req',
-                                                    'address' => '127.0.0.1',
-                                                    'port' => $port1,
-                                                ], JSON_THROW_ON_ERROR));
-
-                                                // complete the handshake process
-                                                $clientInfo[$key]['init'] = 2;
+                                                $clientInfo[$key]['handshake_acked'] = true;
                                                 break;
 
-                                            case 'handshake_resp_nok':
-                                                Console::log('Received invalid handshake');
-                                                break;
-
-                                            /**
-                                             * misc
-                                             */
                                             case 'error':
-                                                $message = $data['message'];
-                                                Console::log('Received error: ' . $message);
+                                                Console::log('Received error: ' . (string)($data['message'] ?? ''));
                                                 break;
 
                                             default:
-                                                $this->send(
-                                                    $client,
-                                                    json_encode(['type' => 'error', 'message' => 'expected handshake'])
-                                                );
-                                                fclose($client);
-                                                unset($clientInfo[$key], $clients[$key]);
+                                                // can arrive just before the handshake finishes, it is safe to drop
+                                                Console::log('Ignoring ' . $data['type'] . ' before the handshake from: ' . $key);
                                                 break;
                                         }
+
+                                        // ready once we accepted their handshake and they accepted ours
+                                        if (isset($clientInfo[$key]) && !empty($clientInfo[$key]['got_handshake'])
+                                            && !empty($clientInfo[$key]['handshake_acked'])) {
+                                            $clientInfo[$key]['init'] = 2;
+
+                                            // request a peer list
+                                            $this->send($client, json_encode([
+                                                'type' => 'peer_list_req'
+                                            ], JSON_THROW_ON_ERROR));
+
+                                            // send our peer details
+                                            $this->send($client, json_encode([
+                                                'type' => 'peer_invite_req',
+                                                'port' => $port1,
+                                            ], JSON_THROW_ON_ERROR));
+                                        }
+
+                                        continue;
                                     }
 
                                     // only allow initialized connections for these commands
@@ -295,96 +295,46 @@ class Node
                                                 Console::log('Received a block from: ' . $key);
                                                 $block = $data['block'] ?? null;
 
-                                                // invalid or duplicate? if so, ignore...
-                                                $id = 0;
-
-                                                if (!is_array($block) || !isset($block['block_id'], $block['transactions'])
-                                                    || !is_array($block['transactions'])
-                                                    || !empty($this->block->getByBlockId((string)$block['block_id']))) {
-                                                    // we will not be forwarding this block
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'block_resp',
-                                                        'result' => 'ok',
-                                                    ], JSON_THROW_ON_ERROR));
+                                                if (!is_array($block) || empty($block)) {
                                                     break;
                                                 }
 
-                                                $validate = $this->block->validateFullBlock($block);
+                                                $status = $this->handleBlock($block);
 
-                                                if ($validate['validated'] && $block['height'] > 1) {
-                                                    // check to current block
-                                                    $localHeight = $this->block->getCurrentHeight();
-                                                    $remoteHeight = (int)$block['height'];
+                                                $this->send($client, json_encode([
+                                                    'type' => 'block_resp',
+                                                    'result' => $status === 'invalid' ? 'nok' : 'ok',
+                                                ], JSON_THROW_ON_ERROR));
 
-                                                    // received a competing block
-                                                    if ($remoteHeight === $localHeight) {
-                                                        /**
-                                                         * Competing Block Received!
-                                                         */
-                                                        $currBlock = $this->block->getCurrent();
-
-                                                        // add it
-                                                        $id = $this->block->add($block, false, true);
-
-                                                        // choose the block based on features
-                                                        $selectedBlock = $this->block->blockSelector(
-                                                            $currBlock,
-                                                            $block
-                                                        );
-                                                        $this->block->acceptBlock(
-                                                            $selectedBlock['block_id'],
-                                                            (int)$selectedBlock['height']
-                                                        );
-                                                    } else if ($remoteHeight > $localHeight) {
-                                                        /**
-                                                         * New Block Received!
-                                                         */
-                                                        // stored as an orphan until it is accepted
-                                                        $id = $this->block->add($block, false, true);
-                                                        $this->block->acceptBlock(
-                                                            $block['block_id'],
-                                                            (int)$block['height']
-                                                        );
-
-                                                        // check if we are behind
-                                                        if ($this->block->isCurrentHeightOrphan()) {
-                                                            $this->queue->add('new_block', $block['block_id']);
-                                                        }
-                                                    } else {
-                                                        /**
-                                                         * Got an older block... just add it
-                                                         */
-                                                        // we have an older block, keep it as an orphan
-                                                        $id = $this->block->add($block, false, true);
-                                                        $this->queue->add('height_test', $block['height']);
-                                                    }
+                                                // ask the same peer for the parent we are missing
+                                                if ($status === 'missing_parent') {
+                                                    $this->send($client, json_encode([
+                                                        'type' => 'block_req',
+                                                        'block_id' => (string)$block['previous_block_id'],
+                                                    ], JSON_THROW_ON_ERROR));
+                                                    $this->syncRequest = ['key' => $key, 'time' => time()];
+                                                    break;
                                                 }
 
-                                                // propagate the new block?
-                                                if ($id > 0) {
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'block_resp',
-                                                        'result' => 'ok'
-                                                    ], JSON_THROW_ON_ERROR));
+                                                // the answer we were waiting for has arrived
+                                                if ($this->syncRequest !== null && $this->syncRequest['key'] === $key) {
+                                                    $this->syncRequest = null;
+                                                }
 
-                                                    // don't overwrite client/etc
+                                                // tell everyone else about a new tip
+                                                if ($status === 'tip') {
+                                                    $tip = $this->block->assembleFullBlock($this->block->getCurrent()['block_id']);
+
                                                     foreach ($clients as $c) {
-                                                        // don't send to self or current client
                                                         if ($server === $c || $client === $c) {
                                                             continue;
                                                         }
 
                                                         $this->send($c, json_encode([
                                                             'type' => 'block',
-                                                            'block' => $block,
+                                                            'block' => $tip,
                                                         ], JSON_THROW_ON_ERROR));
                                                     }
-                                                } else {
-                                                    // new block is invalid...
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'block_resp',
-                                                        'result' => 'nok'
-                                                    ], JSON_THROW_ON_ERROR));
                                                 }
                                                 break;
 
@@ -394,17 +344,15 @@ class Node
                                                 $height = (int)($data['height'] ?? 0);
 
                                                 if (is_string($blockId) && $blockId !== '') {
-                                                    $this->send($client, json_encode([
-                                                        'type' => 'block',
-                                                        'block' => $this->block->assembleFullBlock($blockId)
-                                                    ], JSON_THROW_ON_ERROR));
+                                                    $block = $this->block->getByBlockId($blockId);
+                                                } elseif ($height !== 0) {
+                                                    $block = $this->block->getByHeight($height);
                                                 } else {
-                                                    if ($height !== 0) {
-                                                        $block = $this->block->getByHeight((int)$height);
-                                                    } else {
-                                                        $block = $this->block->getCurrent();
-                                                    }
+                                                    $block = $this->block->getCurrent();
+                                                }
 
+                                                // only answer with blocks we have
+                                                if (!empty($block)) {
                                                     $this->send($client, json_encode([
                                                         'type' => 'block',
                                                         'block' => $this->block->assembleFullBlock($block['block_id'])
@@ -619,6 +567,26 @@ class Node
                 }
             }
 
+            // forget outbound connections that have closed
+            foreach (array_keys($outbound) as $outboundKey) {
+                if (!isset($clients[$outboundKey])) {
+                    unset($outbound[$outboundKey]);
+                }
+            }
+
+            // open one new outbound connection at a time while we have room
+            if (time() - $lastDial >= self::DIAL_INTERVAL && count($clients) - 1 < Config::getMaxPeers()) {
+                $lastDial = time();
+                $connection = $this->dialPeer($address, $port, $outbound);
+
+                if ($connection !== null) {
+                    $clients[] = $connection['stream'];
+                    $outbound[array_key_last($clients)] = $connection['address'];
+                }
+            }
+
+            $this->syncStep($clients, $clientInfo);
+
             // handshakes, pings, etc
             $propagationBlocks = [];
             $queueItems = $this->queue->getItems('new_block');
@@ -688,6 +656,176 @@ class Node
                     unset($clientInfo[$key], $clients[$key]);
                 }
             }
+        }
+    }
+
+    /**
+     * Takes a block from a peer. It is stored if its parent is known, made the tip if it extends our chain,
+     * and switched to if its branch has more work. Blocks waiting on it are processed after it.
+     *
+     * @param array $block
+     * @return string tip, stored, known, missing_parent or invalid
+     */
+    private function handleBlock(array $block): string
+    {
+        if (!isset($block['block_id'], $block['previous_block_id'], $block['height'], $block['transactions'])
+            || !is_array($block['transactions'])) {
+            return 'invalid';
+        }
+
+        unset($block['confirmations']);
+
+        if (!empty($this->block->getByBlockId((string)$block['block_id']))) {
+            return 'known';
+        }
+
+        $parent = $this->block->getByBlockId((string)$block['previous_block_id']);
+
+        if (empty($parent)) {
+            if (count($this->pendingBlocks) >= self::MAX_PENDING_BLOCKS) {
+                array_shift($this->pendingBlocks);
+            }
+
+            $this->pendingBlocks[(string)$block['block_id']] = $block;
+
+            return 'missing_parent';
+        }
+
+        // spends can only be checked against our chain when the block builds on our tip, a block on another
+        // branch gets that check if the branch ever becomes the chain
+        $tip = $this->block->getCurrent();
+        $extendsTip = $parent['block_id'] === $tip['block_id'];
+        $result = $this->block->validateFullBlock($block, $extendsTip);
+
+        if (!$result['validated']) {
+            Console::log('Rejected block ' . $block['block_id'] . ': ' . $result['reason']);
+
+            return 'invalid';
+        }
+
+        if (!$this->block->add($block, false, true)) {
+            return 'invalid';
+        }
+
+        $status = 'stored';
+        $stored = $this->block->getByBlockId((string)$block['block_id']);
+
+        if ($extendsTip) {
+            if ($this->block->acceptBlock($stored['block_id'], (int)$stored['height'])) {
+                $status = 'tip';
+            }
+        } elseif ($this->block->blockSelector($tip, $stored)['block_id'] === $stored['block_id']
+            && $this->block->reorganize($stored)) {
+            Console::log('Switched to a chain with more work at height ' . $stored['height']);
+            $status = 'tip';
+        }
+
+        // blocks that were waiting for this one
+        foreach ($this->pendingBlocks as $pendingId => $pending) {
+            if ((string)$pending['previous_block_id'] === (string)$block['block_id']) {
+                unset($this->pendingBlocks[$pendingId]);
+
+                if ($this->handleBlock($pending) === 'tip') {
+                    $status = 'tip';
+                }
+            }
+        }
+
+        return $status;
+    }
+
+    /**
+     * Opens a connection to a known peer we are not already connected to.
+     *
+     * @param string $listenAddress
+     * @param int $listenPort
+     * @param array $outbound
+     * @return array|null ['stream' => resource, 'address' => string]
+     */
+    private function dialPeer(string $listenAddress, int $listenPort, array $outbound): ?array
+    {
+        $self = [$listenAddress . ':' . $listenPort, '127.0.0.1:' . $listenPort, '0.0.0.0:' . $listenPort];
+
+        foreach ($this->peer->getAll(Config::getMaxPeers()) as $candidate) {
+            $address = (string)$candidate['address'];
+
+            if (in_array($address, $outbound, true) || in_array($address, $self, true)) {
+                continue;
+            }
+
+            $stream = @stream_socket_client('tcp://' . $address, $errno, $errstr, 3);
+
+            if ($stream === false) {
+                Console::log('Could not connect to peer ' . $address . ': ' . $errstr);
+                $this->peer->incrementFails($address);
+                continue;
+            }
+
+            Console::log('Connected to peer ' . $address);
+            $this->peer->clearFails($address);
+
+            return ['stream' => $stream, 'address' => $address];
+        }
+
+        return null;
+    }
+
+    /**
+     * Asks the highest peer for our next block, one request at a time, and sets the mining state. We mine once
+     * no peer is ahead of us, or when we have been alone for the grace period.
+     *
+     * @param array $clients
+     * @param array $clientInfo
+     * @return void
+     * @throws JsonException
+     */
+    private function syncStep(array $clients, array $clientInfo): void
+    {
+        $localHeight = $this->block->getCurrentHeight();
+        $bestKey = null;
+        $bestHeight = $localHeight;
+        $readyPeers = 0;
+
+        foreach ($clientInfo as $key => $info) {
+            if (!isset($clients[$key]) || (int)($info['init'] ?? 0) !== 2) {
+                continue;
+            }
+
+            $readyPeers++;
+
+            if ((int)($info['height'] ?? 0) > $bestHeight) {
+                $bestHeight = (int)$info['height'];
+                $bestKey = $key;
+            }
+        }
+
+        if ($this->syncRequest !== null
+            && (time() - $this->syncRequest['time'] > self::SYNC_REQUEST_TIMEOUT
+                || !isset($clients[$this->syncRequest['key']]))) {
+            $this->syncRequest = null;
+        }
+
+        if ($bestKey !== null && $this->syncRequest === null) {
+            Console::log('Requesting block ' . ($localHeight + 1) . ' of ' . $bestHeight . ' from client: ' . $bestKey);
+            $this->send($clients[$bestKey], json_encode([
+                'type' => 'block_req',
+                'height' => $localHeight + 1,
+            ], JSON_THROW_ON_ERROR));
+            $this->syncRequest = ['key' => $bestKey, 'time' => time()];
+        }
+
+        if ($bestKey !== null) {
+            $state = self::SYNCING;
+        } elseif ($readyPeers > 0 || time() - $this->startTime >= self::SOLO_GRACE_PERIOD) {
+            $state = self::MINING;
+        } else {
+            $state = self::SYNCING;
+        }
+
+        if ($state !== $this->state) {
+            Console::log('Node state: ' . $state);
+            $this->dataStore->add('state', $state);
+            $this->state = $state;
         }
     }
 }

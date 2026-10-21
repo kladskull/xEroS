@@ -357,11 +357,13 @@ class Transaction
      *
      * @param array $transaction
      * @param int|null $height the height of the block the transaction is going into, defaults to the next block
+     * @param bool $checkInputs false to skip the checks that depend on the chain state, used for blocks on a
+     *                          side branch, which get the full check if they ever join the chain
      * @return array
      * @throws Exception
      */
     #[ArrayShape(['validated' => "bool", 'reason' => "string", 'fee' => "string"])]
-    public function validate(array $transaction, ?int $height = null): array
+    public function validate(array $transaction, ?int $height = null, bool $checkInputs = true): array
     {
         $address = new Address();
         $openSsl = new OpenSsl();
@@ -406,8 +408,10 @@ class Transaction
             $result = false;
         }
 
-        if (strlen((string)$transaction['peer']) > 40) {
-            $reason .= '"peer" is too long, must be 40 or less,';
+        // the database keeps letters and digits only, anything else would change the id when a block is reloaded
+        if (strlen((string)$transaction['peer']) > 40
+            || ((string)$transaction['peer'] !== '' && !ctype_alnum((string)$transaction['peer']))) {
+            $reason .= '"peer" must be 40 letters or digits or less,';
             $result = false;
         }
 
@@ -532,6 +536,10 @@ class Transaction
                 continue;
             }
 
+            if (!$checkInputs) {
+                continue;
+            }
+
             $unspent = $this->getUnspentOutput($previousId, (int)$previousOut);
 
             if ($unspent === null) {
@@ -554,6 +562,10 @@ class Transaction
             }
 
             $totalInputs = bcadd($totalInputs, (string)$unspent['value']);
+        }
+
+        if (!$checkInputs) {
+            return ['validated' => $result, 'reason' => $reason, 'fee' => '0'];
         }
 
         $fee = bcsub($totalInputs, $totalOutputs);
