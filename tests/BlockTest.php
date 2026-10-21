@@ -46,46 +46,6 @@ class BlockTest extends TestCase
         }
     }
 
-    private function createAccount(): array
-    {
-        $id = $this->account->create();
-        $this->createdIds[] = $id;
-
-        return $this->account->get($id);
-    }
-
-    /**
-     * @throws Exception
-     */
-    private function createBlock(
-        int $height,
-        int $date,
-        string $nonce,
-        array $generatorAccount,
-        array $previousBlock,
-        array $transactions,
-        string $hash,
-    ): array {
-        return [];
-    }
-
-    /**
-     * No longer works
-     * @throws Exception
-     */
-    private function createTransaction(
-        int $date,
-        string $blockId,
-        int $height,
-        array $destinationAccount,
-        array $sourceAccount,
-        string $amount,
-        string $fee,
-        string $message,
-    ): array {
-        return [];
-    }
-
     public function testGetRewardValue(): void
     {
         $this->assertEquals('5000000000', $this->block->getRewardValue(1));
