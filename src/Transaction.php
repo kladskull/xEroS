@@ -460,8 +460,8 @@ class Transaction
                 $result = false;
             }
 
-            if (strlen((string)($txOut['script'] ?? '')) > Config::getMaxScriptLength()) {
-                $reason .= 'uncompressed script is larger than the max allowed,';
+            if (!$this->isScriptSizeValid((string)($txOut['script'] ?? ''))) {
+                $reason .= 'output script is invalid or larger than the max allowed,';
                 $result = false;
             }
 
@@ -526,8 +526,8 @@ class Transaction
 
             $seen[$outpoint] = true;
 
-            if (strlen((string)($txIn['script'] ?? '')) > Config::getMaxScriptLength()) {
-                $reason .= 'uncompressed script is larger than the max allowed,';
+            if (!$this->isScriptSizeValid((string)($txIn['script'] ?? ''))) {
+                $reason .= 'input script is invalid or larger than the max allowed,';
                 $result = false;
                 continue;
             }
@@ -672,10 +672,41 @@ class Transaction
             return false;
         }
 
-        if (!$script->loadScript($inputScript . $outputScript)) {
+        // a few compressed bytes can expand into a script that takes seconds to run
+        if (strlen($inputScript) + strlen($outputScript) > Config::getMaxDecodedScriptLength()) {
             return false;
         }
 
-        return $script->run(false);
+        // any error inside the script, such as bad math input, means the script fails
+        try {
+            if (!$script->loadScript($inputScript . $outputScript)) {
+                return false;
+            }
+
+            return $script->run(false);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * True if the encoded script decodes and stays within the decoded size limit.
+     *
+     * @param string $encoded
+     * @return bool
+     */
+    public function isScriptSizeValid(string $encoded): bool
+    {
+        if (strlen($encoded) > Config::getMaxScriptLength()) {
+            return false;
+        }
+
+        try {
+            $decoded = (new Script([]))->decodeScript($encoded);
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $decoded !== false && strlen($decoded) <= Config::getMaxDecodedScriptLength();
     }
 }

@@ -544,17 +544,16 @@ class Node
 
                                             case 'peer_invite_req':
                                                 Console::log('Received peer_invite_req');
-                                                // get the IP we see, not what was given
                                                 $packet = null;
-                                                socket_getpeername($client, $peerAddress);
-                                                $peerPort = (int)$data['port'] ?: null;
 
-                                                if (!empty($peerAddress) && $peerPort !== null && filter_var(
-                                                        $peerAddress,
-                                                        FILTER_VALIDATE_IP,
-                                                        FILTER_FLAG_IPV4
-                                                    ) && $peerPort > 0 && $peerPort <= 65535) {
-                                                    $hostAddress = $peerAddress . ':' . $port;
+                                                // use the address we see the connection coming from, not what was sent
+                                                $remote = (string)stream_socket_get_name($client, true);
+                                                $peerAddress = substr($remote, 0, (int)strrpos($remote, ':'));
+                                                $peerPort = (int)($data['port'] ?? 0);
+
+                                                if ($peerAddress !== '' && filter_var($peerAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+                                                    && $peerPort > 0 && $peerPort <= 65535) {
+                                                    $hostAddress = $peerAddress . ':' . $peerPort;
 
                                                     if ($this->peer->getByHostAddress($hostAddress) === null) {
                                                         $this->peer->add($hostAddress);
@@ -562,7 +561,7 @@ class Node
                                                     }
 
                                                     $packet = json_encode([
-                                                        'type' => 'peer_inv_resp',
+                                                        'type' => 'peer_invite_resp',
                                                         'result' => 'ok'
                                                     ], JSON_THROW_ON_ERROR);
                                                 }
@@ -570,7 +569,7 @@ class Node
                                                 if ($packet === null) {
                                                     Console::log('Sending response NOK to peer_invite_req');
                                                     $packet = json_encode([
-                                                        'type' => 'peer_inv_resp',
+                                                        'type' => 'peer_invite_resp',
                                                         'result' => 'nok'
                                                     ], JSON_THROW_ON_ERROR);
                                                 }

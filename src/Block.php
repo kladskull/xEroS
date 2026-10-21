@@ -7,6 +7,7 @@ use JetBrains\PhpStorm\ArrayShape;
 use JetBrains\PhpStorm\Pure;
 use PDO;
 use RuntimeException;
+use Throwable;
 
 /**
  * Class Block
@@ -151,8 +152,8 @@ class Block
      */
     public function getCandidateBlock(int $height, string $publicKey, string $privateKey): array
     {
-        $difficulty = $this->getDifficulty($height);
         $prevBlock = $this->getByHeight($height - 1);
+        $difficulty = $this->getNextDifficulty($prevBlock);
         $transactions = $this->mempool->getAllTransactions($height);
 
         $date = time();
@@ -520,8 +521,8 @@ class Block
             $result = false;
         }
 
-        // check difficulty
-        if ($this->getDifficulty($height) !== (int)$block['difficulty']) {
+        // check difficulty against the block's own parent
+        if ($this->getNextDifficulty($previousBlock) !== (int)$block['difficulty']) {
             $reason .= 'difficulty difference,';
             $result = false;
         }
@@ -988,6 +989,58 @@ class Block
     }
 
     /**
+     * The difficulty a block built on $parent must have. It only reads the parent and its ancestors, so every
+     * block gets the same answer however it arrives and whatever else is at its height.
+     *
+     * @param array $parent
+     * @return int
+     */
+    public function getNextDifficulty(array $parent): int
+    {
+        $height = (int)$parent['height'] + 1;
+        $blocksPerPeriod = (int)(3600 / Config::getDesiredBlockTime()) * 24;
+
+        if ($height < $blocksPerPeriod) {
+            $genesisBlock = $this->getByHeight(1);
+
+            return (int)$genesisBlock['difficulty'];
+        }
+
+        $difficulty = (int)$parent['difficulty'];
+
+        // adjust once per period, using the time the parent's chain took over that period
+        if ($height % $blocksPerPeriod === 0) {
+            $oldestBlock = $parent;
+
+            for ($i = 1; $i < $blocksPerPeriod && (string)$oldestBlock['previous_block_id'] !== ''; $i++) {
+                $oldestBlock = $this->getByBlockId((string)$oldestBlock['previous_block_id']);
+
+                if (empty($oldestBlock)) {
+                    return $difficulty;
+                }
+            }
+
+            $blockTime = $this->getBlockTime(
+                (int)$parent['date_created'],
+                (int)$oldestBlock['date_created'],
+                $blocksPerPeriod
+            );
+
+            // block time was quick, increase difficulty
+            if ($blockTime <= Config::getDesiredBlockTime() - 30) {
+                ++$difficulty;
+            }
+
+            // block time was slow, decrease difficulty
+            if ($blockTime >= Config::getDesiredBlockTime() + 30) {
+                $difficulty--;
+            }
+        }
+
+        return max(Config::getDefaultDifficulty(), min(255, $difficulty));
+    }
+
+    /**
      * Warning, this is a simple "add a block and its transactions to the database". If you want the block to be active
      * you need to '$this->acceptBlock(block_id)'.
      *
@@ -1008,7 +1061,7 @@ class Block
         if ($validate) {
             try {
                 $result = $this->validateFullBlock($block);
-            } catch (Exception|RuntimeException $e) {
+            } catch (Throwable $e) {
                 Console::log('Exception thrown validating block: ' . $e->getMessage());
 
                 return false;
@@ -1357,7 +1410,7 @@ class Block
             }
 
             $result = true;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
 
             if ($ownsTransaction && $this->db->inTransaction()) {
@@ -1469,7 +1522,7 @@ class Block
             if ($ownsTransaction) {
                 $this->db->commit();
             }
-        } catch (Exception|RuntimeException $e) {
+        } catch (Throwable $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
 
             if ($ownsTransaction && $this->db->inTransaction()) {
@@ -1589,7 +1642,7 @@ class Block
                 $this->db->commit();
             }
             $result = true;
-        } catch (Exception|RuntimeException $e) {
+        } catch (Throwable $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
             if ($ownsTransaction ?? false) {
                 $this->db->rollback();
@@ -1622,7 +1675,7 @@ class Block
             if ($ownsTransaction) {
                 $this->db->commit();
             }
-        } catch (Exception|RuntimeException $e) {
+        } catch (Throwable $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
 
             if ($ownsTransaction && $this->db->inTransaction()) {

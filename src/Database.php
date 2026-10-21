@@ -25,8 +25,15 @@ class Database
                     $configEnv = '-' . $configEnv;
                 }
 
-                self::$instance = new PDO('sqlite:' . APP_DIR . strtolower(Config::getProductName()) .
-                    $configEnv . '.db');
+                $path = APP_DIR . strtolower(Config::getProductName()) . $configEnv . '.db';
+
+                // the accounts table holds private keys, keep the file readable by this user only
+                if (!file_exists($path)) {
+                    touch($path);
+                }
+
+                chmod($path, 0600);
+                self::$instance = new PDO('sqlite:' . $path);
                 self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             } catch (PDOException $e) {
                 Console::log($e->getMessage());

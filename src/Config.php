@@ -41,6 +41,7 @@ class Config
     // Scripting
     private const MAX_LOOPS = 100;
     private const MAX_SCRIPT_LENGTH = 2048;
+    private const MAX_DECODED_SCRIPT_LENGTH = 4096; // scripts are compressed, this caps what they expand to
 
     // Peers
     private const MAX_PEERS = 60;
@@ -235,6 +236,14 @@ class Config
     public static function getMaxScriptLength(): int
     {
         return self::MAX_SCRIPT_LENGTH;
+    }
+
+    /**
+     * @return int
+     */
+    public static function getMaxDecodedScriptLength(): int
+    {
+        return self::MAX_DECODED_SCRIPT_LENGTH;
     }
 
     /**
