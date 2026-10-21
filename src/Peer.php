@@ -141,7 +141,11 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
             $query = 'UPDATE peers SET fails=fails+1 WHERE address=:address;';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(
@@ -152,10 +156,14 @@ class Peer
                 256
             );
             $stmt->execute();
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
             $result = true;
         } catch (Exception) {
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
         }
 
         return $result;
@@ -169,7 +177,11 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
             $query = 'UPDATE peers SET fails=0 WHERE address=:address;';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(
@@ -179,10 +191,14 @@ class Peer
                 256
             );
             $stmt->execute();
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
             $result = true;
         } catch (Exception) {
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
         }
 
         return $result;
@@ -196,7 +212,11 @@ class Peer
     {
         $result = false;
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
             $query = 'UPDATE peers SET last_ping=:last_ping WHERE address=:address;';
             $stmt = $this->db->prepare($query);
             $stmt = DatabaseHelpers::filterBind(
@@ -212,10 +232,14 @@ class Peer
                 DatabaseHelpers::INT
             );
             $stmt->execute();
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
             $result = true;
         } catch (Exception) {
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
         }
 
         return $result;
@@ -247,11 +271,17 @@ class Peer
         }
 
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             // Prepare the statement with parameterized query
-            $query = 'INSERT OR REPLACE INTO peers (`address`, `reserve`, `last_ping`, `blacklisted`, `fails`, `date_created`) 
-                      VALUES (:address, :reserve, :last_ping, :blacklisted, :fails, :date_created)';
+            // only blacklisting may overwrite a known peer, a peer list from the network must not reset it
+            $query = ($blacklisted ? 'INSERT OR REPLACE' : 'INSERT OR IGNORE') .
+                ' INTO peers (`address`, `reserve`, `last_ping`, `blacklisted`, `fails`, `date_created`) ' .
+                'VALUES (:address, :reserve, :last_ping, :blacklisted, :fails, :date_created)';
             $stmt = $this->db->prepare($query);
 
             // Bind parameters
@@ -270,18 +300,19 @@ class Peer
             $stmt->execute();
 
             // Get the last inserted ID
-            $id = (int)$this->db->lastInsertId();
+            $id = $stmt->rowCount() > 0 ? (int)$this->db->lastInsertId() : 0;
 
-            if ($id <= 0) {
-                // Failed to add peer to the database
-                throw new RuntimeException('Failed to add peer to the database: ' . $address);
+            if ($ownsTransaction) {
+
+                $this->db->commit();
+
             }
-
-            $this->db->commit();
         } catch (Exception $e) {
             // Log and rollback transaction in case of error
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
             $id = 0; // Return 0 indicating failure
         }
 
@@ -297,7 +328,11 @@ class Peer
     public function delete(int $id): bool
     {
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             // Prepare the delete statement
             $stmt = $this->db->prepare('DELETE FROM peers WHERE id = :id');
@@ -305,12 +340,16 @@ class Peer
             $stmt->execute();
 
             // Commit the transaction
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
             return true;
         } catch (Exception $e) {
             // Log the error and roll back the transaction
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollBack();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
             return false;
         }
     }

@@ -3,6 +3,7 @@
 namespace Blockchain;
 
 use Exception;
+use Throwable;
 
 define('PROGRAM', 'Miner');
 include 'bootstrap.php';
@@ -120,7 +121,7 @@ while (1) {
                         $queue->add('new_block', $candidateBlock['block_id']);
                         break;
                     }
-                } catch (Exception $e) {
+                } catch (Throwable $e) {
                     Console::log('Exception in miner: ' . $e->getMessage());
                 }
             }

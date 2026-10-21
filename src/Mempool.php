@@ -5,6 +5,7 @@ namespace Blockchain;
 use Exception;
 use PDO;
 use RuntimeException;
+use Throwable;
 
 /**
  * Class Mempool
@@ -53,7 +54,7 @@ class Mempool
                     return false;
                 }
             }
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             Console::log('Error ' . $e->getMessage());
 
             return false;
@@ -138,7 +139,7 @@ class Mempool
             if ($ownsTransaction) {
                 $this->db->commit();
             }
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
 
             if ($ownsTransaction && $this->db->inTransaction()) {

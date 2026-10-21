@@ -88,7 +88,11 @@ class Account
     public function create(): int
     {
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             $keys = $this->openSsl->createRsaKeyPair();
             $address = $this->address->create($keys['public_key']);
@@ -138,11 +142,17 @@ class Account
                 throw new RuntimeException("failed to add account to the database");
             }
 
-            $this->db->commit();
+            if ($ownsTransaction) {
+
+                $this->db->commit();
+
+            }
         } catch (Exception $e) {
             $id = 0;
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
         }
 
         return $id;
@@ -156,7 +166,11 @@ class Account
     {
         $result = false;
         try {
-            $this->db->beginTransaction();
+            $ownsTransaction = !$this->db->inTransaction();
+
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
+            }
 
             // delete the block
             $query = 'DELETE FROM accounts WHERE `id` = :id;';
@@ -169,11 +183,17 @@ class Account
             );
             $stmt->execute();
 
-            $this->db->commit();
+            if ($ownsTransaction) {
+
+                $this->db->commit();
+
+            }
             $result = true;
         } catch (Exception $e) {
             Console::log('Rolling back transaction: ' . $e->getMessage());
-            $this->db->rollback();
+            if ($ownsTransaction ?? false) {
+                $this->db->rollBack();
+            }
         }
 
         return $result;
