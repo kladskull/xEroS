@@ -1,10 +1,31 @@
 build:
   image: default-jammy
   environment:
-    php:
-      version: 8.4.0
+    php: '8.4.21'
   nodes:
     analysis:
       tests:
         override:
           - php-scrutinizer-run
+    coverage:
+      dependencies:
+        before:
+          - pecl channel-update pecl.php.net
+          - pecl install pcov
+      project_setup:
+        override:
+          - cp .env_sample .env
+          - ./phinx migrate
+      tests:
+        override:
+          - command: php -d pcov.enabled=1 -d pcov.directory=src vendor/bin/phpunit --bootstrap bootstrap.php --coverage-clover coverage.xml tests
+            coverage:
+              file: coverage.xml
+              format: clover
+
+filter:
+  paths: ['src/*']
+
+# coverage comes from the coverage node above, nothing is uploaded from outside
+tools:
+  external_code_coverage: false
