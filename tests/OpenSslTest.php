@@ -3,6 +3,7 @@
 namespace Blockchain;
 
 use Exception;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class OpenSslTest extends TestCase
@@ -67,10 +68,9 @@ class OpenSslTest extends TestCase
     }
 
     /**
-     * (add multiple functions below)
-     * @dataProvider textDataProvider
      * @throws Exception
      */
+    #[DataProvider('textDataProvider')]
     public function testSignAndVerifyData(string $text): void
     {
         $keys = $this->openssl->createRsaKeyPair();

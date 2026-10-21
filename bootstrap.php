@@ -26,11 +26,8 @@ if (!file_exists(APP_DIR . 'vendor/autoload.php')) {
 // includes
 require APP_DIR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
-// get the interpreter version
-$phpVersion = ((PHP_MAJOR_VERSION * 10000) + (PHP_MINOR_VERSION * 1000) + PHP_RELEASE_VERSION);
-
-if ($phpVersion < 81001) {
-    Console::log('Error: The minimum version of PHP must be 8.1');
+if (PHP_VERSION_ID < 80400) {
+    Console::log('Error: The minimum version of PHP must be 8.4');
     exit(1);
 }
 
@@ -52,7 +49,7 @@ $app->checkMigrations();
 $block = new Block();
 
 if ($block->getCurrentHeight() === 0) {
-    $genesisBlock = $block->genesis($_ENV['ENVIRONMENT'], '', '');
+    $genesisBlock = $block->genesis(Config::getEnvironment());
     $block->add($genesisBlock, false);
     $block->acceptBlock($genesisBlock['block_id'], 1);
 }

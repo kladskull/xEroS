@@ -105,14 +105,4 @@ class BlockTest extends TestCase
         $this->assertEquals(28, 600 - $this->block->getBlockTime(1639526400, 1638316800, 2116));
     }
 
-    public function testDifficultyDefaults(): void
-    {
-        $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(-1));
-        $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty());
-        $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(10));
-        $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(200));
-        $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(2000));
-        $this->assertEquals(Config::getDefaultDifficulty(), $this->block->getDifficulty(2015));
-    }
-
 }

@@ -3,15 +3,13 @@
 namespace Blockchain;
 
 use JetBrains\PhpStorm\ArrayShape;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigTest extends TestCase
 {
-    /**
-     * (add multiple functions below)
-     * @dataProvider additionProvider
-     * @dataProvider additionWithNegativeNumbersProvider
-     */
+    #[DataProvider('additionProvider')]
+    #[DataProvider('additionWithNegativeNumbersProvider')]
     public function testAdd(int $a, int $b, int $expected): void
     {
         $this->assertSame($expected, $a + $b);

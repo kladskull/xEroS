@@ -29,6 +29,57 @@ class Block
     public Transaction $transaction;
     private TransferEncoding $transferEncoding;
 
+    /**
+     * The first block of each network. Make a new one with genesis.php and paste its output here.
+     */
+    private const GENESIS = [
+        'live' => [ // stale, made before the block format changed, re-mine before launch
+            'date' => 1644364863,
+            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrA' .
+                'MjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2Yj' .
+                'srrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh' .
+                '59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB',
+            'signature' => '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af' .
+                '7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a' .
+                '12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6' .
+                '858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab' .
+                '597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c' .
+                '69295c476414',
+            'nonce' => '5bd5d65',
+            'hash' => '0000000f8fd419d81b0eb5ed9512a1cc42910c94a5034bd543653edd83fcb4f3',
+        ],
+        'test' => [ // stale, made before the block format changed, re-mine before launch
+            'date' => 1644364863,
+            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrA' .
+                'MjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2Yj' .
+                'srrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh' .
+                '59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB',
+            'signature' => '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af' .
+                '7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a' .
+                '12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6' .
+                '858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab' .
+                '597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c' .
+                '69295c476414',
+            'nonce' => '1192faa7',
+            'hash' => '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67',
+        ],
+        'dev' => [
+            'date' => 1792594643,
+            'public_key' => 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAveRPU9KVhQruDQDrsO8ZFg/a3mg2HxskENSM1PONewtOkIjsCQ5iQAiA' .
+                'EmjNYiy48PRAx/xhfZucPLPIKRyWX2SimMvs1kyptVWvvx9cvCtdMuaXiDxQdiJU8DbH15OCTUKF7NyUpyJh3qBvFdh2qnBDH3jP' .
+                'N9zQFUJPsAfF0E7ZS0GHdoPHUmoS/U7f263oLwABvgohMCPSi/C/ZxBsrmSpbT59+C8YKT1A1FRAi8/Xqb93epvH+3wY9dt7oX4B' .
+                'rpx6HHPdPZ+wIvz2ErSjdNBpYmz/PXE6JtGDGJRbBfORUuMx2e8iDyYk+wJwncvuqFcefLAjJEWqdUankbleYQIDAQAB',
+            'signature' => '91a23865574151b7832787a9ac415c8057f834bc5478b6b979b4388d168302bd127f067f9221235f79428e8adda5737b0502' .
+                '357f947b268bea161944911f365923dc3e6dd9d1c15d0cee6be99c91a7231f65a79b52471d979cfc559731630cfc178e8655' .
+                '5821715e8a85b5f4979e52e98077ba569379d4e773a7b439337ae611bd11ef4ee6124a0da9117752a0229619dfc8dabb19c2' .
+                'ca739560d4e9e800d8462f13fec53e6dac77680ee2000746619b947c4f108e42a95bf2749632c9981c86e6ad88f15ee03163' .
+                '362f59962c3710561ca795557bdf0277f8970b485e81329b79645fb8c3f941fec58e23bd1181c738595c68d2ec0fc2fd6b41' .
+                '2127d1c9d573',
+            'nonce' => '7609',
+            'hash' => '0000041d0e27e05bdd4c6e48857edbb7f67d8f31ec85661868b5973309ca5bba',
+        ],
+    ];
+
     public function __construct()
     {
         $this->db = Database::getInstance();
@@ -58,89 +109,43 @@ class Block
     }
 
     /**
+     * The genesis block for an environment, built the same way as any other block from the fixed values above.
+     *
      * @param string $environment
-     * @param string $publicKey
-     * @param string $privateKey
-     * @return array
+     * @return array empty if the environment is unknown
      */
-    public function genesis(string $environment, string $publicKey, string $privateKey): array
+    public function genesis(string $environment): array
     {
-        $environment = trim($environment);
-        $height = 1;
-        $previousBlockId = '';
-        $gBlock = [];
+        $environment = Config::normalizeEnvironment($environment);
+        $fixed = self::GENESIS[$environment] ?? null;
 
-        // every network has a fixed genesis key below, no key files are needed
-        $publicKeyRaw = '';
-
-        switch ($environment) {
-            case 'production':
-            case 'live':
-                // block details
-                $date = 1644364863;
-
-                $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJhr6WB94TDhrAMjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJctLcaWmy0gI2YjsrrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hEFlYVtIF6g+wh59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB';
-                $hash = '0000000f8fd419d81b0eb5ed9512a1cc42910c94a5034bd543653edd83fcb4f3';
-                $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
-                $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018ae618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c2369ddc6c69295c476414';
-                $nonce = '5bd5d65';
-
-                $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
-                $gBlock['merkle_root'] = $merkleRoot;
-                $gBlock['hash'] = $hash;
-                $gBlock['nonce'] = $nonce;
-
-                break;
-
-            case 'test':
-                // block details
-                $date = 1644364863;
-
-                // uncomment these to create new keys, and replace the strings below with them
-                //$publicKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR. 'public.key'));
-                //$privateKeyRaw = $openSsl->stripPem(file_get_contents(APP_DIR . 'private.key'));
-
-                $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6iS30IjUFtg5UdqGn7bMWtO2yf3nAhG85xJK9Ro0DByJ' .
-                    'hr6WB94TDhrAMjWK4bwcYO08M6yHvsO6wVUxB6KuONNYrEHOmHqA3lYS+Kz9dfwWN+ymwLbOgDevZ33PKahV6JpXTu5wHKFdPJct' .
-                    'LcaWmy0gI2YjsrrZw8mXiiArNOT3662UvZdFgyMM1SSuPoE/ZXvDjRIXz/4RMnKCE1GH5cbtBheC1yy8XvuZkK9IN+he1osz29hE' .
-                    'FlYVtIF6g+wh59ZGxzrZoA7bcO5mGY491mZFCzHMu0nVXnokAsiKx4YK0KxyV5ETk4P8qili7MizbKVhS9mUinVkU9l16dhreQIDAQAB';
-                $hash = '0000000c7a00d1ea28b8986d5a1b3226e4493d502f68b302d074c97489c06c67';
-                $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
-                $signature = '0aa6338178f42f3fc6a688c7a284c6d9f3bd4f973c067e3c71d6f49d6a4ccab40753f799e6ea3ad61a678727dbd' .
-                    '7329067af7c6626775083bbe323ee8baa61fb586808cb012fa3592018e0f1397ff636ad85c05553c1079f38b071e9d52b8da' .
-                    '5c39fa85a12ebbdd6224e008addaaaa149932ceed3b8bb307937530f91a54edaf7095877bc13116c79ef1bb480e35812ad77' .
-                    'e4c049ec6858f461017fd3c0ce27956971c13c73aca745b1d61f8a0700b0d5a17470c4d983622c525d6691a80d027e79018a' .
-                    'e618ea8ab597c19e7d030b497fdffdeef308bc51d69e2ccc068223a713e67b2114fc609b70263a9562a72ab1ce182686447c' .
-                    '2369ddc6c69295c476414';
-                $nonce = '1192faa7';
-
-                $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
-                $gBlock['merkle_root'] = $merkleRoot;
-                $gBlock['hash'] = $hash;
-                $gBlock['nonce'] = $nonce;
-
-                break;
-
-            case 'dev':
-            case 'development':
-                // block details
-                $date = 1646786361;
-
-                $publicKeyRaw = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxsUPQdLF5QPyqFUmCWqiSVFLjf+pYHwOpPdHf/bZZuGDzu/nNp7EXT9tsMIdEdgNzhMEkpD+JcMaXwfBZm6u7ThrAwDl8QOldHiSA+j87O3zk3CSeR5edeRjUgj36zFJzsrvqFQkCmEzl25WAyKDhU68nqOdNuEBBp4sq7yMSMkWw2uiPUW5+hkBi0x3kXM7yl0hld9n4qVfjY3/JI+8RnIeIQMLANbO2Ms+E0wPmBhLVTaLMM8uH5bLd4dM+KGrLeEqKN23V5mziFM/JS5z7AMy2DDHqYr7JXyiuhyt8QQxmLZPC/24Z9nCxZ5VWYRmrpUEYh9IwzNnqYMCJ2YlRwIDAQAB';
-                $hash = '0000b97b1fada4f3b8c88093d2b724d7c723a1532550daf0ec08f5f66a19cb87';
-                $merkleRoot = '737a608f997acacaad87a2665ff32dfc5c436963cb9b15096a435f341266fa33';
-                $signature = '983de74a65334f1273bf72a9957ce5877c01ff93a34259aaeb470ce2ce35ae138f9c2e9bbd400c41f6f4479750f88e5f56c28940d5461fa7bbdc4104abaa6c711fdead8cf900147524036a44c23fe18cc898cba9d19a35a5e3bc13c827eb0cec546b63741a730f189c30996f6ee4561fb259eeac71032f4d8007e234ad5b93145786270f0a818aee52cd666e77ac0031c3b2772e26f856f2177769fe3b26321aabc2c21968e3d81ae4db6dd7698d04195a6d8b2954b4b28c5407eb8dc83cd86d572adc2d167f2dc0345dd509382219b01d55d5914d8233a9622d4dc0f67b525c9535e159d43def2fac8ecf418bdaa0f1594165ff2b80547356a895bcdb3eb525';
-                $nonce = '93e4';
-
-                $gBlock = $this->transactionWork($previousBlockId, $date, $height, $publicKeyRaw, $signature);
-                $gBlock['merkle_root'] = $merkleRoot;
-                $gBlock['hash'] = $hash;
-                $gBlock['nonce'] = $nonce;
-
-                break;
+        if ($fixed === null) {
+            return [];
         }
 
-        return $gBlock;
+        $block = $this->assembleGenesis($environment, $fixed['date'], $fixed['public_key'], $fixed['signature']);
+        $block['nonce'] = $fixed['nonce'];
+        $block['hash'] = $fixed['hash'];
+
+        return $block;
+    }
+
+    /**
+     * A new, signed but unmined genesis block. Used by genesis.php.
+     *
+     * @param string $environment
+     * @param int $date
+     * @param string $publicKey PEM
+     * @param string $privateKey PEM
+     * @return array
+     */
+    public function createGenesis(string $environment, int $date, string $publicKey, string $privateKey): array
+    {
+        $publicKeyRaw = $this->openSsl->stripPem($publicKey);
+        $transaction = $this->genesisTransaction($date, $publicKeyRaw);
+        $signature = $this->transaction->signTransaction($transaction, $publicKey, $privateKey);
+
+        return $this->assembleGenesis(Config::normalizeEnvironment($environment), $date, $publicKeyRaw, $signature);
     }
 
     /**
@@ -475,9 +480,9 @@ class Block
 
         // the genesis block is fixed, it is trusted when it matches ours exactly
         if ($height === 1) {
-            $genesis = $this->genesis($_ENV['ENVIRONMENT'] ?? 'dev', '', '');
-            $isGenesis = $block['previous_block_id'] === '' && isset($genesis['hash'])
-                && $block['hash'] === $genesis['hash'];
+            $genesis = $this->genesis(Config::getEnvironment());
+            $isGenesis = isset($genesis['hash']) && $block['previous_block_id'] === ''
+                && $block['block_id'] === $genesis['block_id'] && $block['hash'] === $genesis['hash'];
 
             return $this->returnValidateResult($isGenesis ? '' : 'invalid genesis block,', $isGenesis);
         }
@@ -885,84 +890,6 @@ class Block
     public function getBlockTime(int $currentTimeSeconds, int $previousTimeSeconds, int $blocksCreated): float
     {
         return ceil(($currentTimeSeconds - $previousTimeSeconds) / $blocksCreated);
-    }
-
-    /**
-     * calculates the difficulty
-     *
-     * the higher the difficulty number, the harder it is.
-     * the lower the difficulty number, the easier it is.
-     *
-     * @param int $height
-     * @param array|null $latestBlock
-     * @param array|null $oldestBlock
-     * @return int
-     */
-    public function getDifficulty(int $height = 0, ?array $latestBlock = null, ?array $oldestBlock = null): int
-    {
-        // get the current height, if not given
-        if ($height === 0) {
-            $height = $this->getCurrentHeight();
-        }
-
-        // get blocks per period
-        $blocksPerPeriod = (int)(3600 / Config::getDesiredBlockTime()) * 24;
-
-        // if less than 144 use the genesis difficulty
-        if ($height < $blocksPerPeriod) {
-            $genesisBlock = $this->getByHeight(1);
-
-            return (int)$genesisBlock['difficulty'];
-        }
-
-        // get the desired block height and get the current difficulty
-        if (empty($latestBlock)) {
-            $latestBlock = $this->getByHeight($height);
-
-            if (empty($latestBlock)) {
-                $latestBlock = $this->getByHeight($this->getCurrentHeight());
-            }
-        }
-
-        // use the difficulty of the latest block
-        $difficulty = (int)$latestBlock['difficulty'];
-
-        // adjust when it's been 144
-        if ($height % $blocksPerPeriod === 0) {
-            if ($oldestBlock === null) {
-                $oldestBlock = $this->getByHeight(max(1, $height - $blocksPerPeriod));
-            }
-
-            $blockTime = $this->getBlockTime(
-                $latestBlock['date_created'],
-                $oldestBlock['date_created'],
-                $blocksPerPeriod
-            );
-
-            // block time was quick, increase difficulty
-            if ($blockTime <= Config::getDesiredBlockTime() - 30) {
-                ++$difficulty;
-            }
-
-            // block time was slow, decrease difficulty
-            if ($blockTime >= Config::getDesiredBlockTime() + 30) {
-                $difficulty--;
-            }
-        }
-
-        // never go less than the initial difficulty
-        $minimumDifficulty = Config::getDefaultDifficulty();
-
-        if ($difficulty < $minimumDifficulty) {
-            $difficulty = $minimumDifficulty;
-        }
-
-        // max out at 255 ~ almost impossible
-        if ($difficulty > 255) {
-            $difficulty = 255;
-        }
-
-        return $difficulty;
     }
 
     /**
@@ -1821,49 +1748,23 @@ class Block
     }
 
     /**
-     * @param string $previousBlockId
+     * The genesis coinbase, paying the first reward to $publicKeyRaw. Unsigned.
+     *
      * @param int $date
-     * @param int $height
      * @param string $publicKeyRaw
-     * @param string $signature
      * @return array
      */
-    private function transactionWork(
-        string $previousBlockId,
-        int    $date,
-        int    $height,
-        string $publicKeyRaw,
-        string $signature,
-    ): array
+    private function genesisTransaction(int $date, string $publicKeyRaw): array
     {
-        // create a block ID
-        $blockId = $this->generateId(Config::getNetworkIdentifier(), $previousBlockId, $date, $height);
-
-        // transaction details
-        $amount = $this->getRewardValue(1);
-
-        // prepare script
         $address = new Address();
-        $transferEncoding = new TransferEncoding();
         $script = new Script([]);
-        $partialAddress = $transferEncoding->binToHex(
-            $address->createPartial(
-                $this->openSsl->formatPem(
-                    $publicKeyRaw,
-                    false
-                )
-            )
-        );
+        $publicKey = $this->openSsl->formatPem($publicKeyRaw, false);
+        $partialAddress = $this->transferEncoding->binToHex($address->createPartial($publicKey));
         $scriptText = 'mov ' . $partialAddress . ',ax;adha ax;pop bx;adpk bx;vadr ax,bx;pop ax;pop bx;' .
             'vsig ax,<hash>,bx;rem 466F7274756E65202D2043727970746F2069732066756C6C792062616E6E6564206' .
             '96E204368696E6120616E642038206F7468657220636F756E7472696573202D204A616E7561727920342C2032303232;';
-        $txId = 0;
-        $lockHeight = $height + Config::getLockHeight();
-        $toAddress = $address->create($this->openSsl->formatPem($publicKeyRaw, false));
 
-        $transactionRecord = [
-            'id' => 1,
-            'block_id' => $blockId,
+        $transaction = [
             'date_created' => $date,
             'public_key' => $publicKeyRaw,
             'peer' => 'genesis',
@@ -1872,39 +1773,44 @@ class Block
             Transaction::INPUTS => [],
             Transaction::OUTPUTS => [
                 [
-                    'block_id' => $blockId,
-                    'tx_id' => $txId,
-                    'address' => $toAddress,
-                    'value' => $amount,
+                    'tx_id' => 0,
+                    'address' => $address->create($publicKey),
+                    'value' => $this->getRewardValue(1),
                     'script' => $script->encodeScript($scriptText),
-                    'lock_height' => $lockHeight,
-                ]
+                    'lock_height' => 1 + Config::getLockHeight(),
+                ],
             ],
         ];
-        $transactionId = $this->transaction->computeId($transactionRecord);
-        $transactionRecord['transaction_id'] = $transactionId;
-        $transactionRecord[Transaction::OUTPUTS][0]['hash'] = bin2hex($this->pow->doubleSha256($transactionId . $txId));
+        $transaction['transaction_id'] = $this->transaction->computeId($transaction);
+        $transaction[Transaction::OUTPUTS][0]['hash'] = bin2hex(
+            $this->pow->doubleSha256($transaction['transaction_id'] . '0')
+        );
 
-        // sign
-        $transactionRecord['signature'] = $signature;
-        /**
-         * used for creating the signature
-         *
-         * $transactionRecord['signature'] = $this->transaction->signTransaction(
-         * $transactionRecord,
-         * $this->openSsl->formatPem($publicKeyRaw, false),
-         * $this->openSsl->formatPem($privateKeyRaw, true)
-         * );
-         */
+        return $transaction;
+    }
+
+    /**
+     * @param string $environment
+     * @param int $date
+     * @param string $publicKeyRaw
+     * @param string $signature
+     * @return array the block without nonce and hash
+     */
+    private function assembleGenesis(string $environment, int $date, string $publicKeyRaw, string $signature): array
+    {
+        $transaction = $this->genesisTransaction($date, $publicKeyRaw);
+        $transaction['signature'] = $signature;
+        $merkleRoot = $this->merkle->computeMerkleHash([$transaction]);
 
         return [
             'network_id' => Config::getNetworkIdentifier(),
-            'block_id' => $blockId,
+            'block_id' => $this->generateId(Config::getNetworkIdentifier(), '', $date, 1, $merkleRoot),
             'previous_block_id' => '',
             'date_created' => $date,
-            'height' => $height,
-            'difficulty' => Config::getDefaultDifficulty(),
-            'transactions' => [$transactionRecord],
+            'height' => 1,
+            'difficulty' => Config::getDefaultDifficulty($environment),
+            'merkle_root' => $merkleRoot,
+            'transactions' => [$transaction],
             'transaction_count' => 1,
             'previous_hash' => '',
         ];
